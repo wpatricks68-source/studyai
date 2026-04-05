@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg:       #0a0c12;
+  --surface:  #111420;
+  --surface2: #181d2e;
+  --border:   #1f2640;
+  --text:     #e8eaf6;
+  --muted:    #6b7194;
+  --accent:   #6c63ff;
+  --accent2:  #00d4aa;
+  --amber:    #f59e0b;
+  --red:      #ef4444;
+  --green:    #10b981;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar global */
+::-webkit-scrollbar        { width: 4px; height: 4px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* Seleção de texto */
+::selection { background: rgba(108, 99, 255, 0.3); }
+
+@layer utilities {
+  .text-accent  { color: var(--accent); }
+  .text-accent2 { color: var(--accent2); }
+  .text-muted   { color: var(--muted); }
+  .bg-surface   { background-color: var(--surface); }
+  .bg-surface2  { background-color: var(--surface2); }
+  .border-custom { border-color: var(--border); }
+}
