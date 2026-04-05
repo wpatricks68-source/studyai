@@ -1,0 +1,805 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0c12;--surface:#111420;--surface2:#181d2e;--border:#1f2640;
+  --text:#e8eaf6;--muted:#6b7194;--accent:#6c63ff;--accent2:#00d4aa;
+  --amber:#f59e0b;--red:#ef4444;--green:#10b981;
+  --font:'Segoe UI',system-ui,sans-serif
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text)}
+.shell{display:flex;height:900px;border-radius:16px;border:1px solid var(--border);overflow:hidden}
+.sidebar{width:192px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+.logo{padding:18px 16px 14px;border-bottom:1px solid var(--border)}
+.logo-mark{font-size:17px;font-weight:700;color:var(--accent)}
+.logo-sub{font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-top:2px}
+.nav{padding:10px 8px;flex:1}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--muted);border:none;background:none;width:100%;text-align:left;margin-bottom:2px;transition:all .12s}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{background:rgba(108,99,255,.15);color:var(--accent);border-left:2px solid var(--accent);padding-left:8px}
+.nav-icon{width:15px;height:15px;flex-shrink:0;opacity:.7}
+.nav-item.active .nav-icon{opacity:1}
+.nav-sec{font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;padding:10px 10px 5px}
+.sb-footer{padding:12px;border-top:1px solid var(--border)}
+.avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#6c63ff,#00d4aa);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;flex-shrink:0}
+.user-chip{display:flex;align-items:center;gap:8px}
+
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
+
+/* search bar */
+.search-panel{padding:14px 18px 12px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}
+.search-row{display:flex;gap:8px;align-items:center}
+.search-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 14px;color:var(--text);font-size:14px;outline:none;transition:border .15s}
+.search-input:focus{border-color:var(--accent)}
+.search-input::placeholder{color:var(--muted)}
+.btn{padding:7px 14px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s;white-space:nowrap}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#5a52e0}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn-sm{padding:5px 10px;font-size:12px}
+
+/* tab bar */
+.tab-bar{display:flex;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+.tab{padding:10px 18px;font-size:13px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;user-select:none}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* content area */
+.content-area{flex:1;display:flex;overflow:hidden}
+
+/* ── EDITOR PANEL ── */
+.study-panel{flex:1;display:flex;flex-direction:column;overflow:hidden}
+
+/* toolbar */
+.toolbar{display:flex;align-items:center;gap:2px;padding:7px 10px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap;flex-shrink:0}
+.tool-sep{width:1px;height:20px;background:var(--border);margin:0 4px;flex-shrink:0}
+.tb-btn{width:28px;height:26px;border:none;background:transparent;border-radius:5px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;font-weight:500;transition:all .12s;flex-shrink:0}
+.tb-btn:hover{background:var(--surface2);color:var(--text)}
+.tb-btn.active{background:rgba(108,99,255,.2);color:var(--accent)}
+.tb-btn svg{width:13px;height:13px}
+.hl-swatch{width:16px;height:16px;border-radius:3px;border:2px solid transparent;cursor:pointer;transition:border .12s;flex-shrink:0}
+.hl-swatch.sel{border-color:#fff}
+.bs-btn{width:20px;height:20px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--muted);flex-shrink:0;transition:all .12s}
+.bs-btn.active{background:rgba(108,99,255,.2);border-color:var(--accent);color:var(--accent)}
+.tool-lbl{font-size:10px;color:var(--muted);padding:0 3px;white-space:nowrap;flex-shrink:0}
+
+/* editor */
+.editor-wrap{flex:1;position:relative;overflow:hidden}
+.draw-canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5}
+.draw-canvas.brush-mode{pointer-events:all;cursor:crosshair}
+.draw-canvas.eraser-mode{pointer-events:all;cursor:cell}
+.study-editor{height:100%;padding:22px 26px;overflow-y:auto;font-size:14px;line-height:1.9;color:var(--text);outline:none;background:var(--bg);position:relative;z-index:1}
+.study-editor::-webkit-scrollbar{width:3px}
+.study-editor::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.study-editor h2{font-size:16px;font-weight:600;color:var(--text);margin:0 0 10px;border-left:3px solid var(--accent);padding-left:11px}
+.study-editor h3{font-size:13px;font-weight:600;color:#a09cf7;margin:14px 0 5px}
+.study-editor p{margin-bottom:10px;color:#c8cae6;font-size:13px}
+.study-editor .law{color:var(--accent2);font-size:12px;font-style:italic}
+.study-editor .tip{background:rgba(108,99,255,.08);border:1px solid rgba(108,99,255,.2);border-radius:8px;padding:9px 13px;margin:10px 0;font-size:12px}
+.study-editor .tip-lbl{font-size:10px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px}
+
+/* status */
+.status-bar{padding:5px 14px;background:var(--surface2);border-top:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-shrink:0}
+.st-item{font-size:11px;color:var(--muted)}
+.st-sep{width:1px;height:11px;background:var(--border)}
+
+/* ── QUESTIONS PANEL ── */
+.q-panel{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
+.q-header{padding:14px 18px 10px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}
+.q-title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.q-title{font-size:14px;font-weight:500;color:var(--text)}
+.q-meta{font-size:12px;color:var(--muted)}
+.q-progress-track{height:4px;background:var(--surface2);border-radius:2px;overflow:hidden}
+.q-progress-fill{height:100%;border-radius:2px;background:var(--accent);transition:width .4s}
+.q-body{flex:1;overflow-y:auto;padding:18px}
+.q-body::-webkit-scrollbar{width:3px}
+.q-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* question card */
+.q-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:14px}
+.q-num{font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.q-text{font-size:14px;color:var(--text);line-height:1.7;margin-bottom:14px;font-weight:500}
+.q-banca{font-size:11px;color:var(--muted);margin-bottom:14px}
+
+/* options */
+.opt{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;border:1px solid var(--border);margin-bottom:7px;cursor:pointer;transition:all .15s;background:var(--surface2)}
+.opt:hover:not(.locked){border-color:var(--accent);background:rgba(108,99,255,.06)}
+.opt.selected{border-color:var(--accent);background:rgba(108,99,255,.1)}
+.opt.correct{border-color:var(--green);background:rgba(16,185,129,.1)}
+.opt.wrong{border-color:var(--red);background:rgba(239,68,68,.1)}
+.opt.show-correct{border-color:var(--green);background:rgba(16,185,129,.07)}
+.opt-letter{width:22px;height:22px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--muted);flex-shrink:0;margin-top:1px;transition:all .15s}
+.opt.selected .opt-letter{border-color:var(--accent);color:var(--accent);background:rgba(108,99,255,.15)}
+.opt.correct .opt-letter{border-color:var(--green);color:var(--green);background:rgba(16,185,129,.15)}
+.opt.wrong .opt-letter{border-color:var(--red);color:var(--red);background:rgba(239,68,68,.15)}
+.opt.show-correct .opt-letter{border-color:var(--green);color:var(--green);background:rgba(16,185,129,.1)}
+.opt-text{font-size:13px;color:var(--text);line-height:1.6;flex:1}
+
+/* feedback */
+.feedback{border-radius:8px;padding:11px 14px;margin-top:10px;font-size:13px;line-height:1.6;display:none}
+.feedback.show{display:block}
+.feedback.ok{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.25);color:#34d399}
+.feedback.nok{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:#f87171}
+.feedback-lbl{font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px}
+.feedback-body{color:#c8cae6;font-size:12px;margin-top:4px}
+
+/* confirm btn */
+.confirm-btn{width:100%;padding:10px;border-radius:8px;background:var(--accent);color:#fff;border:none;font-size:13px;font-weight:500;cursor:pointer;margin-top:10px;transition:all .15s}
+.confirm-btn:hover{background:#5a52e0}
+.confirm-btn:disabled{background:var(--surface2);color:var(--muted);cursor:default;border:1px solid var(--border)}
+
+/* scoreboard */
+.score-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px;text-align:center;margin-bottom:14px}
+.score-big{font-size:48px;font-weight:700;color:var(--accent)}
+.score-label{font-size:13px;color:var(--muted);margin-top:4px}
+.score-row{display:flex;gap:10px;margin-top:16px}
+.score-mini{flex:1;background:var(--surface2);border-radius:8px;padding:12px;text-align:center}
+.score-mini-val{font-size:20px;font-weight:600}
+.score-mini-lbl{font-size:11px;color:var(--muted);margin-top:2px}
+.restart-btn{width:100%;padding:10px;border-radius:8px;background:var(--accent);color:#fff;border:none;font-size:13px;font-weight:500;cursor:pointer;margin-top:14px}
+
+/* side panel */
+.side-panel{width:200px;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+.sp-sec{padding:13px;border-bottom:1px solid var(--border)}
+.sp-title{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:9px}
+.ai-btn{width:100%;text-align:left;padding:8px 10px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:12px;cursor:pointer;margin-bottom:5px;display:flex;align-items:center;gap:7px;transition:all .15s}
+.ai-btn:hover{border-color:var(--accent);color:var(--accent)}
+.ai-btn svg{width:13px;height:13px;color:var(--accent);flex-shrink:0}
+.fonte-item{display:flex;gap:7px;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px}
+.fonte-item:last-child{border-bottom:none}
+.fonte-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0;margin-top:3px}
+.fonte-title{color:var(--text);line-height:1.4}
+.fonte-url{color:var(--muted);font-size:10px}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500}
+.badge-accent{background:rgba(108,99,255,.15);color:#a09cf7;border:1px solid rgba(108,99,255,.3)}
+</style>
+
+<div class="shell">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="logo"><div class="logo-mark">StudyAI</div><div class="logo-sub">Concursos</div></div>
+    <div class="nav">
+      <div class="nav-sec">Principal</div>
+      <button class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
+        Dashboard
+      </button>
+      <button class="nav-item active">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg>
+        Busca + IA
+      </button>
+      <button class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="9" rx="2"/><path d="M5 7h6M5 10h4"/></svg>
+        Flashcards
+      </button>
+      <div class="nav-sec">Organização</div>
+      <button class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="12" rx="1.5"/><path d="M5 1v4M11 1v4M2 7h12"/></svg>
+        Cronograma
+      </button>
+      <button class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12l3-4 3 2 3-5 3 3"/></svg>
+        Estatísticas
+      </button>
+      <div class="nav-sec">Ferramentas</div>
+      <button class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 4v4l3 2"/></svg>
+        Pomodoro
+      </button>
+    </div>
+    <div class="sb-footer">
+      <div class="user-chip">
+        <div class="avatar">MS</div>
+        <div><div style="font-size:12px;color:var(--text)">Maria Silva</div><div style="font-size:10px;color:var(--muted)">TRF • 2025</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- search -->
+    <div class="search-panel">
+      <div class="search-row">
+        <input class="search-input" value="Princípio da Legalidade Administrativa" id="sq">
+        <button class="btn btn-ghost btn-sm">PDF</button>
+        <button class="btn btn-primary btn-sm">Buscar</button>
+      </div>
+    </div>
+
+    <!-- tabs -->
+    <div class="tab-bar">
+      <div class="tab active" id="tab-editor" onclick="switchTab('editor')">Área de estudo</div>
+      <div class="tab" id="tab-q" onclick="switchTab('q')">Questões <span class="badge badge-accent" style="margin-left:5px;font-size:10px">5</span></div>
+    </div>
+
+    <div class="content-area">
+
+      <!-- ══ EDITOR TAB ══ -->
+      <div class="study-panel" id="panel-editor">
+        <div class="toolbar">
+          <span class="tool-lbl">Texto</span>
+          <button class="tb-btn" id="btn-b" title="Negrito" onclick="applyFmt('bold',this)"><b>B</b></button>
+          <button class="tb-btn" id="btn-i" title="Itálico" onclick="applyFmt('italic',this)"><i style="font-style:italic">I</i></button>
+          <button class="tb-btn" id="btn-u" title="Sublinhar" onclick="applyFmt('underline',this)"><u>S</u></button>
+          <div class="tool-sep"></div>
+          <span class="tool-lbl">Realçar</span>
+          <div class="hl-swatch sel" style="background:#ffe066" data-color="#ffe066" onclick="pickHL(this)"></div>
+          <div class="hl-swatch" style="background:#ff9de2" data-color="#ff9de2" onclick="pickHL(this)"></div>
+          <div class="hl-swatch" style="background:#80ffdb" data-color="#80ffdb" onclick="pickHL(this)"></div>
+          <div class="hl-swatch" style="background:#74c0fc" data-color="#74c0fc" onclick="pickHL(this)"></div>
+          <div class="hl-swatch" style="background:#ff8787" data-color="#ff8787" onclick="pickHL(this)"></div>
+          <div class="hl-swatch" style="background:#d0bfff" data-color="#d0bfff" onclick="pickHL(this)"></div>
+          <button class="tb-btn" id="btn-hl" title="Aplicar realce na seleção" onclick="applyHL()" style="width:36px">
+            <svg viewBox="0 0 14 14" fill="none"><path d="M2 10.5l2-2L9.5 3 11 4.5 5.5 10l-1.5 2H2v-1.5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><rect x="0" y="11.5" width="14" height="2.5" rx="1" id="hl-bar" fill="#ffe066"/></svg>
+          </button>
+          <button class="tb-btn btn-sm" title="Remover realce" onclick="removeHL()" style="font-size:10px;width:auto;padding:0 5px;color:var(--muted)">✕ HL</button>
+          <div class="tool-sep"></div>
+          <span class="tool-lbl">Pincel</span>
+          <button class="tb-btn" id="btn-brush" title="Pincel livre" onclick="setDrawMode('brush')">
+            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M2 12c1-1.5 2-2 3-1.5s1.5 1 2.5 0L11 3l-2-1-7 10z" stroke-linejoin="round"/></svg>
+          </button>
+          <button class="tb-btn" id="btn-eraser" title="Borracha" onclick="setDrawMode('eraser')">
+            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1" y="5" width="12" height="7" rx="1.5"/><path d="M4 5V3.5a2 2 0 014 0V5"/></svg>
+          </button>
+          <div class="bs-btn active" id="bs-s" onclick="setBS(3,this)">S</div>
+          <div class="bs-btn" id="bs-m" onclick="setBS(7,this)">M</div>
+          <div class="bs-btn" id="bs-g" onclick="setBS(14,this)">G</div>
+          <div class="hl-swatch sel" style="background:#6c63ff;margin-left:3px" data-bc="#6c63ff" onclick="pickBC(this)"></div>
+          <div class="hl-swatch" style="background:#f87171" data-bc="#f87171" onclick="pickBC(this)"></div>
+          <div class="hl-swatch" style="background:#fbbf24" data-bc="#fbbf24" onclick="pickBC(this)"></div>
+          <div class="hl-swatch" style="background:#34d399" data-bc="#34d399" onclick="pickBC(this)"></div>
+          <div class="tool-sep"></div>
+          <button class="tb-btn" onclick="undoLast()" title="Desfazer traço" style="font-size:15px">↩</button>
+          <button class="tb-btn" onclick="clearDraw()" style="font-size:10px;width:auto;padding:0 5px;color:var(--muted)">Limpar</button>
+        </div>
+
+        <div class="editor-wrap" id="ew">
+          <canvas class="draw-canvas" id="dc"></canvas>
+          <div class="study-editor" id="se" contenteditable="true" spellcheck="false">
+            <h2>Princípio da Legalidade Administrativa</h2>
+            <p>O <strong>princípio da legalidade</strong> é um dos pilares do Direito Administrativo brasileiro, consagrado no <em>art. 37, caput, da CF/88</em>, ao lado dos demais princípios do <strong>LIMPE</strong>.</p>
+            <p class="law">Base legal: CF/88, art. 37; Lei 9.784/99, art. 2º; LINDB, art. 20</p>
+            <h3>Conceito fundamental</h3>
+            <p>Diferente dos particulares — que podem fazer <em>tudo que a lei não proíbe</em> (art. 5º, II, CF) —, a Administração Pública somente pode agir quando a lei expressamente autoriza. <strong>O que não é permitido é proibido à Administração.</strong></p>
+            <div class="tip"><div class="tip-lbl">Dica CESPE</div>A banca testa a diferença entre a liberdade do particular (pode o que não é proibido) e da Adm. (só pode o que é permitido). Cuidado com a inversão.</div>
+            <h3>Legalidade estrita vs. Juridicidade</h3>
+            <p>A doutrina moderna distingue a <strong>legalidade estrita</strong> — conformidade com a lei formal — da <strong>juridicidade</strong>, que exige conformidade com todo o ordenamento jurídico, incluindo princípios constitucionais. STJ e STF têm adotado o conceito de juridicidade em julgados recentes.</p>
+            <h3>Dimensões do princípio</h3>
+            <p><strong>1. Limite:</strong> A Adm. não pode restringir direitos sem autorização legal prévia.<br><strong>2. Fundamento:</strong> Todo ato administrativo deve encontrar base em norma habilitante.<br><strong>3. Discricionariedade:</strong> Mesmo nos atos discricionários, a margem é delimitada pela lei.</p>
+            <div class="tip"><div class="tip-lbl">FGV e FCC</div>Essas bancas cobram a relação entre legalidade e discricionariedade. Discricionariedade não é arbitrariedade — o ato discricionário obedece à legalidade dentro dos limites legais.</div>
+          </div>
+        </div>
+
+        <div class="status-bar">
+          <span class="st-item" id="st-mode">Modo: edição de texto</span>
+          <div class="st-sep"></div>
+          <span class="st-item">~320 palavras</span>
+          <div class="st-sep"></div>
+          <span class="st-item" id="st-hl">Realce: amarelo</span>
+        </div>
+      </div>
+
+      <!-- ══ QUESTIONS TAB ══ -->
+      <div class="q-panel" id="panel-q" style="display:none">
+        <div class="q-header">
+          <div class="q-title-row">
+            <span class="q-title">Questões — Legalidade Administrativa</span>
+            <span class="q-meta" id="q-counter">1 / 5</span>
+          </div>
+          <div class="q-progress-track"><div class="q-progress-fill" id="q-prog" style="width:20%"></div></div>
+        </div>
+        <div class="q-body" id="q-body"></div>
+      </div>
+
+      <!-- SIDE PANEL (shared) -->
+      <div class="side-panel">
+        <div class="sp-sec">
+          <div class="sp-title">Gerar com IA</div>
+          <button class="ai-btn" onclick="switchTab('q')">
+            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="7" cy="7" r="5.5"/><path d="M7 4.5v3M7 9.5v.5"/></svg>
+            Ver questões
+          </button>
+          <button class="ai-btn">
+            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1" y="2" width="12" height="8" rx="1.5"/><path d="M4 6h6M4 9h4"/></svg>
+            Flashcards ↗
+          </button>
+          <button class="ai-btn">
+            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M2 3h10M2 7h7M2 11h5"/></svg>
+            Resumo rápido ↗
+          </button>
+          <button class="ai-btn">
+            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="7" cy="7" r="2"/><path d="M7 1v2M7 11v2M1 7h2M11 7h2"/></svg>
+            Mapa mental ↗
+          </button>
+        </div>
+        <div class="sp-sec" style="flex:1;overflow-y:auto">
+          <div class="sp-title">Fontes</div>
+          <div class="fonte-item"><div class="fonte-dot"></div><div><div class="fonte-title">CF/88 — art. 37</div><div class="fonte-url">planalto.gov.br</div></div></div>
+          <div class="fonte-item"><div class="fonte-dot" style="background:var(--accent2)"></div><div><div class="fonte-title">Di Pietro, 36ª ed.</div><div class="fonte-url">Referência bibliográfica</div></div></div>
+          <div class="fonte-item"><div class="fonte-dot" style="background:var(--amber)"></div><div><div class="fonte-title">STJ — Resp 1.315.179</div><div class="fonte-url">stj.jus.br</div></div></div>
+        </div>
+        <div class="sp-sec">
+          <button class="btn btn-primary" style="width:100%;font-size:12px;padding:8px" onclick="saveOk()">Salvar sessão</button>
+          <div style="font-size:10px;color:var(--muted);margin-top:5px;text-align:center">Anotações salvas automaticamente</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+/* ─── TAB SWITCH ─── */
+function switchTab(t) {
+  const isEditor = t === 'editor';
+  document.getElementById('panel-editor').style.display = isEditor ? 'flex' : 'none';
+  document.getElementById('panel-q').style.display = isEditor ? 'none' : 'flex';
+  document.getElementById('tab-editor').classList.toggle('active', isEditor);
+  document.getElementById('tab-q').classList.toggle('active', !isEditor);
+  if (!isEditor) renderQ();
+}
+
+/* ─── HIGHLIGHT (fixed) ─── */
+let hlColor = '#ffe066';
+let savedRange = null;
+
+function pickHL(el) {
+  hlColor = el.dataset.color;
+  document.querySelectorAll('.hl-swatch[data-color]').forEach(s => s.classList.remove('sel'));
+  el.classList.add('sel');
+  document.getElementById('hl-bar').setAttribute('fill', hlColor);
+  document.getElementById('st-hl').textContent = 'Realce: ' + colorName(hlColor);
+}
+
+function colorName(c) {
+  const m = {'#ffe066':'amarelo','#ff9de2':'rosa','#80ffdb':'verde','#74c0fc':'azul','#ff8787':'vermelho','#d0bfff':'roxo'};
+  return m[c] || c;
+}
+
+function saveSelection() {
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+    const range = sel.getRangeAt(0);
+    const editor = document.getElementById('se');
+    if (editor.contains(range.commonAncestorContainer)) {
+      savedRange = range.cloneRange();
+      return true;
+    }
+  }
+  return false;
+}
+
+document.getElementById('se').addEventListener('mouseup', () => { saveSelection(); });
+document.getElementById('se').addEventListener('keyup', () => { saveSelection(); });
+
+function applyHL() {
+  const editor = document.getElementById('se');
+  const sel = window.getSelection();
+
+  let targetRange = null;
+  if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+    const r = sel.getRangeAt(0);
+    if (editor.contains(r.commonAncestorContainer)) targetRange = r;
+  }
+  if (!targetRange && savedRange) targetRange = savedRange;
+  if (!targetRange || targetRange.collapsed) {
+    flashBtn('btn-hl'); return;
+  }
+
+  const span = document.createElement('span');
+  span.style.backgroundColor = hlColor;
+  span.style.color = '#111';
+  span.style.borderRadius = '2px';
+  span.style.padding = '0 1px';
+
+  try {
+    targetRange.surroundContents(span);
+  } catch(e) {
+    const frag = targetRange.extractContents();
+    span.appendChild(frag);
+    targetRange.insertNode(span);
+  }
+
+  sel.removeAllRanges();
+  savedRange = null;
+  editor.focus();
+}
+
+function removeHL() {
+  const editor = document.getElementById('se');
+  const sel = window.getSelection();
+  let r = null;
+  if (sel && sel.rangeCount > 0 && !sel.isCollapsed) r = sel.getRangeAt(0);
+  else if (savedRange) r = savedRange;
+  if (!r) return;
+
+  const frag = r.cloneContents();
+  const spans = frag.querySelectorAll('span[style*="background"]');
+  if (spans.length === 0) return;
+  document.execCommand('removeFormat');
+  editor.focus();
+}
+
+function flashBtn(id) {
+  const b = document.getElementById(id);
+  b.style.background = 'rgba(239,68,68,.2)';
+  setTimeout(() => { b.style.background = ''; }, 400);
+}
+
+/* ─── TEXT FORMAT ─── */
+let drawMode = 'text';
+function applyFmt(cmd, btn) {
+  if (drawMode !== 'text') setDrawMode('text');
+  document.getElementById('se').focus();
+  document.execCommand(cmd, false, null);
+  btn.classList.toggle('active');
+}
+
+/* ─── CANVAS DRAW ─── */
+const canvas = document.getElementById('dc');
+const ctx = canvas.getContext('2d');
+const ew = document.getElementById('ew');
+let isDrawing = false;
+let strokes = [];
+let cur = [];
+let brushColor = '#6c63ff';
+let brushSize = 3;
+
+function resizeCanvas() {
+  const r = ew.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = r.width * dpr;
+  canvas.height = r.height * dpr;
+  canvas.style.width = r.width + 'px';
+  canvas.style.height = r.height + 'px';
+  ctx.scale(dpr, dpr);
+  redraw();
+}
+
+function redraw() {
+  const r = ew.getBoundingClientRect();
+  ctx.clearRect(0, 0, r.width, r.height);
+  strokes.forEach(s => {
+    if (!s.pts.length) return;
+    ctx.save();
+    if (s.eraser) { ctx.globalCompositeOperation = 'destination-out'; ctx.strokeStyle = 'rgba(0,0,0,1)'; ctx.lineWidth = s.sz * 3; }
+    else { ctx.globalCompositeOperation = 'source-over'; ctx.strokeStyle = s.color; ctx.lineWidth = s.sz; ctx.globalAlpha = .85; }
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(s.pts[0].x, s.pts[0].y);
+    s.pts.forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.stroke(); ctx.restore();
+  });
+}
+
+function xy(e) {
+  const r = canvas.getBoundingClientRect();
+  const src = e.touches ? e.touches[0] : e;
+  return { x: src.clientX - r.left, y: src.clientY - r.top };
+}
+
+canvas.addEventListener('mousedown', e => {
+  if (drawMode === 'text') return;
+  isDrawing = true;
+  cur = [xy(e)];
+  strokes.push({ pts: cur, color: brushColor, sz: brushSize, eraser: drawMode === 'eraser' });
+});
+canvas.addEventListener('mousemove', e => { if (!isDrawing) return; cur.push(xy(e)); redraw(); });
+canvas.addEventListener('mouseup', () => { isDrawing = false; });
+canvas.addEventListener('mouseleave', () => { isDrawing = false; });
+
+function setDrawMode(m) {
+  drawMode = m;
+  const se = document.getElementById('se');
+  canvas.classList.remove('brush-mode', 'eraser-mode');
+  document.getElementById('btn-brush').classList.toggle('active', m === 'brush');
+  document.getElementById('btn-eraser').classList.toggle('active', m === 'eraser');
+  if (m === 'brush') { canvas.classList.add('brush-mode'); se.contentEditable = 'false'; }
+  else if (m === 'eraser') { canvas.classList.add('eraser-mode'); se.contentEditable = 'false'; }
+  else { se.contentEditable = 'true'; }
+  document.getElementById('st-mode').textContent = m === 'brush' ? 'Modo: pincel' : m === 'eraser' ? 'Modo: borracha' : 'Modo: edição de texto';
+}
+
+function setBS(sz, el) {
+  brushSize = sz;
+  document.querySelectorAll('.bs-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function pickBC(el) {
+  brushColor = el.dataset.bc;
+  document.querySelectorAll('.hl-swatch[data-bc]').forEach(s => s.classList.remove('sel'));
+  el.classList.add('sel');
+}
+
+function undoLast() { strokes.pop(); redraw(); }
+function clearDraw() { strokes = []; redraw(); }
+
+window.addEventListener('resize', resizeCanvas);
+setTimeout(resizeCanvas, 80);
+
+/* ─── QUESTIONS ─── */
+const questions = [
+  {
+    num: 1,
+    banca: 'CESPE/CEBRASPE — TCU 2023',
+    text: 'De acordo com o princípio da legalidade, a Administração Pública pode fazer tudo aquilo que a lei não proíbe, assim como ocorre com os particulares.',
+    tipo: 'cv',
+    gabarito: 'E',
+    feedback_ok: 'Correto! A assertiva está errada. Ao contrário dos particulares, a Administração só pode fazer o que a lei expressamente autoriza. Art. 37, caput, CF/88.',
+    feedback_nok: 'Incorreto. A assertiva está ERRADA. Particulares podem fazer tudo que a lei não proíbe; já a Adm. só age quando há autorização legal expressa.',
+  },
+  {
+    num: 2,
+    banca: 'FGV — TJ-RS 2022',
+    text: 'O conceito de juridicidade, adotado pela doutrina administrativista moderna e pela jurisprudência do STJ:',
+    tipo: 'mc',
+    opts: [
+      'Equivale exatamente ao conceito de legalidade estrita, sendo termos sinônimos.',
+      'Exige conformidade do ato administrativo apenas com a Constituição Federal.',
+      'Amplia o conceito de legalidade para abarcar a conformidade com todo o ordenamento jurídico, incluindo princípios constitucionais.',
+      'Restringe a atuação da Administração exclusivamente às hipóteses previstas em lei ordinária.',
+      'Afasta a aplicação dos princípios implícitos da Constituição Federal à Administração Pública.',
+    ],
+    correta: 2,
+    feedback_ok: 'Exato! Juridicidade vai além da legalidade estrita: exige conformidade com todo o ordenamento — leis, princípios constitucionais, tratados e atos normativos. Posição adotada pelo STJ e STF.',
+    feedback_nok: 'Não. A alternativa correta é a C. Juridicidade é conceito mais amplo que legalidade estrita, abrangendo conformidade com todo o ordenamento jurídico, inclusive princípios constitucionais.',
+  },
+  {
+    num: 3,
+    banca: 'FCC — TRF 3ª Região 2022',
+    text: 'A discricionariedade administrativa é incompatível com o princípio da legalidade, pois confere ao agente liberdade absoluta de escolha.',
+    tipo: 'cv',
+    gabarito: 'E',
+    feedback_ok: 'Correto! A afirmativa está errada. Discricionariedade não é arbitrariedade — a margem de escolha do gestor é sempre delimitada pela lei. Não há liberdade absoluta.',
+    feedback_nok: 'Incorreto. A afirmativa está ERRADA. Discricionariedade e legalidade são compatíveis: a lei estabelece os limites dentro dos quais o gestor escolhe a melhor solução. Não há liberdade absoluta.',
+  },
+  {
+    num: 4,
+    banca: 'CESPE/CEBRASPE — AGU 2022',
+    text: 'Assinale a alternativa que apresenta uma mitigação constitucionalmente prevista ao princípio da legalidade administrativa:',
+    tipo: 'mc',
+    opts: [
+      'A possibilidade de o particular impugnar ato administrativo por vício de legalidade.',
+      'A edição de medidas provisórias pelo Poder Executivo em caso de relevância e urgência.',
+      'A aplicação do princípio da eficiência como vetor da atividade administrativa.',
+      'O controle de legalidade exercido pelo Tribunal de Contas.',
+      'A obrigatoriedade de motivação dos atos administrativos vinculados.',
+    ],
+    correta: 1,
+    feedback_ok: 'Correto! As Medidas Provisórias (art. 62, CF) permitem ao Executivo editar normas com força de lei em caráter excepcional — mitigação constitucional ao princípio da legalidade.',
+    feedback_nok: 'Não. A alternativa correta é a B. As Medidas Provisórias (art. 62, CF/88) são mitigação expressa ao princípio da legalidade, permitindo ao Executivo legislar excepcionalmente.',
+  },
+  {
+    num: 5,
+    banca: 'VUNESP — TJ-SP 2023',
+    text: 'A Administração Pública pode praticar atos administrativos não previstos em lei, desde que não sejam expressamente proibidos pelo ordenamento jurídico.',
+    tipo: 'cv',
+    gabarito: 'E',
+    feedback_ok: 'Correto! A assertiva está errada. A Adm. só pode agir quando há autorização legal prévia — não basta que o ato não seja proibido, é necessário que seja expressamente autorizado.',
+    feedback_nok: 'Incorreto. A assertiva está ERRADA. Para a Adm. não basta ausência de proibição — é necessária autorização legal expressa. Isso é o que diferencia a legalidade administrativa da liberdade do particular.',
+  }
+];
+
+let qState = {};
+let qDone = 0;
+let qCorrect = 0;
+let finished = false;
+
+function initQ() {
+  qState = {};
+  qDone = 0;
+  qCorrect = 0;
+  finished = false;
+  questions.forEach((q,i) => { qState[i] = { answered: false, selected: null, correct: null }; });
+}
+initQ();
+
+function renderQ() {
+  if (finished) { renderScore(); return; }
+  const body = document.getElementById('q-body');
+  body.innerHTML = '';
+  const answered = Object.values(qState).filter(s => s.answered).length;
+  document.getElementById('q-counter').textContent = (answered + 1) + ' / ' + questions.length;
+  document.getElementById('q-prog').style.width = Math.round((answered / questions.length) * 100) + '%';
+
+  questions.forEach((q, qi) => {
+    const st = qState[qi];
+    const card = document.createElement('div');
+    card.className = 'q-card';
+
+    const numEl = document.createElement('div');
+    numEl.className = 'q-num';
+    numEl.textContent = 'Questão ' + q.num;
+    card.appendChild(numEl);
+
+    const bancaEl = document.createElement('div');
+    bancaEl.className = 'q-banca';
+    bancaEl.textContent = q.banca;
+    card.appendChild(bancaEl);
+
+    const textEl = document.createElement('div');
+    textEl.className = 'q-text';
+    textEl.textContent = q.text;
+    card.appendChild(textEl);
+
+    if (q.tipo === 'cv') {
+      ['Certo','Errado'].forEach((lbl, oi) => {
+        const letter = oi === 0 ? 'C' : 'E';
+        const opt = document.createElement('div');
+        opt.className = 'opt';
+        if (st.answered) opt.classList.add('locked');
+        if (st.answered && st.selected === letter) {
+          opt.classList.add(st.correct ? 'correct' : 'wrong');
+        }
+        if (st.answered && letter === q.gabarito && !st.correct) opt.classList.add('show-correct');
+
+        const dot = document.createElement('div');
+        dot.className = 'opt-letter';
+        dot.textContent = letter;
+        const txt = document.createElement('div');
+        txt.className = 'opt-text';
+        txt.textContent = lbl;
+        opt.appendChild(dot); opt.appendChild(txt);
+
+        if (!st.answered) {
+          opt.onclick = () => {
+            card.querySelectorAll('.opt').forEach(o => o.classList.remove('selected'));
+            opt.classList.add('selected');
+            qState[qi].selected = letter;
+            card.querySelector('.confirm-btn').disabled = false;
+          };
+        }
+        card.appendChild(opt);
+      });
+    } else {
+      q.opts.forEach((o, oi) => {
+        const letters = ['A','B','C','D','E'];
+        const letter = letters[oi];
+        const opt = document.createElement('div');
+        opt.className = 'opt';
+        if (st.answered) opt.classList.add('locked');
+        if (st.answered && st.selected === oi) opt.classList.add(st.correct ? 'correct' : 'wrong');
+        if (st.answered && oi === q.correta && !st.correct) opt.classList.add('show-correct');
+
+        const dot = document.createElement('div');
+        dot.className = 'opt-letter';
+        dot.textContent = letter;
+        const txt = document.createElement('div');
+        txt.className = 'opt-text';
+        txt.textContent = o;
+        opt.appendChild(dot); opt.appendChild(txt);
+
+        if (!st.answered) {
+          opt.onclick = () => {
+            card.querySelectorAll('.opt').forEach(o2 => o2.classList.remove('selected'));
+            opt.classList.add('selected');
+            qState[qi].selected = oi;
+            card.querySelector('.confirm-btn').disabled = false;
+          };
+        }
+        card.appendChild(opt);
+      });
+    }
+
+    const fbEl = document.createElement('div');
+    fbEl.className = 'feedback' + (st.answered ? ' show ' + (st.correct ? 'ok' : 'nok') : '');
+    if (st.answered) {
+      const lbl = document.createElement('div');
+      lbl.className = 'feedback-lbl';
+      lbl.textContent = st.correct ? 'Resposta correta!' : 'Resposta incorreta';
+      const body2 = document.createElement('div');
+      body2.className = 'feedback-body';
+      body2.textContent = st.correct ? q.feedback_ok : q.feedback_nok;
+      fbEl.appendChild(lbl); fbEl.appendChild(body2);
+    }
+    card.appendChild(fbEl);
+
+    if (!st.answered) {
+      const btn = document.createElement('button');
+      btn.className = 'confirm-btn';
+      btn.textContent = 'Confirmar resposta';
+      btn.disabled = true;
+      btn.onclick = () => confirmAnswer(qi, q, card, btn, fbEl);
+      card.appendChild(btn);
+    }
+
+    body.appendChild(card);
+  });
+
+  const allDone = Object.values(qState).every(s => s.answered);
+  if (allDone && !finished) {
+    const finBtn = document.createElement('button');
+    finBtn.className = 'confirm-btn';
+    finBtn.style.marginTop = '6px';
+    finBtn.textContent = 'Ver resultado final';
+    finBtn.onclick = () => { finished = true; renderScore(); };
+    body.appendChild(finBtn);
+  }
+}
+
+function confirmAnswer(qi, q, card, btn, fbEl) {
+  const st = qState[qi];
+  if (st.selected === null && st.selected !== 0) return;
+
+  let correct = false;
+  if (q.tipo === 'cv') correct = st.selected === q.gabarito;
+  else correct = st.selected === q.correta;
+
+  st.answered = true;
+  st.correct = correct;
+  if (correct) qCorrect++;
+  qDone++;
+
+  const answered = Object.values(qState).filter(s => s.answered).length;
+  document.getElementById('q-counter').textContent = (answered < questions.length ? answered + 1 : answered) + ' / ' + questions.length;
+  document.getElementById('q-prog').style.width = Math.round((answered / questions.length) * 100) + '%';
+
+  card.querySelectorAll('.opt').forEach((o, oi) => {
+    o.classList.add('locked');
+    o.onclick = null;
+    const letter = o.querySelector('.opt-letter').textContent;
+    if (q.tipo === 'cv') {
+      if (letter === st.selected) o.classList.add(correct ? 'correct' : 'wrong');
+      if (!correct && letter === q.gabarito) o.classList.add('show-correct');
+    } else {
+      const idx = ['A','B','C','D','E'].indexOf(letter);
+      if (idx === st.selected) o.classList.add(correct ? 'correct' : 'wrong');
+      if (!correct && idx === q.correta) o.classList.add('show-correct');
+    }
+  });
+
+  fbEl.className = 'feedback show ' + (correct ? 'ok' : 'nok');
+  const lbl = document.createElement('div');
+  lbl.className = 'feedback-lbl';
+  lbl.textContent = correct ? 'Resposta correta!' : 'Resposta incorreta';
+  const fbBody = document.createElement('div');
+  fbBody.className = 'feedback-body';
+  fbBody.textContent = correct ? q.feedback_ok : q.feedback_nok;
+  fbEl.innerHTML = '';
+  fbEl.appendChild(lbl); fbEl.appendChild(fbBody);
+  btn.remove();
+
+  const allDone = Object.values(qState).every(s => s.answered);
+  if (allDone) {
+    const finBtn = document.createElement('button');
+    finBtn.className = 'confirm-btn';
+    finBtn.style.marginTop = '10px';
+    finBtn.textContent = 'Ver resultado final';
+    finBtn.onclick = () => { finished = true; renderScore(); };
+    document.getElementById('q-body').appendChild(finBtn);
+  }
+}
+
+function renderScore() {
+  const pct = Math.round((qCorrect / questions.length) * 100);
+  const emoji = pct >= 80 ? 'Excelente!' : pct >= 60 ? 'Bom resultado' : 'Precisa revisar';
+  const color = pct >= 80 ? 'var(--green)' : pct >= 60 ? 'var(--amber)' : 'var(--red)';
+
+  document.getElementById('q-body').innerHTML = `
+    <div class="score-card">
+      <div class="score-big" style="color:${color}">${pct}%</div>
+      <div class="score-label">${emoji} — ${qCorrect} de ${questions.length} corretas</div>
+      <div class="score-row">
+        <div class="score-mini"><div class="score-mini-val" style="color:var(--green)">${qCorrect}</div><div class="score-mini-lbl">Corretas</div></div>
+        <div class="score-mini"><div class="score-mini-val" style="color:var(--red)">${questions.length - qCorrect}</div><div class="score-mini-lbl">Erradas</div></div>
+        <div class="score-mini"><div class="score-mini-val" style="color:var(--accent)">${pct}%</div><div class="score-mini-lbl">Aproveit.</div></div>
+      </div>
+      <div style="margin-top:14px;font-size:12px;color:var(--muted);line-height:1.6">
+        ${pct < 70 ? 'Recomendamos reler a seção sobre Legalidade vs. Juridicidade e as mitigações constitucionais.' : 'Ótimo desempenho! Explore flashcards para fixar os pontos específicos.'}
+      </div>
+      <button class="restart-btn" onclick="restartQ()">Refazer questões</button>
+    </div>`;
+  document.getElementById('q-counter').textContent = questions.length + ' / ' + questions.length;
+  document.getElementById('q-prog').style.width = '100%';
+}
+
+function restartQ() { initQ(); renderQ(); }
+function saveOk() {
+  const b = event.target;
+  b.textContent = 'Salvo!'; b.style.background = '#10b981';
+  setTimeout(() => { b.textContent = 'Salvar sessão'; b.style.background = ''; }, 2000);
+}
+</script>
