@@ -1,6 +1,14 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { formatDuration } from '@/lib/utils'
+
+function formatDuration(min: number | null | undefined) {
+  const total = Number(min ?? 0)
+  const h = Math.floor(total / 60)
+  const m = total % 60
+
+  if (h > 0) return `${h}h ${m}min`
+  return `${m}min`
+}
 
 type Profile = {
   name?: string | null
@@ -63,9 +71,13 @@ export default async function DashboardPage() {
   const answers = (answersData ?? []) as QuestionAnswer[]
 
   const totalMin = sessions.reduce((s, r) => s + (r.duration_min ?? 0), 0)
-  const dueCards = flashcards.filter(
-    f => f.next_review && new Date(f.next_review) <= new Date()
-  ).length
+
+  const dueCards = flashcards.filter(f => {
+    if (!f.next_review) return false
+    const time = new Date(f.next_review).getTime()
+    return !isNaN(time) && time <= Date.now()
+  }).length
+
   const totalAns = answers.length
   const correctAns = answers.filter(a => a.is_correct).length
   const acerto = totalAns > 0 ? Math.round((correctAns / totalAns) * 100) : 0
@@ -84,15 +96,16 @@ export default async function DashboardPage() {
     Informática: '#f87171',
   }
 
-  const diasParaProva =
-    profile?.exam_date
-      ? Math.max(
-          0,
-          Math.ceil(
-            (new Date(profile.exam_date).getTime() - Date.now()) / 86400000
-          )
-        )
-      : null
+  const diasParaProva = (() => {
+    if (!profile?.exam_date) return null
+
+    const date = new Date(profile.exam_date)
+    const time = date.getTime()
+
+    if (isNaN(time)) return null
+
+    return Math.max(0, Math.ceil((time - Date.now()) / 86400000))
+  })()
 
   return (
     <div style={{ padding: '28px 32px', flex: 1, overflowY: 'auto' }}>
@@ -272,8 +285,7 @@ export default async function DashboardPage() {
                     height: '8px',
                     borderRadius: '50%',
                     flexShrink: 0,
-                    background:
-                      materiaColors[s.materia ?? ''] ?? 'var(--accent)',
+                    background: materiaColors[s.materia ?? ''] ?? 'var(--accent)',
                   }}
                 />
                 <div
@@ -289,7 +301,7 @@ export default async function DashboardPage() {
                   {s.title ?? 'Sessão sem título'}
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--muted)', flexShrink: 0 }}>
-                  {formatDuration(s.duration_min ?? 0)}
+                  {formatDuration(s.duration_min)}
                 </div>
               </div>
             ))
