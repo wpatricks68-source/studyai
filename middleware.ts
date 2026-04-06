@@ -14,14 +14,9 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll()
         },
-        setAll(
-          cookiesToSet: Array<{
-            name: string
-            value: string
-            options?: Record<string, unknown>
-          }>
-        ) {
+        setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => {
+            request.cookies.set(name, value)
             response.cookies.set(name, value, options)
           })
         },
@@ -29,13 +24,21 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  let user = null
+
+  try {
+    const {
+      data: { user: currentUser },
+    } = await supabase.auth.getUser()
+
+    user = currentUser
+  } catch {
+    user = null
+  }
 
   const publicRoutes = ['/auth/login', '/auth/register', '/auth/callback']
   const isPublic = publicRoutes.some(
-    (route) =>
+    route =>
       request.nextUrl.pathname === route ||
       request.nextUrl.pathname.startsWith(route)
   )
