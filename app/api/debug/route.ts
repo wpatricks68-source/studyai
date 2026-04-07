@@ -4,15 +4,15 @@ export async function GET() {
   const results: Record<string, string> = {}
 
   // 1. Checa variáveis de ambiente
-  const openaiKey = process.env.OPENAI_API_KEY
+  const anthropicKey = process.env.ANTHROPIC_API_KEY
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const tavilyKey = process.env.TAVILY_API_KEY
 
-  results['OPENAI_API_KEY'] = !openaiKey
+  results['ANTHROPIC_API_KEY'] = !anthropicKey
     ? 'AUSENTE'
-    : openaiKey.startsWith('sk-')
-      ? `OK (${openaiKey.slice(0, 8)}...)`
-      : `FORMATO ESTRANHO (começa com: ${openaiKey.slice(0, 6)})`
+    : anthropicKey.startsWith('sk-ant-')
+      ? `OK (${anthropicKey.slice(0, 12)}...)`
+      : `FORMATO ESTRANHO (começa com: ${anthropicKey.slice(0, 8)})`
 
   results['NEXT_PUBLIC_SUPABASE_URL'] = supabaseUrl
     ? `OK (${supabaseUrl.slice(0, 30)}...)`
@@ -22,34 +22,35 @@ export async function GET() {
     ? `OK (${tavilyKey.slice(0, 8)}...)`
     : 'AUSENTE'
 
-  // 2. Testa conexão real com a OpenAI
-  if (openaiKey) {
+  // 2. Testa conexão real com a Anthropic
+  if (anthropicKey) {
     try {
-      const res = await fetch('https://api.openai.com/v1/models', {
-        headers: { Authorization: `Bearer ${openaiKey}` },
+      const res = await fetch('https://api.anthropic.com/v1/models', {
+        headers: {
+          'x-api-key': anthropicKey,
+          'anthropic-version': '2023-06-01',
+        },
       })
       const data = await res.json()
 
       if (res.ok) {
-        // Lista os modelos disponíveis na conta
         const models: string[] = (data.data ?? []).map((m: { id: string }) => m.id)
-        const hasGpt4o     = models.some(m => m.includes('gpt-4o'))
-        const hasGpt4oMini = models.some(m => m.includes('gpt-4o-mini'))
-        const hasGpt35     = models.some(m => m.includes('gpt-3.5'))
+        const hasOpus   = models.some(m => m.includes('opus'))
+        const hasSonnet = models.some(m => m.includes('sonnet'))
+        const hasHaiku  = models.some(m => m.includes('haiku'))
 
-        results['OpenAI conexão'] = 'OK — chave válida'
-        results['gpt-4o']         = hasGpt4o     ? 'DISPONÍVEL' : 'NÃO DISPONÍVEL'
-        results['gpt-4o-mini']    = hasGpt4oMini ? 'DISPONÍVEL' : 'NÃO DISPONÍVEL'
-        results['gpt-3.5-turbo']  = hasGpt35     ? 'DISPONÍVEL' : 'NÃO DISPONÍVEL'
+        results['Anthropic conexão'] = 'OK — chave válida'
+        results['claude-opus-4-6']   = hasOpus   ? 'DISPONÍVEL' : 'NÃO DISPONÍVEL'
+        results['claude-sonnet-4-6'] = hasSonnet ? 'DISPONÍVEL' : 'NÃO DISPONÍVEL'
+        results['claude-haiku-4-5']  = hasHaiku  ? 'DISPONÍVEL' : 'NÃO DISPONÍVEL'
       } else {
-        results['OpenAI conexão'] = `ERRO ${res.status}: ${data?.error?.message ?? 'sem detalhes'}`
-        results['OpenAI código']  = data?.error?.code ?? 'desconhecido'
+        results['Anthropic conexão'] = `ERRO ${res.status}: ${data?.error?.message ?? 'sem detalhes'}`
       }
     } catch (e) {
-      results['OpenAI conexão'] = `FALHA DE REDE: ${(e as Error).message}`
+      results['Anthropic conexão'] = `FALHA DE REDE: ${(e as Error).message}`
     }
   } else {
-    results['OpenAI conexão'] = 'NÃO TESTADO — chave ausente'
+    results['Anthropic conexão'] = 'NÃO TESTADO — chave ausente'
   }
 
   // 3. Testa conexão com a Tavily

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import OpenAI from 'openai'
+import Anthropic from '@anthropic-ai/sdk'
 
 type GenType = 'summary' | 'flashcards' | 'questions'
 
@@ -63,17 +63,17 @@ Formato múltipla escolha: {"question":"enunciado","tipo":"mc","options":["A tex
 export async function POST(req: NextRequest) {
   try {
     // 1. Verificar API key ANTES de qualquer coisa
-    const apiKey = process.env.OPENAI_API_KEY
+    const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) {
-      console.error('[generate] OPENAI_API_KEY ausente nas env vars')
+      console.error('[generate] ANTHROPIC_API_KEY ausente nas env vars')
       return NextResponse.json(
-        { error: 'Chave da OpenAI não configurada. Adicione OPENAI_API_KEY nas variáveis de ambiente da Vercel.' },
+        { error: 'Chave da Anthropic não configurada. Adicione ANTHROPIC_API_KEY nas variáveis de ambiente.' },
         { status: 500 }
       )
     }
 
     // 2. Autenticação
-    const supabase = await createClient()
+    const supabase = createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
@@ -91,41 +91,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `type inválido: ${type}` }, { status: 400 })
     }
 
-    // 4. Instanciar OpenAI DENTRO da função (não no escopo do módulo)
-    const openai = new OpenAI({ apiKey })
+    // 4. Chamar a API da Anthropic
+    const anthropic = new Anthropic({ apiKey })
     const prompt = buildPrompt(type as GenType, topic ?? '', content)
 
-    // 5. Tentar modelos em cascata
-    let result = ''
-    const models = ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo']
+    const message = await anthropic.messages.create({
+      model: 'claude-opus-4-6',
+      max_tokens: type === 'summary' ? 3000 : 2000,
+      messages: [{ role: 'user', content: prompt }],
+    })
 
-    for (const model of models) {
-      try {
-        const completion = await openai.chat.completions.create({
-          model,
-          messages:    [{ role: 'user', content: prompt }],
-          max_tokens:  type === 'summary' ? 3000 : 2000,
-          temperature: type === 'summary' ? 0.4 : 0.6,
-        })
-        result = completion.choices[0]?.message?.content ?? ''
-        console.log(`[generate] OK — modelo: ${model}, tipo: ${type}`)
-        break
-      } catch (modelErr: unknown) {
-        const msg = (modelErr as Error).message ?? ''
-        console.warn(`[generate] Falhou ${model}: ${msg}`)
-
-        const isModelUnavailable =
-          msg.includes('model') ||
-          msg.includes('does not exist') ||
-          msg.includes('deprecated') ||
-          msg.includes('not supported')
-
-        if (!isModelUnavailable) throw modelErr
-        if (model === models[models.length - 1]) {
-          throw new Error('Nenhum modelo OpenAI disponível. Verifique seu plano em platform.openai.com')
-        }
-      }
-    }
+    const result = message.content[0]?.type === 'text' ? message.content[0].text : ''
+    console.log(`[generate] OK — modelo: claude-opus-4-6, tipo: ${type}`)
 
     if (!result) {
       return NextResponse.json(
@@ -134,7 +111,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 6. Salvar flashcards no banco (best-effort)
+    // 5. Salvar flashcards no banco (best-effort)
     if (type === 'flashcards' && sessionId) {
       try {
         const cleaned = result.replace(/```json|```/g, '').trim()
@@ -152,7 +129,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 7. Salvar questões no banco (best-effort)
+    // 6. Salvar questões no banco (best-effort)
     if (type === 'questions' && sessionId) {
       try {
         const cleaned = result.replace(/```json|```/g, '').trim()
@@ -183,15 +160,15 @@ export async function POST(req: NextRequest) {
     const code = (error as { status?: number }).status
     console.error('[generate] Erro final:', msg)
 
-    if (msg.includes('API key') || msg.includes('Incorrect API key') || msg.includes('invalid_api_key')) {
+    if (msg.includes('API key') || msg.includes('invalid x-api-key') || msg.includes('authentication')) {
       return NextResponse.json(
-        { error: 'Chave da OpenAI inválida. Verifique OPENAI_API_KEY nas variáveis de ambiente da Vercel.' },
+        { error: 'Chave da Anthropic inválida. Verifique ANTHROPIC_API_KEY nas variáveis de ambiente.' },
         { status: 500 }
       )
     }
-    if (msg.includes('quota') || msg.includes('billing') || code === 429) {
+    if (msg.includes('rate') || code === 429) {
       return NextResponse.json(
-        { error: 'Limite de uso da OpenAI atingido. Adicione créditos em platform.openai.com/account/billing' },
+        { error: 'Limite de uso da Anthropic atingido. Aguarde alguns instantes e tente novamente.' },
         { status: 429 }
       )
     }
