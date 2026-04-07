@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 type GenType  = 'summary' | 'flashcards' | 'questions'
@@ -45,6 +45,31 @@ export default function BuscaPage() {
   const [error,      setError]      = useState('')
   const abortRef = useRef<AbortController | null>(null)
 
+  // ─── Persistir sessão no sessionStorage ───────────────────
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('busca_session')
+      if (!raw) return
+      const { session: s, query: q, view: v } = JSON.parse(raw)
+      if (s?.resumo) {
+        setSession(s)
+        setQuery(q ?? '')
+        setView(v ?? 'resumo')
+        setPhase('done')
+      }
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    if (phase === 'done' && session.resumo) {
+      try {
+        sessionStorage.setItem('busca_session', JSON.stringify({ session, query, view }))
+      } catch {}
+    } else if (phase === 'idle' && !session.resumo) {
+      sessionStorage.removeItem('busca_session')
+    }
+  }, [session, query, view, phase])
+
   // ─── Cancelar busca em andamento ──────────────────────────
   function cancel() {
     abortRef.current?.abort()
@@ -59,6 +84,7 @@ export default function BuscaPage() {
     setPhase('searching')
     setSession(EMPTY)
     setView('resumo')
+    try { sessionStorage.removeItem('busca_session') } catch {}
 
     const ac = new AbortController()
     abortRef.current = ac
@@ -156,7 +182,8 @@ export default function BuscaPage() {
   // ─── GERAR FLASHCARDS ─────────────────────────────────────
   async function handleFlashcards() {
     if (!session.resumo || genTarget) return
-    if (session.flashcards.length > 0) { setView('flashcards'); return }
+    setView('flashcards')
+    if (session.flashcards.length > 0) return
 
     setGenTarget('flashcards')
     setError('')
@@ -195,7 +222,8 @@ export default function BuscaPage() {
   // ─── GERAR QUESTÕES ───────────────────────────────────────
   async function handleQuestions() {
     if (!session.resumo || genTarget) return
-    if (session.questions.length > 0) { setView('questoes'); return }
+    setView('questoes')
+    if (session.questions.length > 0) return
 
     setGenTarget('questions')
     setError('')
@@ -429,10 +457,10 @@ export default function BuscaPage() {
               {/* Botão FLASHCARDS */}
               <button
                 onClick={handleFlashcards}
-                disabled={!session.resumo || genTarget === 'flashcards'}
+                disabled={!session.resumo || !!genTarget}
                 style={{
                   padding: '5px 14px', borderRadius: '7px', fontSize: '12px', fontWeight: 500,
-                  cursor: !session.resumo || genTarget === 'flashcards' ? 'default' : 'pointer',
+                  cursor: !session.resumo || !!genTarget ? 'default' : 'pointer',
                   border: '1px solid',
                   borderColor: view === 'flashcards' ? '#00d4aa' : 'var(--border,#1f2640)',
                   background: genTarget === 'flashcards' ? 'rgba(0,212,170,.1)' : view === 'flashcards' ? 'rgba(0,212,170,.1)' : 'transparent',
@@ -447,10 +475,10 @@ export default function BuscaPage() {
               {/* Botão QUESTÕES */}
               <button
                 onClick={handleQuestions}
-                disabled={!session.resumo || genTarget === 'questions'}
+                disabled={!session.resumo || !!genTarget}
                 style={{
                   padding: '5px 14px', borderRadius: '7px', fontSize: '12px', fontWeight: 500,
-                  cursor: !session.resumo || genTarget === 'questions' ? 'default' : 'pointer',
+                  cursor: !session.resumo || !!genTarget ? 'default' : 'pointer',
                   border: '1px solid',
                   borderColor: view === 'questoes' ? '#f59e0b' : 'var(--border,#1f2640)',
                   background: genTarget === 'questions' ? 'rgba(245,158,11,.1)' : view === 'questoes' ? 'rgba(245,158,11,.1)' : 'transparent',
