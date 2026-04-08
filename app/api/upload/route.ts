@@ -1,6 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+async function extractTextWithOcrSpace(file: File) {
+  const apiKey = process.env.OCR_SPACE_API_KEY
+
+  if (!apiKey) {
+    throw new Error('OCR_SPACE_API_KEY não configurada')
+  }
+
+  const form = new FormData()
+  form.append('file', file)
+  form.append('language', 'por')
+  form.append('isOverlayRequired', 'false')
+  form.append('scale', 'true')
+  form.append('OCREngine', '2')
+  form.append('filetype', 'PDF')
+
+  const res = await fetch('https://api.ocr.space/parse/image', {
+    method: 'POST',
+    headers: {
+      apikey: apiKey,
+    },
+    body: form,
+  })
+
+  if (!res.ok) {
+    throw new Error(`OCR HTTP ${res.status}`)
+  }
+
+  const data = await res.json()
+
+  if (data.IsErroredOnProcessing) {
+    const message =
+      data.ErrorMessage?.join?.(' | ') ||
+      data.ErrorMessage ||
+      'OCR falhou ao processar o PDF'
+    throw new Error(message)
+  }
+
+  const text = Array.isArray(data.ParsedResults)
+    ? data.ParsedResults.map((r: { ParsedText?: string }) => r.ParsedText ?? '').join('\n')
+    : ''
+
+  return text.trim()
+}
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient()
@@ -37,22 +81,39 @@ export async function POST(req: NextRequest) {
     }
 
     let content = ''
+    let extractionMode: 'plain' | 'pdf-parse' | 'ocr' = 'plain'
 
     if (file.type === 'text/plain' || file.type === 'text/markdown') {
       content = await file.text()
+      extractionMode = 'plain'
     } else if (file.type === 'application/pdf') {
+      // 1) tenta extração normal
       try {
         const pdfParseModule = await import('pdf-parse')
         const pdfParse = (pdfParseModule as any).default ?? pdfParseModule
         const buffer = Buffer.from(await file.arrayBuffer())
         const parsed = await pdfParse(buffer)
-        content = parsed.text
-      } catch (pdfErr) {
-        console.error('[upload] pdf-parse error:', (pdfErr as Error).message)
-        return NextResponse.json(
-          { error: 'Não foi possível extrair o texto do PDF. Tente converter para TXT.' },
-          { status: 422 }
-        )
+        content = (parsed?.text ?? '').trim()
+        extractionMode = 'pdf-parse'
+      } catch (err) {
+        console.warn('[upload] pdf-parse falhou, tentando OCR:', (err as Error).message)
+      }
+
+      // 2) fallback automático para OCR
+      if (!content.trim()) {
+        try {
+          content = await extractTextWithOcrSpace(file)
+          extractionMode = 'ocr'
+        } catch (ocrErr) {
+          console.error('[upload] OCR falhou:', (ocrErr as Error).message)
+          return NextResponse.json(
+            {
+              error: 'Não foi possível extrair o texto do PDF.',
+              detail: (ocrErr as Error).message,
+            },
+            { status: 422 }
+          )
+        }
       }
     }
 
@@ -75,9 +136,13 @@ export async function POST(req: NextRequest) {
       content: content.slice(0, 15000),
       originalName: file.name,
       size: file.size,
+      extractionMode,
     })
   } catch (error) {
     console.error('[upload]', error)
-    return NextResponse.json({ error: 'Erro inesperado no upload.' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Erro inesperado no upload.' },
+      { status: 500 }
+    )
   }
 }
