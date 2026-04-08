@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
@@ -22,35 +22,46 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Tipo não suportado. Use PDF, TXT ou MD' }, { status: 400 })
     }
 
-    // Fazer upload no Supabase Storage
-    const fileName = `${user.id}/${Date.now()}-${file.name}`
-    const { error: uploadError } = await supabase.storage
-      .from('study-uploads')
-      .upload(fileName, file, { contentType: file.type, upsert: false })
-
-    if (uploadError) throw uploadError
-
-    // Extrair texto do arquivo
+    // ── Extrai texto do arquivo ───────────────────────────────
     let content = ''
+
     if (file.type === 'text/plain' || file.type === 'text/markdown') {
       content = await file.text()
     } else if (file.type === 'application/pdf') {
-      // Para PDF: retorna aviso e usa o nome do arquivo como contexto
-      // A extração real de PDF requer pdf-parse (adicionar se necessário)
-      content = `[Arquivo PDF: ${file.name}]\nConteúdo extraído do arquivo enviado pelo usuário.`
+      try {
+        const pdfParse = (await import('pdf-parse')).default
+        const buffer = Buffer.from(await file.arrayBuffer())
+        const parsed = await pdfParse(buffer)
+        content = parsed.text
+      } catch (pdfErr) {
+        console.error('[upload] pdf-parse error:', (pdfErr as Error).message)
+        return NextResponse.json(
+          { error: 'Não foi possível extrair o texto do PDF. Tente converter para TXT.' },
+          { status: 422 }
+        )
+      }
     }
 
-    // Limitar tamanho do conteúdo para a IA
-    const truncated = content.slice(0, 15000)
+    if (!content.trim()) {
+      return NextResponse.json({ error: 'O arquivo está vazio ou sem texto legível.' }, { status: 422 })
+    }
+
+    // ── Salva no Storage (best-effort, não bloqueia a resposta) ──
+    const fileName = `${user.id}/${Date.now()}-${file.name}`
+    supabase.storage
+      .from('study-uploads')
+      .upload(fileName, file, { contentType: file.type, upsert: false })
+      .catch(e => console.warn('[upload] storage ignorado:', (e as Error)?.message))
 
     return NextResponse.json({
       fileName,
-      content: truncated,
+      content: content.slice(0, 15000),
       originalName: file.name,
       size: file.size,
     })
+
   } catch (error) {
-    console.error('[Upload]', error)
-    return NextResponse.json({ error: 'Erro no upload' }, { status: 500 })
+    console.error('[upload]', error)
+    return NextResponse.json({ error: 'Erro inesperado no upload.' }, { status: 500 })
   }
 }
