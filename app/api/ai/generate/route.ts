@@ -2,9 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
 
-type GenType = 'summary' | 'flashcards' | 'questions'
+type GenType      = 'summary' | 'flashcards' | 'questions'
+type TipoQuestoes = 'cv' | 'mc' | 'misto'
 
-function buildPrompt(type: GenType, topic: string, content: string): string {
+function buildPrompt(
+  type: GenType,
+  topic: string,
+  content: string,
+  quantidade = 10,
+  tipoQuestoes: TipoQuestoes = 'misto',
+): string {
   const base = `Você é um professor especialista em concursos públicos brasileiros com foco em provas CESPE, FGV, FCC e VUNESP.
 Tema do aluno: "${topic}"
 Conteúdo de referência:
@@ -51,13 +58,30 @@ Retorne APENAS um array JSON válido, sem texto antes ou depois, sem markdown.
 
 [{"front": "pergunta objetiva aqui", "back": "resposta direta e completa aqui"}]`
 
+  const instrucaoTipo =
+    tipoQuestoes === 'cv'
+      ? 'TODAS as questões devem ser do tipo CERTO/ERRADO no estilo CEBRASPE/CESPE.'
+      : tipoQuestoes === 'mc'
+        ? 'TODAS as questões devem ser de MÚLTIPLA ESCOLHA com exatamente 5 alternativas (A/B/C/D/E).'
+        : `Misture os tipos: aproximadamente metade CERTO/ERRADO (CEBRASPE) e metade MÚLTIPLA ESCOLHA com 5 alternativas.`
+
   return `${base}
 
-TAREFA: Crie 6 questões de concurso (3 CESPE certo/errado + 3 FGV múltipla escolha).
-Retorne APENAS um array JSON válido, sem texto antes ou depois, sem markdown.
+TAREFA: Crie exatamente ${quantidade} questões de concurso sobre o tema acima.
+${instrucaoTipo}
+Retorne APENAS um array JSON válido, sem texto antes ou depois, sem markdown, sem \`\`\`json.
 
-Formato certo/errado: {"question":"enunciado","tipo":"cv","gabarito":"C","explanation":"explicação com fundamento legal"}
-Formato múltipla escolha: {"question":"enunciado","tipo":"mc","options":["A texto","B texto","C texto","D texto","E texto"],"correct":2,"explanation":"explicação","banca":"FGV 2024"}`
+Para questões CERTO/ERRADO use este formato exato:
+{"question":"enunciado completo da questão","tipo":"cv","gabarito":"C","explanation":"explicação detalhada com fundamento legal","banca":"CEBRASPE 2024"}
+
+Para questões MÚLTIPLA ESCOLHA use este formato exato:
+{"question":"enunciado completo da questão","tipo":"mc","options":["A) texto da alternativa","B) texto","C) texto","D) texto","E) texto"],"correct":2,"explanation":"explicação detalhada","banca":"FGV 2024"}
+
+Regras:
+- "gabarito" deve ser "C" (certo) ou "E" (errado) apenas para tipo "cv"
+- "correct" é o índice 0-4 da alternativa correta apenas para tipo "mc"
+- Cubra os pontos mais cobrados em concursos sobre o tema
+- Varie o nível de dificuldade entre as questões`
 }
 
 export async function POST(req: NextRequest) {
@@ -81,7 +105,7 @@ export async function POST(req: NextRequest) {
 
     // 3. Parse body
     const body = await req.json()
-    const { content, topic, type, sessionId } = body
+    const { content, topic, type, sessionId, quantidade, tipoQuestoes } = body
 
     if (!content?.trim()) {
       return NextResponse.json({ error: 'content é obrigatório' }, { status: 400 })
@@ -91,13 +115,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `type inválido: ${type}` }, { status: 400 })
     }
 
+    const qtd: number        = typeof quantidade   === 'number' ? quantidade   : 10
+    const tq: TipoQuestoes   = ['cv','mc','misto'].includes(tipoQuestoes) ? tipoQuestoes : 'misto'
+
     // 4. Chamar a API da Anthropic
     const anthropic = new Anthropic({ apiKey })
-    const prompt = buildPrompt(type as GenType, topic ?? '', content)
+    const prompt = buildPrompt(type as GenType, topic ?? '', content, qtd, tq)
 
     const message = await anthropic.messages.create({
       model: 'claude-opus-4-6',
-      max_tokens: type === 'summary' ? 3000 : 2000,
+      max_tokens: type === 'summary' ? 3000 : type === 'questions' ? Math.max(2000, qtd * 200) : 2000,
       messages: [{ role: 'user', content: prompt }],
     })
 

@@ -20,6 +20,11 @@ interface Question {
   banca?: string
 }
 
+interface QuestoesConfig {
+  quantidade: 5 | 10 | 15 | 20
+  tipo: 'cv' | 'mc' | 'misto'
+}
+
 interface SessionState {
   query:      string
   resumo:     string
@@ -43,6 +48,8 @@ export default function BuscaPage() {
   const [phase,      setPhase]      = useState<'idle' | 'searching' | 'generating' | 'done'>('idle')
   const [genTarget,  setGenTarget]  = useState<GenType | null>(null)
   const [error,      setError]      = useState('')
+  const [showQModal, setShowQModal] = useState(false)
+  const [qConfig,    setQConfig]    = useState<QuestoesConfig>({ quantidade: 10, tipo: 'misto' })
   const abortRef = useRef<AbortController | null>(null)
 
   // ─── Persistir sessão no sessionStorage ───────────────────
@@ -219,12 +226,16 @@ export default function BuscaPage() {
     }
   }
 
-  // ─── GERAR QUESTÕES ───────────────────────────────────────
-  async function handleQuestions() {
+  // ─── GERAR QUESTÕES — abre modal de configuração ─────────
+  function handleQuestions() {
     if (!session.resumo || genTarget) return
-    setView('questoes')
-    if (session.questions.length > 0) return
+    if (session.questions.length > 0) { setView('questoes'); return }
+    setShowQModal(true)
+  }
 
+  async function generateQuestions(cfg: QuestoesConfig) {
+    setShowQModal(false)
+    setView('questoes')
     setGenTarget('questions')
     setError('')
 
@@ -233,27 +244,33 @@ export default function BuscaPage() {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
-          content:   session.resumo,
-          topic:     session.query,
-          type:      'questions',
-          sessionId: session.sessionId,
+          content:       session.resumo,
+          topic:         session.query,
+          type:          'questions',
+          sessionId:     session.sessionId,
+          quantidade:    cfg.quantidade,
+          tipoQuestoes:  cfg.tipo,
         }),
       })
-      if (!res.ok) throw new Error('Erro ao gerar questões.')
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        throw new Error(d.error || 'Erro ao gerar questões.')
+      }
       const data = await res.json()
 
       let qs: Question[] = []
       try {
-        const cleaned = (data.result ?? '').replace(/```json|```/g, '').trim()
+        const cleaned = (data.result ?? '').replace(/```json[\s\S]*?```|```/g, '').trim()
         qs = JSON.parse(cleaned)
+        if (!Array.isArray(qs)) throw new Error()
       } catch {
         throw new Error('Resposta da IA inválida. Tente novamente.')
       }
 
       setSession(prev => ({ ...prev, questions: qs }))
-      setView('questoes')
     } catch (e: unknown) {
       setError((e as Error).message || 'Erro ao gerar questões.')
+      setView('resumo')
     } finally {
       setGenTarget(null)
     }
@@ -556,6 +573,91 @@ export default function BuscaPage() {
         </div>
       )}
 
+      {/* ── Modal de configuração de questões ── */}
+      {showQModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 50,
+          background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }} onClick={() => setShowQModal(false)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)',
+            borderRadius: '16px', padding: '28px 28px 24px', width: '380px', maxWidth: '90vw',
+          }}>
+            <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text,#e8eaf6)', marginBottom: '20px' }}>
+              Configurar Questões
+            </div>
+
+            {/* Quantidade */}
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>
+                Quantidade
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {([5, 10, 15, 20] as const).map(n => (
+                  <button key={n} onClick={() => setQConfig(c => ({ ...c, quantidade: n }))}
+                    style={{
+                      flex: 1, padding: '8px 0', borderRadius: '8px', fontSize: '13px', fontWeight: 600,
+                      border: '1px solid', cursor: 'pointer', transition: 'all .12s',
+                      borderColor: qConfig.quantidade === n ? 'var(--accent,#6c63ff)' : 'var(--border,#1f2640)',
+                      background:  qConfig.quantidade === n ? 'rgba(108,99,255,.18)' : 'transparent',
+                      color:       qConfig.quantidade === n ? 'var(--accent,#6c63ff)' : 'var(--muted,#6b7194)',
+                    }}>
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Tipo */}
+            <div style={{ marginBottom: '24px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>
+                Estilo
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                {([
+                  { v: 'cv',    label: 'Certo / Errado',       sub: 'Estilo CEBRASPE / CESPE' },
+                  { v: 'mc',    label: 'Múltipla Escolha',     sub: 'A / B / C / D / E (5 alternativas)' },
+                  { v: 'misto', label: 'Misto',                sub: 'Combina os dois estilos' },
+                ] as const).map(({ v, label, sub }) => (
+                  <button key={v} onClick={() => setQConfig(c => ({ ...c, tipo: v }))}
+                    style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
+                      padding: '10px 14px', borderRadius: '8px', cursor: 'pointer', transition: 'all .12s',
+                      border: '1px solid',
+                      borderColor: qConfig.tipo === v ? 'var(--accent,#6c63ff)' : 'var(--border,#1f2640)',
+                      background:  qConfig.tipo === v ? 'rgba(108,99,255,.12)' : 'transparent',
+                    }}>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: qConfig.tipo === v ? 'var(--accent,#6c63ff)' : 'var(--text,#e8eaf6)' }}>
+                      {label}
+                    </span>
+                    <span style={{ fontSize: '11px', color: 'var(--muted,#6b7194)', marginTop: '2px' }}>
+                      {sub}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Ações */}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setShowQModal(false)} style={{
+                flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)',
+                background: 'transparent', color: 'var(--muted,#6b7194)', fontSize: '13px', cursor: 'pointer',
+              }}>
+                Cancelar
+              </button>
+              <button onClick={() => generateQuestions(qConfig)} style={{
+                flex: 2, padding: '10px', borderRadius: '8px', border: 'none',
+                background: 'var(--accent,#6c63ff)', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+              }}>
+                Gerar {qConfig.quantidade} questões
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
@@ -662,115 +764,177 @@ function FlashcardsView({ cards, loading }: { cards: Flashcard[]; loading: boole
 
 // ─── Sub-componente: QUESTÕES ──────────────────────────────
 function QuestoesView({ questions, loading }: { questions: Question[]; loading: boolean }) {
-  const [answers,  setAnswers]  = useState<Record<number, string | number>>({})
-  const [revealed, setRevealed] = useState<Record<number, boolean>>({})
+  const [answers,      setAnswers]      = useState<Record<number, string | number>>({})
+  const [revealed,     setRevealed]     = useState<Record<number, boolean>>({})
+  const [showGabarito, setShowGabarito] = useState(false)
 
   if (loading) return <LoadingDots label="Gerando questões..." />
-  if (questions.length === 0) return <div style={{ color: 'var(--muted,#6b7194)', fontSize: '13px' }}>Nenhuma questão gerada ainda.</div>
+  if (questions.length === 0) return (
+    <div style={{ color: 'var(--muted,#6b7194)', fontSize: '13px', padding: '20px 0' }}>
+      Nenhuma questão gerada ainda.
+    </div>
+  )
 
-  const correct = Object.entries(revealed).filter(([qi, rev]) => {
+  const totalRespondidas = Object.keys(revealed).length
+  const totalCorretas    = Object.entries(revealed).filter(([qi, rev]) => {
     if (!rev) return false
     const q = questions[Number(qi)]
-    if (q.tipo === 'cv') return answers[Number(qi)] === q.gabarito
-    return answers[Number(qi)] === q.correct
+    return q.tipo === 'cv' ? answers[Number(qi)] === q.gabarito : answers[Number(qi)] === q.correct
   }).length
+  const pct = totalRespondidas > 0 ? Math.round(totalCorretas / totalRespondidas * 100) : 0
+  const pctColor = pct >= 70 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444'
 
   return (
     <div style={{ maxWidth: '760px' }}>
-      {/* Placar */}
-      {Object.keys(revealed).length > 0 && (
-        <div style={{ background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)', borderRadius: '10px', padding: '12px 16px', marginBottom: '20px', display: 'flex', gap: '20px', alignItems: 'center' }}>
-          <div style={{ fontSize: '22px', fontWeight: 700, color: correct / Object.keys(revealed).length >= .7 ? 'var(--green,#10b981)' : '#f59e0b' }}>
-            {Math.round(correct / Object.keys(revealed).length * 100)}%
+
+      {/* ── Placar ── */}
+      {totalRespondidas > 0 && (
+        <div style={{
+          background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)',
+          borderRadius: '12px', padding: '14px 18px', marginBottom: '20px',
+          display: 'flex', alignItems: 'center', gap: '16px',
+        }}>
+          <div style={{ fontSize: '28px', fontWeight: 700, color: pctColor, minWidth: '56px' }}>
+            {pct}%
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--muted,#6b7194)' }}>
-            {correct} de {Object.keys(revealed).length} respondida{Object.keys(revealed).length !== 1 ? 's' : ''} corretamente
+          <div>
+            <div style={{ fontSize: '13px', color: 'var(--text,#e8eaf6)', fontWeight: 500 }}>
+              {totalCorretas} de {totalRespondidas} corretas
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--muted,#6b7194)', marginTop: '2px' }}>
+              {questions.length - totalRespondidas > 0
+                ? `${questions.length - totalRespondidas} questão(ões) ainda não respondida(s)`
+                : 'Todas respondidas!'}
+            </div>
           </div>
         </div>
       )}
 
+      {/* ── Lista de questões ── */}
       {questions.map((q, qi) => {
-        const answered = answers[qi] !== undefined
-        const rev      = revealed[qi]
+        const answered  = answers[qi] !== undefined
+        const rev       = revealed[qi]
         const isCorrect = q.tipo === 'cv'
           ? answers[qi] === q.gabarito
           : answers[qi] === q.correct
 
         return (
-          <div key={qi} style={{ background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)', borderRadius: '12px', padding: '18px', marginBottom: '14px' }}>
+          <div key={qi} style={{
+            background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)',
+            borderRadius: '12px', padding: '18px', marginBottom: '14px',
+          }}>
             {/* Cabeçalho */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <span style={{ fontSize: '10px', color: 'var(--accent,#6c63ff)', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                Questão {qi + 1}
-              </span>
-              {q.banca && <span style={{ fontSize: '10px', color: 'var(--muted,#6b7194)' }}>{q.banca}</span>}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '10px', color: 'var(--accent,#6c63ff)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600 }}>
+                  Q{qi + 1}
+                </span>
+                <span style={{
+                  fontSize: '10px', padding: '2px 7px', borderRadius: '4px', fontWeight: 600,
+                  background: q.tipo === 'cv' ? 'rgba(245,158,11,.12)' : 'rgba(108,99,255,.12)',
+                  color: q.tipo === 'cv' ? '#f59e0b' : 'var(--accent,#6c63ff)',
+                }}>
+                  {q.tipo === 'cv' ? 'CERTO / ERRADO' : 'MÚLTIPLA ESCOLHA'}
+                </span>
+              </div>
+              {q.banca && (
+                <span style={{ fontSize: '10px', color: 'var(--muted,#6b7194)' }}>{q.banca}</span>
+              )}
             </div>
 
             {/* Enunciado */}
-            <div style={{ fontSize: '14px', color: 'var(--text,#e8eaf6)', lineHeight: 1.7, marginBottom: '16px', fontWeight: 500 }}>
+            <div style={{ fontSize: '14px', color: 'var(--text,#e8eaf6)', lineHeight: 1.75, marginBottom: '16px', fontWeight: 500 }}>
               {q.question}
             </div>
 
-            {/* Opções */}
+            {/* Opções Certo/Errado */}
             {q.tipo === 'cv' ? (
               <div style={{ display: 'flex', gap: '8px' }}>
-                {['C', 'E'].map(opt => {
+                {(['C', 'E'] as const).map(opt => {
                   const selected = answers[qi] === opt
                   const isRight  = opt === q.gabarito
-                  let bg = 'var(--surface2,#181d2e)', border = 'var(--border,#1f2640)', color = 'var(--muted,#6b7194)'
+                  let bg = 'var(--surface2,#181d2e)', brd = 'var(--border,#1f2640)', clr = 'var(--muted,#6b7194)'
                   if (rev) {
-                    if (isRight) { bg = 'rgba(16,185,129,.12)'; border = '#10b981'; color = '#34d399' }
-                    else if (selected && !isRight) { bg = 'rgba(239,68,68,.1)'; border = '#ef4444'; color = '#f87171' }
+                    if (isRight)               { bg = 'rgba(16,185,129,.12)'; brd = '#10b981'; clr = '#34d399' }
+                    else if (selected)         { bg = 'rgba(239,68,68,.1)';   brd = '#ef4444'; clr = '#f87171' }
                   } else if (selected) {
-                    bg = 'rgba(108,99,255,.12)'; border = 'var(--accent,#6c63ff)'; color = 'var(--accent,#6c63ff)'
+                    bg = 'rgba(108,99,255,.12)'; brd = 'var(--accent,#6c63ff)'; clr = 'var(--accent,#6c63ff)'
                   }
                   return (
-                    <button key={opt} onClick={() => !rev && setAnswers(a => ({ ...a, [qi]: opt }))}
-                      style={{ flex: 1, padding: '10px', borderRadius: '8px', border: `1px solid ${border}`, background: bg, color, fontSize: '13px', fontWeight: 600, cursor: rev ? 'default' : 'pointer', transition: 'all .15s' }}>
-                      {opt === 'C' ? 'Certo' : 'Errado'}
+                    <button key={opt}
+                      onClick={() => !rev && setAnswers(a => ({ ...a, [qi]: opt }))}
+                      style={{
+                        flex: 1, padding: '11px', borderRadius: '8px',
+                        border: `1px solid ${brd}`, background: bg, color: clr,
+                        fontSize: '13px', fontWeight: 700,
+                        cursor: rev ? 'default' : 'pointer', transition: 'all .15s',
+                      }}>
+                      {opt === 'C' ? '✓ Certo' : '✗ Errado'}
                     </button>
                   )
                 })}
               </div>
             ) : (
+              /* Opções múltipla escolha */
               <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
                 {(q.options ?? []).map((opt, oi) => {
                   const selected = answers[qi] === oi
                   const isRight  = oi === q.correct
-                  let bg = 'var(--surface2,#181d2e)', border = 'var(--border,#1f2640)', color = 'var(--text,#e8eaf6)'
+                  let bg = 'var(--surface2,#181d2e)', brd = 'var(--border,#1f2640)', clr = 'var(--text,#e8eaf6)'
                   if (rev) {
-                    if (isRight) { bg = 'rgba(16,185,129,.12)'; border = '#10b981'; color = '#34d399' }
-                    else if (selected && !isRight) { bg = 'rgba(239,68,68,.1)'; border = '#ef4444'; color = '#f87171' }
+                    if (isRight)       { bg = 'rgba(16,185,129,.12)'; brd = '#10b981'; clr = '#34d399' }
+                    else if (selected) { bg = 'rgba(239,68,68,.1)';   brd = '#ef4444'; clr = '#f87171' }
                   } else if (selected) {
-                    bg = 'rgba(108,99,255,.12)'; border = 'var(--accent,#6c63ff)'
+                    bg = 'rgba(108,99,255,.12)'; brd = 'var(--accent,#6c63ff)'
                   }
                   return (
-                    <div key={oi} onClick={() => !rev && setAnswers(a => ({ ...a, [qi]: oi }))}
-                      style={{ display: 'flex', gap: '10px', padding: '10px 12px', borderRadius: '8px', border: `1px solid ${border}`, background: bg, cursor: rev ? 'default' : 'pointer', transition: 'all .15s', alignItems: 'flex-start' }}>
-                      <div style={{ width: '20px', height: '20px', borderRadius: '50%', border: `1px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 600, color, flexShrink: 0 }}>
+                    <div key={oi}
+                      onClick={() => !rev && setAnswers(a => ({ ...a, [qi]: oi }))}
+                      style={{
+                        display: 'flex', gap: '10px', padding: '10px 12px', borderRadius: '8px',
+                        border: `1px solid ${brd}`, background: bg,
+                        cursor: rev ? 'default' : 'pointer', transition: 'all .15s', alignItems: 'flex-start',
+                      }}>
+                      <div style={{
+                        width: '22px', height: '22px', borderRadius: '50%',
+                        border: `1.5px solid ${brd}`, flexShrink: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '11px', fontWeight: 700, color: clr,
+                      }}>
                         {['A','B','C','D','E'][oi]}
                       </div>
-                      <div style={{ fontSize: '13px', color, lineHeight: 1.6 }}>{opt}</div>
+                      <div style={{ fontSize: '13px', color: clr, lineHeight: 1.6, paddingTop: '2px' }}>{opt}</div>
                     </div>
                   )
                 })}
               </div>
             )}
 
-            {/* Botão confirmar / feedback */}
+            {/* Confirmar / feedback */}
             {!rev ? (
               <button
                 onClick={() => answered && setRevealed(r => ({ ...r, [qi]: true }))}
                 disabled={!answered}
-                style={{ marginTop: '12px', width: '100%', padding: '9px', borderRadius: '8px', border: 'none', background: answered ? 'var(--accent,#6c63ff)' : 'var(--surface2,#181d2e)', color: answered ? '#fff' : 'var(--muted,#6b7194)', fontSize: '13px', fontWeight: 500, cursor: answered ? 'pointer' : 'default', transition: 'all .15s' }}>
+                style={{
+                  marginTop: '14px', width: '100%', padding: '10px', borderRadius: '8px',
+                  border: 'none',
+                  background: answered ? 'var(--accent,#6c63ff)' : 'var(--surface2,#181d2e)',
+                  color: answered ? '#fff' : 'var(--muted,#6b7194)',
+                  fontSize: '13px', fontWeight: 600,
+                  cursor: answered ? 'pointer' : 'default', transition: 'all .15s',
+                }}>
                 Confirmar resposta
               </button>
             ) : (
-              <div style={{ marginTop: '12px', padding: '12px 14px', borderRadius: '8px', background: isCorrect ? 'rgba(16,185,129,.1)' : 'rgba(239,68,68,.08)', border: `1px solid ${isCorrect ? 'rgba(16,185,129,.3)' : 'rgba(239,68,68,.25)'}` }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.8px', color: isCorrect ? '#34d399' : '#f87171', marginBottom: '6px' }}>
-                  {isCorrect ? 'Resposta correta!' : 'Resposta incorreta'}
+              <div style={{
+                marginTop: '12px', padding: '12px 14px', borderRadius: '8px',
+                background: isCorrect ? 'rgba(16,185,129,.08)' : 'rgba(239,68,68,.08)',
+                border: `1px solid ${isCorrect ? 'rgba(16,185,129,.3)' : 'rgba(239,68,68,.25)'}`,
+              }}>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: isCorrect ? '#34d399' : '#f87171', marginBottom: '6px' }}>
+                  {isCorrect ? '✓ Resposta correta!' : '✗ Resposta incorreta'}
                 </div>
-                <div style={{ fontSize: '12px', color: '#c8cae6', lineHeight: 1.6 }}>
+                <div style={{ fontSize: '12px', color: '#c8cae6', lineHeight: 1.65 }}>
                   {q.explanation}
                 </div>
               </div>
@@ -778,6 +942,80 @@ function QuestoesView({ questions, loading }: { questions: Question[]; loading: 
           </div>
         )
       })}
+
+      {/* ── Seção de Gabarito ── */}
+      <div style={{ marginTop: '8px', paddingTop: '20px', borderTop: '1px solid var(--border,#1f2640)' }}>
+        <button
+          onClick={() => setShowGabarito(g => !g)}
+          style={{
+            width: '100%', padding: '11px', borderRadius: '10px', cursor: 'pointer',
+            border: '1px solid var(--border,#1f2640)',
+            background: showGabarito ? 'rgba(108,99,255,.12)' : 'transparent',
+            color: showGabarito ? 'var(--accent,#6c63ff)' : 'var(--muted,#6b7194)',
+            fontSize: '13px', fontWeight: 600, transition: 'all .15s',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+          }}>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path d="M7 1.5v11M2 7h10" strokeLinecap="round"/>
+          </svg>
+          {showGabarito ? 'Ocultar Gabarito' : 'Ver Gabarito'}
+        </button>
+
+        {showGabarito && (
+          <div style={{ marginTop: '16px', background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)', borderRadius: '12px', overflow: 'hidden' }}>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border,#1f2640)', fontSize: '11px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600 }}>
+              Gabarito — {questions.length} questão(ões)
+            </div>
+            {questions.map((q, qi) => {
+              const letraCorreta = q.tipo === 'cv'
+                ? (q.gabarito === 'C' ? 'CERTO' : 'ERRADO')
+                : `${['A','B','C','D','E'][q.correct ?? 0]}`
+              const textoOpcao = q.tipo === 'mc' ? ` — ${q.options?.[q.correct ?? 0] ?? ''}` : ''
+
+              return (
+                <div key={qi} style={{
+                  padding: '12px 16px', borderBottom: qi < questions.length - 1 ? '1px solid var(--border,#1f2640)' : 'none',
+                  display: 'flex', gap: '12px', alignItems: 'flex-start',
+                }}>
+                  {/* Número */}
+                  <div style={{ minWidth: '28px', fontSize: '11px', color: 'var(--accent,#6c63ff)', fontWeight: 700, paddingTop: '2px' }}>
+                    Q{qi + 1}
+                  </div>
+                  {/* Badge tipo */}
+                  <div style={{
+                    fontSize: '10px', padding: '2px 6px', borderRadius: '4px', fontWeight: 600, whiteSpace: 'nowrap', marginTop: '1px',
+                    background: q.tipo === 'cv' ? 'rgba(245,158,11,.12)' : 'rgba(108,99,255,.12)',
+                    color: q.tipo === 'cv' ? '#f59e0b' : 'var(--accent,#6c63ff)',
+                  }}>
+                    {q.tipo === 'cv' ? 'C/E' : 'MC'}
+                  </div>
+                  {/* Resposta */}
+                  <div style={{ flex: 1 }}>
+                    <span style={{
+                      fontSize: '13px', fontWeight: 700,
+                      color: q.tipo === 'cv'
+                        ? (q.gabarito === 'C' ? '#34d399' : '#f87171')
+                        : '#34d399',
+                    }}>
+                      {letraCorreta}
+                    </span>
+                    {textoOpcao && (
+                      <span style={{ fontSize: '12px', color: '#c8cae6' }}>{textoOpcao}</span>
+                    )}
+                    {q.banca && (
+                      <span style={{ fontSize: '10px', color: 'var(--muted,#6b7194)', marginLeft: '8px' }}>({q.banca})</span>
+                    )}
+                    <div style={{ fontSize: '11px', color: 'var(--muted,#6b7194)', marginTop: '4px', lineHeight: 1.5 }}>
+                      {q.explanation}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
     </div>
   )
 }
