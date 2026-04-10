@@ -18,6 +18,7 @@ export interface StudySession {
   source_type: 'web' | 'upload'
   duration_min: number
   revisoes: number
+  revisao_dates: string[] | null   // ISO dates of each revision
   tags: string[]
   notas: string | null
   created_at: string
