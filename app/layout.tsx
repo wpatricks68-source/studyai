@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { ThemeProvider } from '@/components/ThemeProvider'
 
 export const metadata: Metadata = {
   title: 'StudyAI — Estudo inteligente para concursos',
@@ -13,8 +14,12 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="pt-BR">
-      <body>{children}</body>
+    <html lang="pt-BR" suppressHydrationWarning>
+      <body>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          {children}
+        </ThemeProvider>
+      </body>
     </html>
   )
 }

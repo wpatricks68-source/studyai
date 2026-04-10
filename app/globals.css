@@ -16,6 +16,20 @@
   --green:    #10b981;
 }
 
+.light {
+  --bg:       #f9fafb;
+  --surface:  #ffffff;
+  --surface2: #f3f4f6;
+  --border:   #e5e7eb;
+  --text:     #111827;
+  --muted:    #6b7280;
+  --accent:   #4f46e5;
+  --accent2:  #0d9488;
+  --amber:    #d97706;
+  --red:      #dc2626;
+  --green:    #059669;
+}
+
 * {
   box-sizing: border-box;
 }
