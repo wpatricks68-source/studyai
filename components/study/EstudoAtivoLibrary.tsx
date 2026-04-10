@@ -104,9 +104,9 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
 
   if (groups.length === 0) {
     return (
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '14px', color: 'var(--muted)', padding: '40px' }}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '14px', color: 'var(--muted,#6b7194)', padding: '40px', background: 'var(--bg,#0a0c12)' }}>
         <div style={{ fontSize: '40px', opacity: .25 }}>🎓</div>
-        <div style={{ fontSize: '16px', fontWeight: 500, color: 'var(--text)' }}>Nenhum conteúdo salvo ainda</div>
+        <div style={{ fontSize: '16px', fontWeight: 500, color: 'var(--text,#e8eaf6)' }}>Nenhum conteúdo salvo ainda</div>
         <div style={{ fontSize: '13px', textAlign: 'center', maxWidth: '360px', lineHeight: 1.7 }}>
           Gere flashcards e questões na página <strong>Busca + IA</strong> e eles aparecerão aqui organizados por disciplina e tema.
         </div>
@@ -115,19 +115,19 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: '100%', overflow: 'hidden', background: 'var(--bg,#0a0c12)' }}>
 
       {/* ── Painel esquerdo: disciplinas e temas ── */}
       <div style={{
         width: '240px', flexShrink: 0,
-        background: 'var(--surface)', borderRight: '1px solid var(--border)',
+        background: 'var(--surface,#111420)', borderRight: '1px solid var(--border,#1f2640)',
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
       }}>
-        <div style={{ padding: '14px 14px 10px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1.4px', color: 'var(--muted)', fontWeight: 600 }}>
+        <div style={{ padding: '14px 14px 10px', borderBottom: '1px solid var(--border,#1f2640)' }}>
+          <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1.4px', color: 'var(--muted,#6b7194)', fontWeight: 600 }}>
             Estudo Ativo
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '4px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--muted,#6b7194)', marginTop: '4px' }}>
             {flashcards.length} flashcard{flashcards.length !== 1 ? 's' : ''} · {questions.length} questão(ões)
           </div>
         </div>
@@ -142,8 +142,8 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
                   width: '100%', textAlign: 'left', padding: '8px 10px',
                   borderRadius: '8px', border: 'none', cursor: 'pointer',
                   background: selectedDisc === g.disciplina ? 'rgba(108,99,255,.15)' : 'transparent',
-                  color:      selectedDisc === g.disciplina ? 'var(--accent)' : 'var(--text)',
-                  borderLeft: selectedDisc === g.disciplina ? '2px solid var(--accent)' : '2px solid transparent',
+                  color:      selectedDisc === g.disciplina ? 'var(--accent,#6c63ff)' : 'var(--text,#e8eaf6)',
+                  borderLeft: selectedDisc === g.disciplina ? '2px solid var(--accent,#6c63ff)' : '2px solid transparent',
                   transition: 'all .12s',
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px',
                 }}
@@ -153,8 +153,8 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
                 </span>
                 <span style={{
                   fontSize: '10px', padding: '1px 6px', borderRadius: '8px', flexShrink: 0,
-                  background: selectedDisc === g.disciplina ? 'rgba(108,99,255,.2)' : 'var(--surface2)',
-                  color: selectedDisc === g.disciplina ? 'var(--accent)' : 'var(--muted)',
+                  background: selectedDisc === g.disciplina ? 'rgba(108,99,255,.2)' : 'var(--surface2,#181d2e)',
+                  color: selectedDisc === g.disciplina ? 'var(--accent,#6c63ff)' : 'var(--muted,#6b7194)',
                 }}>
                   {g.topics.length}
                 </span>
@@ -171,7 +171,7 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
                         width: '100%', textAlign: 'left', padding: '6px 10px',
                         borderRadius: '6px', border: 'none', cursor: 'pointer',
                         background: selectedTopic === t.topic ? 'rgba(108,99,255,.1)' : 'transparent',
-                        color:      selectedTopic === t.topic ? 'var(--accent)' : 'var(--muted)',
+                        color:      selectedTopic === t.topic ? 'var(--accent,#6c63ff)' : 'var(--muted,#6b7194)',
                         fontSize: '12px', lineHeight: 1.4, transition: 'all .1s',
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px',
                       }}
@@ -194,18 +194,18 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
       {/* ── Painel direito: conteúdo do tema ── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {!topicGroup ? (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '10px', color: 'var(--muted)' }}>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '10px', color: 'var(--muted,#6b7194)' }}>
             <div style={{ fontSize: '32px', opacity: .25 }}>📚</div>
-            <div style={{ fontSize: '14px', color: 'var(--text)' }}>Selecione um tema</div>
+            <div style={{ fontSize: '14px', color: 'var(--text,#e8eaf6)' }}>Selecione um tema</div>
           </div>
         ) : (
           <>
             {/* Header do tema */}
-            <div style={{ padding: '14px 20px 0', borderBottom: '1px solid var(--border)', background: 'var(--surface)', flexShrink: 0 }}>
-              <div style={{ fontSize: '11px', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>
+            <div style={{ padding: '14px 20px 0', borderBottom: '1px solid var(--border,#1f2640)', background: 'var(--surface,#111420)', flexShrink: 0 }}>
+              <div style={{ fontSize: '11px', color: 'var(--accent,#6c63ff)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>
                 {selectedDisc}
               </div>
-              <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text)', marginBottom: '10px' }}>
+              <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text,#e8eaf6)', marginBottom: '10px' }}>
                 {topicGroup.topic}
               </div>
 
@@ -218,8 +218,8 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
                     style={{
                       padding: '7px 16px', border: 'none', background: 'transparent', cursor: 'pointer',
                       fontSize: '13px', fontWeight: activeTab === tab ? 600 : 400,
-                      color:       activeTab === tab ? 'var(--accent)' : 'var(--muted)',
-                      borderBottom: activeTab === tab ? '2px solid var(--accent)' : '2px solid transparent',
+                      color:       activeTab === tab ? 'var(--accent,#6c63ff)' : 'var(--muted,#6b7194)',
+                      borderBottom: activeTab === tab ? '2px solid var(--accent,#6c63ff)' : '2px solid transparent',
                       transition: 'all .12s',
                     }}
                   >
@@ -253,7 +253,7 @@ function FlashcardsPanel({ cards }: { cards: Flashcard[] }) {
 
   if (cards.length === 0) {
     return (
-      <div style={{ color: 'var(--muted)', fontSize: '13px', padding: '20px 0' }}>
+      <div style={{ color: 'var(--muted,#6b7194)', fontSize: '13px', padding: '20px 0' }}>
         Nenhum flashcard gerado para este tema ainda.
       </div>
     )
@@ -261,10 +261,10 @@ function FlashcardsPanel({ cards }: { cards: Flashcard[] }) {
 
   return (
     <div>
-      <div style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '16px' }}>
+      <div style={{ fontSize: '12px', color: 'var(--muted,#6b7194)', marginBottom: '16px' }}>
         {cards.length} flashcard{cards.length !== 1 ? 's' : ''} — clique para ver a resposta
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
         {cards.map((card) => {
           const isFlipped = !!flipped[card.id]
           return (
@@ -272,8 +272,8 @@ function FlashcardsPanel({ cards }: { cards: Flashcard[] }) {
               key={card.id}
               onClick={() => setFlipped(f => ({ ...f, [card.id]: !f[card.id] }))}
               style={{
-                background: 'var(--surface)',
-                border: `1px solid ${isFlipped ? 'var(--accent2,#00d4aa)' : 'var(--border)'}`,
+                background: 'var(--surface,#111420)',
+                border: `1px solid ${isFlipped ? 'var(--accent2,#00d4aa)' : 'var(--border,#1f2640)'}`,
                 borderRadius: '12px', padding: '18px 16px', cursor: 'pointer',
                 minHeight: '120px', display: 'flex', flexDirection: 'column', justifyContent: 'center',
                 transition: 'border-color .2s, transform .15s', userSelect: 'none',
@@ -282,13 +282,13 @@ function FlashcardsPanel({ cards }: { cards: Flashcard[] }) {
             >
               {!isFlipped ? (
                 <>
-                  <div style={{ fontSize: '10px', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--accent,#6c63ff)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>
                     Frente
                   </div>
-                  <div style={{ fontSize: '13px', color: 'var(--text)', lineHeight: 1.65, fontWeight: 500 }}>
+                  <div style={{ fontSize: '13px', color: 'var(--text,#e8eaf6)', lineHeight: 1.65, fontWeight: 500 }}>
                     {card.front}
                   </div>
-                  <div style={{ fontSize: '10px', color: 'var(--muted)', marginTop: '12px' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--muted,#6b7194)', marginTop: '12px' }}>
                     Toque para ver a resposta
                   </div>
                 </>
@@ -297,7 +297,7 @@ function FlashcardsPanel({ cards }: { cards: Flashcard[] }) {
                   <div style={{ fontSize: '10px', color: 'var(--accent2,#00d4aa)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>
                     Verso
                   </div>
-                  <div style={{ fontSize: '13px', color: 'var(--text)', lineHeight: 1.7 }}>
+                  <div style={{ fontSize: '13px', color: 'var(--text,#e8eaf6)', lineHeight: 1.7 }}>
                     {card.back}
                   </div>
                 </>
@@ -319,7 +319,7 @@ function QuestoesPanel({ questions }: { questions: Question[] }) {
 
   if (questions.length === 0) {
     return (
-      <div style={{ color: 'var(--muted)', fontSize: '13px', padding: '20px 0' }}>
+      <div style={{ color: 'var(--muted,#6b7194)', fontSize: '13px', padding: '20px 0' }}>
         Nenhuma questão gerada para este tema ainda.
       </div>
     )
@@ -340,16 +340,16 @@ function QuestoesPanel({ questions }: { questions: Question[] }) {
       {/* Placar */}
       {totalResp > 0 && (
         <div style={{
-          background: 'var(--surface)', border: '1px solid var(--border)',
+          background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)',
           borderRadius: '12px', padding: '14px 18px', marginBottom: '20px',
           display: 'flex', alignItems: 'center', gap: '16px',
         }}>
           <div style={{ fontSize: '28px', fontWeight: 700, color: pctColor, minWidth: '56px' }}>{pct}%</div>
           <div>
-            <div style={{ fontSize: '13px', color: 'var(--text)', fontWeight: 500 }}>
+            <div style={{ fontSize: '13px', color: 'var(--text,#e8eaf6)', fontWeight: 500 }}>
               {totalCertas} de {totalResp} corretas
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--muted)', marginTop: '2px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--muted,#6b7194)', marginTop: '2px' }}>
               {questions.length - totalResp > 0
                 ? `${questions.length - totalResp} ainda não respondida(s)`
                 : 'Todas respondidas!'}
@@ -368,7 +368,7 @@ function QuestoesPanel({ questions }: { questions: Question[] }) {
 
         return (
           <div key={q.id} style={{
-            background: 'var(--surface)', border: '1px solid var(--border)',
+            background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)',
             borderRadius: '12px', padding: '18px', marginBottom: '14px',
           }}>
             {/* Cabeçalho */}
@@ -377,16 +377,16 @@ function QuestoesPanel({ questions }: { questions: Question[] }) {
                 <span style={{
                   fontSize: '10px', padding: '2px 7px', borderRadius: '4px', fontWeight: 600,
                   background: q.tipo === 'cv' ? 'rgba(245,158,11,.12)' : 'rgba(108,99,255,.12)',
-                  color: q.tipo === 'cv' ? '#f59e0b' : 'var(--accent)',
+                  color: q.tipo === 'cv' ? '#f59e0b' : 'var(--accent,#6c63ff)',
                 }}>
                   {q.tipo === 'cv' ? 'CERTO / ERRADO' : 'MÚLTIPLA ESCOLHA'}
                 </span>
               </div>
-              {q.banca && <span style={{ fontSize: '10px', color: 'var(--muted)' }}>{q.banca}</span>}
+              {q.banca && <span style={{ fontSize: '10px', color: 'var(--muted,#6b7194)' }}>{q.banca}</span>}
             </div>
 
             {/* Enunciado */}
-            <div style={{ fontSize: '14px', color: 'var(--text)', lineHeight: 1.75, marginBottom: '16px', fontWeight: 500 }}>
+            <div style={{ fontSize: '14px', color: 'var(--text,#e8eaf6)', lineHeight: 1.75, marginBottom: '16px', fontWeight: 500 }}>
               {q.question}
             </div>
 
@@ -396,12 +396,12 @@ function QuestoesPanel({ questions }: { questions: Question[] }) {
                 {(['C', 'E'] as const).map(opt => {
                   const selected = answers[q.id] === opt
                   const isRight  = opt === q.gabarito
-                  let bg = 'var(--surface2,#181d2e)', brd = 'var(--border)', clr = 'var(--muted)'
+                  let bg = 'var(--surface2,#181d2e)', brd = 'var(--border,#1f2640)', clr = 'var(--muted,#6b7194)'
                   if (rev) {
                     if (isRight)           { bg = 'rgba(16,185,129,.12)'; brd = '#10b981'; clr = '#34d399' }
                     else if (selected)     { bg = 'rgba(239,68,68,.1)';   brd = '#ef4444'; clr = '#f87171' }
                   } else if (selected) {
-                    bg = 'rgba(108,99,255,.12)'; brd = 'var(--accent)'; clr = 'var(--accent)'
+                    bg = 'rgba(108,99,255,.12)'; brd = 'var(--accent,#6c63ff)'; clr = 'var(--accent,#6c63ff)'
                   }
                   return (
                     <button key={opt}
@@ -422,12 +422,12 @@ function QuestoesPanel({ questions }: { questions: Question[] }) {
                 {(q.options ?? []).map((opt, oi) => {
                   const selected = answers[q.id] === oi
                   const isRight  = oi === q.correct
-                  let bg = 'var(--surface2,#181d2e)', brd = 'var(--border)', clr = 'var(--text)'
+                  let bg = 'var(--surface2,#181d2e)', brd = 'var(--border,#1f2640)', clr = 'var(--text,#e8eaf6)'
                   if (rev) {
                     if (isRight)       { bg = 'rgba(16,185,129,.12)'; brd = '#10b981'; clr = '#34d399' }
                     else if (selected) { bg = 'rgba(239,68,68,.1)';   brd = '#ef4444'; clr = '#f87171' }
                   } else if (selected) {
-                    bg = 'rgba(108,99,255,.12)'; brd = 'var(--accent)'
+                    bg = 'rgba(108,99,255,.12)'; brd = 'var(--accent,#6c63ff)'
                   }
                   return (
                     <div key={oi}
@@ -459,8 +459,8 @@ function QuestoesPanel({ questions }: { questions: Question[] }) {
                 disabled={!answered}
                 style={{
                   marginTop: '14px', width: '100%', padding: '10px', borderRadius: '8px', border: 'none',
-                  background: answered ? 'var(--accent)' : 'var(--surface2,#181d2e)',
-                  color: answered ? '#fff' : 'var(--muted)',
+                  background: answered ? 'var(--accent,#6c63ff)' : 'var(--surface2,#181d2e)',
+                  color: answered ? '#fff' : 'var(--muted,#6b7194)',
                   fontSize: '13px', fontWeight: 600,
                   cursor: answered ? 'pointer' : 'default', transition: 'all .15s',
                 }}>
@@ -475,7 +475,7 @@ function QuestoesPanel({ questions }: { questions: Question[] }) {
                 <div style={{ fontSize: '12px', fontWeight: 700, color: isCorrect ? '#34d399' : '#f87171', marginBottom: '6px' }}>
                   {isCorrect ? '✓ Resposta correta!' : '✗ Resposta incorreta'}
                 </div>
-                <div style={{ fontSize: '12px', color: 'var(--text)', lineHeight: 1.65 }}>
+                <div style={{ fontSize: '12px', color: 'var(--text,#e8eaf6)', lineHeight: 1.65 }}>
                   {q.explanation}
                 </div>
               </div>
@@ -485,23 +485,26 @@ function QuestoesPanel({ questions }: { questions: Question[] }) {
       })}
 
       {/* Gabarito */}
-      <div style={{ marginTop: '8px', paddingTop: '20px', borderTop: '1px solid var(--border)' }}>
+      <div style={{ marginTop: '8px', paddingTop: '20px', borderTop: '1px solid var(--border,#1f2640)' }}>
         <button
           onClick={() => setShowGab(g => !g)}
           style={{
             width: '100%', padding: '11px', borderRadius: '10px', cursor: 'pointer',
-            border: '1px solid var(--border)',
+            border: '1px solid var(--border,#1f2640)',
             background: showGab ? 'rgba(108,99,255,.12)' : 'transparent',
-            color: showGab ? 'var(--accent)' : 'var(--muted)',
+            color: showGab ? 'var(--accent,#6c63ff)' : 'var(--muted,#6b7194)',
             fontSize: '13px', fontWeight: 600, transition: 'all .15s',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
           }}>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path d="M7 1.5v11M2 7h10" strokeLinecap="round"/>
+          </svg>
           {showGab ? 'Ocultar Gabarito' : 'Ver Gabarito'}
         </button>
 
         {showGab && (
-          <div style={{ marginTop: '16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', fontSize: '11px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600 }}>
+          <div style={{ marginTop: '16px', background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)', borderRadius: '12px', overflow: 'hidden' }}>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border,#1f2640)', fontSize: '11px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600 }}>
               Gabarito — {questions.length} questão(ões)
             </div>
             {questions.map((q, qi) => {
@@ -512,14 +515,14 @@ function QuestoesPanel({ questions }: { questions: Question[] }) {
               return (
                 <div key={q.id} style={{
                   padding: '12px 16px',
-                  borderBottom: qi < questions.length - 1 ? '1px solid var(--border)' : 'none',
+                  borderBottom: qi < questions.length - 1 ? '1px solid var(--border,#1f2640)' : 'none',
                   display: 'flex', gap: '12px', alignItems: 'flex-start',
                 }}>
-                  <div style={{ minWidth: '28px', fontSize: '11px', color: 'var(--accent)', fontWeight: 700, paddingTop: '2px' }}>Q{qi + 1}</div>
+                  <div style={{ minWidth: '28px', fontSize: '11px', color: 'var(--accent,#6c63ff)', fontWeight: 700, paddingTop: '2px' }}>Q{qi + 1}</div>
                   <div style={{
                     fontSize: '10px', padding: '2px 6px', borderRadius: '4px', fontWeight: 600, whiteSpace: 'nowrap', marginTop: '1px',
                     background: q.tipo === 'cv' ? 'rgba(245,158,11,.12)' : 'rgba(108,99,255,.12)',
-                    color: q.tipo === 'cv' ? '#f59e0b' : 'var(--accent)',
+                    color: q.tipo === 'cv' ? '#f59e0b' : 'var(--accent,#6c63ff)',
                   }}>
                     {q.tipo === 'cv' ? 'C/E' : 'MC'}
                   </div>
@@ -530,8 +533,8 @@ function QuestoesPanel({ questions }: { questions: Question[] }) {
                     }}>
                       {letraCorreta}
                     </span>
-                    {textoOpcao && <span style={{ fontSize: '12px', color: 'var(--text)' }}>{textoOpcao}</span>}
-                    <div style={{ fontSize: '11px', color: 'var(--muted)', marginTop: '4px', lineHeight: 1.5 }}>
+                    {textoOpcao && <span style={{ fontSize: '12px', color: 'var(--text,#e8eaf6)' }}>{textoOpcao}</span>}
+                    <div style={{ fontSize: '11px', color: 'var(--muted,#6b7194)', marginTop: '4px', lineHeight: 1.5 }}>
                       {q.explanation}
                     </div>
                   </div>
