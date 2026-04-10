@@ -219,8 +219,26 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
             {/* Tab content */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '22px 28px' }}>
               {activeTab === 'resumo' && (
-                <div style={{ fontSize: '14px', lineHeight: 1.9, color: '#c8cae6', whiteSpace: 'pre-wrap' }}>
-                  {selected.content || 'Conteúdo não disponível.'}
+                <div className="ed-library-content" style={{ fontSize: '14px', lineHeight: 1.9, color: '#c8cae6' }}>
+                  {(() => {
+                    if (!selected.content) return 'Conteúdo não disponível.'
+                    try {
+                      const data = JSON.parse(selected.content)
+                      if (data.type === 'rich') {
+                        return (
+                          <div style={{ position: 'relative' }}>
+                            <div dangerouslySetInnerHTML={{ __html: data.html }} />
+                            {data.canvas && (
+                              <img src={data.canvas} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 'auto', pointerEvents: 'none' }} alt="Anotações" />
+                            )}
+                          </div>
+                        )
+                      }
+                    } catch {}
+                    
+                    // Fallback para markdown antigo usando html simples ou whiteSpace
+                    return <div style={{ whiteSpace: 'pre-wrap' }}>{selected.content}</div>
+                  })()}
                 </div>
               )}
 

@@ -244,15 +244,15 @@ export function EditableResumo({ content, sessionId, loading }: Props) {
 
         {/* Text Formats (only works when text mode) */}
         <div style={{ display: 'flex', gap: '2px', opacity: mode === 'text' ? 1 : 0.5, pointerEvents: mode === 'text' ? 'auto' : 'none' }}>
-          <button onClick={() => formatText('bold')} style={{ padding: '6px', borderRadius: '6px', background: 'transparent', color: 'var(--muted)', cursor: 'pointer', border: 'none' }} title="Negrito"><Bold size={16}/></button>
-          <button onClick={() => formatText('italic')} style={{ padding: '6px', borderRadius: '6px', background: 'transparent', color: 'var(--muted)', cursor: 'pointer', border: 'none' }} title="Itálico"><Italic size={16}/></button>
-          <button onClick={() => formatText('underline')} style={{ padding: '6px', borderRadius: '6px', background: 'transparent', color: 'var(--muted)', cursor: 'pointer', border: 'none' }} title="Sublinhado"><Underline size={16}/></button>
+          <button onMouseDown={e => e.preventDefault()} onClick={() => formatText('bold')} style={{ padding: '6px', borderRadius: '6px', background: 'transparent', color: 'var(--muted)', cursor: 'pointer', border: 'none' }} title="Negrito"><Bold size={16}/></button>
+          <button onMouseDown={e => e.preventDefault()} onClick={() => formatText('italic')} style={{ padding: '6px', borderRadius: '6px', background: 'transparent', color: 'var(--muted)', cursor: 'pointer', border: 'none' }} title="Itálico"><Italic size={16}/></button>
+          <button onMouseDown={e => e.preventDefault()} onClick={() => formatText('underline')} style={{ padding: '6px', borderRadius: '6px', background: 'transparent', color: 'var(--muted)', cursor: 'pointer', border: 'none' }} title="Sublinhado"><Underline size={16}/></button>
           
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center', marginLeft: '4px' }}>
-            <button onClick={() => formatText('hiliteColor', hlColor)} style={{ padding: '6px', borderRadius: '6px', background: 'transparent', color: hlColor, cursor: 'pointer', border: 'none' }} title="Realçar">
+            <button onMouseDown={e => e.preventDefault()} onClick={() => formatText('backColor', hlColor)} style={{ padding: '6px', borderRadius: '6px', background: 'transparent', color: hlColor, cursor: 'pointer', border: 'none' }} title="Realçar">
               <Highlighter size={16}/>
             </button>
-            <input type="color" value={hlColor} onChange={e => setHlColor(e.target.value)} style={{ width: '20px', height: '20px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }} />
+            <input type="color" value={hlColor} onChange={e => setHlColor(e.target.value)} style={{ width: '20px', height: '20px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', margin: '0 4px' }} title="Escolher cor de realce" />
           </div>
         </div>
 
