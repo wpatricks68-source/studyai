@@ -149,6 +149,28 @@ export default function BuscaPage() {
     setGenTarget(null)
   }
 
+  // ─── LIMPAR SESSÃO (Novo Projeto) ─────────────────────────
+  const handleClear = useCallback(() => {
+    setDisciplina('')
+    setTema('')
+    setQuery('')
+    setSession(EMPTY)
+    setView('resumo')
+    setPhase('idle')
+    setGenTarget(null)
+    setError('')
+    try { sessionStorage.removeItem('busca_session') } catch {}
+    
+    // Remove id from URL if present
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href)
+      if (url.searchParams.has('id')) {
+        url.searchParams.delete('id')
+        window.history.replaceState({}, '', url.toString())
+      }
+    }
+  }, [])
+
   // ─── BUSCA PRINCIPAL ──────────────────────────────────────
   const handleSearch = useCallback(async () => {
     const temaFinal = tema.trim()
@@ -723,6 +745,21 @@ export default function BuscaPage() {
             </button>
           ) : (
             <>
+              {hasContent && (
+                <button
+                  onClick={handleClear}
+                  title="Limpar sessão para começar um novo projeto"
+                  style={{
+                    padding: '9px 14px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)',
+                    background: 'transparent', color: 'var(--text,#e8eaf6)',
+                    fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: '5px'
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>
+                  Novo
+                </button>
+              )}
               {!hasContent && (
                 <button
                   onClick={handleManualCreate}
