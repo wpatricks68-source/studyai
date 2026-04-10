@@ -853,11 +853,11 @@ export default function BuscaPage() {
 
               {/* Botão FLASHCARDS */}
               <button
-                onClick={handleFlashcards}
-                disabled={!session.resumo || !!genTarget}
+                onClick={() => setView('flashcards')}
+                disabled={!session.resumo}
                 style={{
                   padding: '5px 14px', borderRadius: '7px', fontSize: '12px', fontWeight: 500,
-                  cursor: !session.resumo || !!genTarget ? 'default' : 'pointer',
+                  cursor: !session.resumo ? 'default' : 'pointer',
                   border: '1px solid',
                   borderColor: view === 'flashcards' ? '#00d4aa' : 'var(--border,#1f2640)',
                   background: genTarget === 'flashcards' ? 'rgba(0,212,170,.1)' : view === 'flashcards' ? 'rgba(0,212,170,.1)' : 'transparent',
@@ -871,11 +871,11 @@ export default function BuscaPage() {
 
               {/* Botão QUESTÕES */}
               <button
-                onClick={handleQuestions}
-                disabled={!session.resumo || !!genTarget}
+                onClick={() => setView('questoes')}
+                disabled={!session.resumo}
                 style={{
                   padding: '5px 14px', borderRadius: '7px', fontSize: '12px', fontWeight: 500,
-                  cursor: !session.resumo || !!genTarget ? 'default' : 'pointer',
+                  cursor: !session.resumo ? 'default' : 'pointer',
                   border: '1px solid',
                   borderColor: view === 'questoes' ? '#f59e0b' : 'var(--border,#1f2640)',
                   background: genTarget === 'questions' ? 'rgba(245,158,11,.1)' : view === 'questoes' ? 'rgba(245,158,11,.1)' : 'transparent',
@@ -927,12 +927,12 @@ export default function BuscaPage() {
 
               {/* ── FLASHCARDS ── */}
               {view === 'flashcards' && (
-                <FlashcardsView cards={session.flashcards} loading={genTarget === 'flashcards'} />
+                <FlashcardsView cards={session.flashcards} loading={genTarget === 'flashcards'} onOpenManual={() => setShowManualFcModal(true)} onGenerateAI={handleFlashcards} />
               )}
 
               {/* ── QUESTÕES ── */}
               {view === 'questoes' && (
-                <QuestoesView questions={session.questions} loading={genTarget === 'questions'} />
+                <QuestoesView questions={session.questions} loading={genTarget === 'questions'} onOpenManual={() => setShowManualQModal(true)} onGenerateAI={handleQuestions} />
               )}
             </div>
           </div>
@@ -1188,17 +1188,36 @@ function ResumoView({ content, loading }: { content: string; loading: boolean })
 }
 
 // ─── Sub-componente: FLASHCARDS ────────────────────────────
-function FlashcardsView({ cards, loading, onOpenManual }: { cards: Flashcard[]; loading: boolean; onOpenManual?: () => void }) {
+function FlashcardsView({ cards, loading, onOpenManual, onGenerateAI }: { cards: Flashcard[]; loading: boolean; onOpenManual?: () => void; onGenerateAI?: () => void }) {
   const [flipped, setFlipped] = useState<Record<number, boolean>>({})
   if (loading) return <LoadingDots label="Criando flashcards..." />
+
+  if (cards.length === 0) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '50px 20px', background: 'var(--surface,#111420)', borderRadius: '12px', border: '1px dashed var(--border,#1f2640)' }}>
+        <div style={{ color: 'var(--text,#e8eaf6)', fontSize: '15px', fontWeight: 600, marginBottom: '8px' }}>Nenhum flashcard gerado ainda</div>
+        <div style={{ color: 'var(--muted,#6b7194)', fontSize: '13px', marginBottom: '24px', textAlign: 'center' }}>Como você deseja criar seus flashcards para este tema?</div>
+        
+        <div style={{ display: 'flex', gap: '16px' }}>
+          <button onClick={onGenerateAI} style={{ padding: '14px 24px', borderRadius: '10px', background: 'rgba(0,212,170,.1)', border: '1px solid #00d4aa', color: '#00d4aa', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', minWidth: '160px', transition: 'all .2s' }}>
+             Gerar com IA
+             <span style={{ fontSize: '11px', fontWeight: 400, opacity: 0.8 }}>Automático</span>
+          </button>
+          
+          <button onClick={onOpenManual} style={{ padding: '14px 24px', borderRadius: '10px', background: 'transparent', border: '1px solid var(--border,#1f2640)', color: 'var(--text,#e8eaf6)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', minWidth: '160px', transition: 'all .2s' }}>
+             Criar Manualmente
+             <span style={{ fontSize: '11px', fontWeight: 400, opacity: 0.8, color: 'var(--muted,#6b7194)' }}>Você escreve</span>
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
         <div style={{ fontSize: '12px', color: 'var(--muted,#6b7194)' }}>
-          {cards.length === 0
-            ? 'Nenhum flashcard gerado ainda. Clique no botão ao lado para criar o seu.'
-            : `${cards.length} flashcard${cards.length !== 1 ? 's' : ''} — clique em cada card para ver a resposta`}
+          {cards.length} flashcard{cards.length !== 1 ? 's' : ''} — clique em cada card para ver a resposta
         </div>
         {onOpenManual && (
           <button onClick={onOpenManual} style={{ padding: '6px 14px', borderRadius: '8px', background: 'var(--accent,#6c63ff)', color: '#fff', fontSize: '12px', fontWeight: 600, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
@@ -1248,12 +1267,33 @@ function FlashcardsView({ cards, loading, onOpenManual }: { cards: Flashcard[]; 
 }
 
 // ─── Sub-componente: QUESTÕES ──────────────────────────────
-function QuestoesView({ questions, loading, onOpenManual }: { questions: Question[]; loading: boolean; onOpenManual?: () => void }) {
+function QuestoesView({ questions, loading, onOpenManual, onGenerateAI }: { questions: Question[]; loading: boolean; onOpenManual?: () => void; onGenerateAI?: () => void }) {
   const [answers,      setAnswers]      = useState<Record<number, string | number>>({})
   const [revealed,     setRevealed]     = useState<Record<number, boolean>>({})
   const [showGabarito, setShowGabarito] = useState(false)
 
   if (loading) return <LoadingDots label="Gerando questões..." />
+
+  if (questions.length === 0) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '50px 20px', background: 'var(--surface,#111420)', borderRadius: '12px', border: '1px dashed var(--border,#1f2640)', maxWidth: '760px' }}>
+        <div style={{ color: 'var(--text,#e8eaf6)', fontSize: '15px', fontWeight: 600, marginBottom: '8px' }}>Nenhuma questão gerada ainda</div>
+        <div style={{ color: 'var(--muted,#6b7194)', fontSize: '13px', marginBottom: '24px', textAlign: 'center' }}>Como você deseja começar a criar questões para este tema?</div>
+        
+        <div style={{ display: 'flex', gap: '16px' }}>
+          <button onClick={onGenerateAI} style={{ padding: '14px 24px', borderRadius: '10px', background: 'rgba(245,158,11,.1)', border: '1px solid #f59e0b', color: '#f59e0b', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', minWidth: '160px', transition: 'all .2s' }}>
+             Gerar com IA
+             <span style={{ fontSize: '11px', fontWeight: 400, opacity: 0.8 }}>Automático</span>
+          </button>
+          
+          <button onClick={onOpenManual} style={{ padding: '14px 24px', borderRadius: '10px', background: 'transparent', border: '1px solid var(--border,#1f2640)', color: 'var(--text,#e8eaf6)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', minWidth: '160px', transition: 'all .2s' }}>
+             Criar Manualmente
+             <span style={{ fontSize: '11px', fontWeight: 400, opacity: 0.8, color: 'var(--muted,#6b7194)' }}>Você elabora</span>
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   const totalRespondidas = Object.keys(revealed).length
   const totalCorretas    = Object.entries(revealed).filter(([qi, rev]) => {
@@ -1267,10 +1307,7 @@ function QuestoesView({ questions, loading, onOpenManual }: { questions: Questio
   return (
     <div style={{ maxWidth: '760px' }}>
       
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
-        <div style={{ color: 'var(--muted,#6b7194)', fontSize: '13px' }}>
-          {questions.length === 0 ? 'Nenhuma questão gerada ainda. Clique para criar uma manualmente.' : ''}
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start', marginBottom: '20px' }}>
         {onOpenManual && (
           <button onClick={onOpenManual} style={{ padding: '6px 14px', borderRadius: '8px', background: 'var(--accent,#6c63ff)', color: '#fff', fontSize: '12px', fontWeight: 600, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
             + Nova Questão
