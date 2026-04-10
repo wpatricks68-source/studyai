@@ -400,6 +400,116 @@ export default function BuscaPage() {
     }
   }
 
+  // ─── EXPORTAR PDF ──────────────────────────────────────────
+  function handleExportPDF() {
+    const { disciplina, tema, resumo, flashcards, questions } = session
+    const titulo = disciplina ? `${disciplina} — ${tema || 'Resumo'}` : (tema || 'StudyAI — Resumo')
+
+    // Converte markdown do resumo em HTML simples
+    function mdToHtml(md: string): string {
+      return md.split('\n').map(line => {
+        if (line.startsWith('## '))  return `<h2>${line.slice(3)}</h2>`
+        if (line.startsWith('### ')) return `<h3>${line.slice(4)}</h3>`
+        if (line.startsWith('- ') || line.startsWith('\u2022 '))
+          return `<li>${line.replace(/^[-\u2022] /, '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</li>`
+        if (line.trim() === '') return '<br/>'
+        return `<p>${line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</p>`
+      }).join('')
+    }
+
+    const flashcardsHTML = flashcards.length === 0 ? '<p style="color:#666">Nenhum flashcard gerado.</p>' :
+      flashcards.map((fc, i) => `
+        <div class="card">
+          <div class="card-num">CARD ${i + 1}</div>
+          <div class="card-front"><strong>Frente:</strong><br/>${fc.front}</div>
+          <div class="card-back"><strong>Verso:</strong><br/>${fc.back}</div>
+        </div>`).join('')
+
+    const questoesHTML = questions.length === 0 ? '<p style="color:#666">Nenhuma questão gerada.</p>' :
+      questions.map((q, qi) => {
+        const gabarito = q.tipo === 'cv'
+          ? (q.gabarito === 'C' ? '✓ CERTO' : '✗ ERRADO')
+          : `${['A','B','C','D','E'][q.correct ?? 0]} — ${q.options?.[q.correct ?? 0] ?? ''}`
+        const opts = q.tipo === 'mc' && q.options
+          ? `<ol class="opts">${q.options.map((o, oi) => `<li class="${oi === q.correct ? 'correta' : ''}">${o}</li>`).join('')}</ol>`
+          : ''
+        return `
+          <div class="quest">
+            <div class="q-header">
+              <span class="q-num">Q${qi + 1}</span>
+              <span class="q-tipo">${q.tipo === 'cv' ? 'CERTO / ERRADO' : 'MÚkTIPLA ESCOLHA'}</span>
+              ${q.banca ? `<span class="q-banca">${q.banca}</span>` : ''}
+            </div>
+            <p class="q-enunciado">${q.question}</p>
+            ${opts}
+            <div class="q-gabarito">► Gabarito: <strong>${gabarito}</strong></div>
+            <div class="q-exp">${q.explanation ?? ''}</div>
+          </div>`
+      }).join('')
+
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <title>${titulo}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Georgia', serif; color: #111; background: #fff; padding: 40px 50px; max-width: 900px; margin: 0 auto; font-size: 13px; line-height: 1.75; }
+    h1 { font-size: 22px; margin-bottom: 4px; color: #1a1a2e; }
+    .subtitle { font-size: 12px; color: #666; margin-bottom: 32px; border-bottom: 2px solid #6c63ff; padding-bottom: 10px; }
+    .section-title { font-size: 16px; font-weight: 700; color: #6c63ff; margin: 32px 0 16px; padding-left: 10px; border-left: 4px solid #6c63ff; text-transform: uppercase; letter-spacing: 1px; }
+    h2 { font-size: 15px; margin: 20px 0 6px; color: #1a1a2e; border-left: 3px solid #6c63ff; padding-left: 10px; }
+    h3 { font-size: 13px; font-weight: 700; margin: 14px 0 4px; color: #333; }
+    p  { margin: 4px 0; }
+    li { margin: 3px 0 3px 20px; }
+    strong { color: #1a1a2e; }
+    /* Flashcards */
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 14px 16px; margin-bottom: 12px; page-break-inside: avoid; }
+    .card-num { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #6c63ff; font-weight: 700; margin-bottom: 8px; }
+    .card-front { background: #f7f7ff; border-radius: 6px; padding: 8px 12px; margin-bottom: 8px; font-weight: 600; }
+    .card-back  { background: #f0fdf8; border-radius: 6px; padding: 8px 12px; color: #065f46; }
+    /* Questões */
+    .quest { border: 1px solid #ddd; border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; page-break-inside: avoid; }
+    .q-header { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+    .q-num  { font-size: 11px; font-weight: 700; color: #6c63ff; }
+    .q-tipo { font-size: 10px; background: #f0eeff; color: #6c63ff; padding: 2px 7px; border-radius: 4px; font-weight: 700; }
+    .q-banca{ font-size: 10px; color: #999; margin-left: auto; }
+    .q-enunciado { font-size: 13px; font-weight: 600; margin-bottom: 10px; line-height: 1.6; }
+    .opts { margin: 8px 0 8px 20px; }
+    .opts li { margin: 4px 0; font-size: 12px; }
+    .opts li.correta { font-weight: 700; color: #065f46; }
+    .q-gabarito { margin-top: 10px; font-size: 12px; color: #065f46; border-top: 1px dashed #ccc; padding-top: 8px; }
+    .q-exp { font-size: 11px; color: #555; margin-top: 6px; line-height: 1.6; }
+    @media print {
+      body { padding: 20px 30px; }
+      .section-title { margin-top: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <h1>${titulo}</h1>
+  <div class="subtitle">Gerado por StudyAI &mdash; ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
+
+  <div class="section-title">📝 Resumo</div>
+  ${mdToHtml(typeof resumo === 'string' ? resumo : '')}
+
+  <div class="section-title">🃟 Flashcards (${flashcards.length})</div>
+  ${flashcardsHTML}
+
+  <div class="section-title">❓ Questões (${questions.length})</div>
+  ${questoesHTML}
+
+  <script>window.onload = () => window.print()<\/script>
+</body>
+</html>`
+
+    const win = window.open('', '_blank')
+    if (win) {
+      win.document.write(html)
+      win.document.close()
+    }
+  }
+
   const isLoading  = phase === 'searching' || phase === 'generating'
   const hasContent = phase === 'done' && session.resumo
 
@@ -443,16 +553,35 @@ export default function BuscaPage() {
             }}
           />
 
-          {/* PDF */}
+          {/* Arquivo (upload PDF/txt) */}
           <label style={{
             padding: '8px 14px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)',
             color: 'var(--muted,#6b7194)',
             fontSize: '13px', cursor: isLoading ? 'default' : 'pointer', whiteSpace: 'nowrap',
             pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? .5 : 1,
+            display: 'flex', alignItems: 'center', gap: '5px',
           }}>
-            PDF
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 2v9M4 7l4 4 4-4"/><rect x="2" y="12" width="12" height="2" rx="1"/></svg>
+            Arquivo
             <input type="file" accept=".pdf,.txt,.md" style={{ display: 'none' }} onChange={handleUpload} disabled={isLoading} />
           </label>
+
+          {/* Exportar PDF */}
+          {hasContent && (
+            <button
+              onClick={handleExportPDF}
+              title="Exportar todo o conteúdo em PDF"
+              style={{
+                padding: '8px 14px', borderRadius: '8px', border: '1px solid #6c63ff',
+                background: 'rgba(108,99,255,.12)', color: 'var(--accent,#6c63ff)',
+                fontSize: '13px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+                display: 'flex', alignItems: 'center', gap: '5px',
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M2 4h8l4 4v6a1 1 0 01-1 1H3a1 1 0 01-1-1V5a1 1 0 011-1z"/><path d="M10 4v4h4"/><path d="M6 10v3M4.5 11.5L6 13l1.5-1.5" strokeLinecap="round"/></svg>
+              Exportar PDF
+            </button>
+          )}
 
           {isLoading ? (
             <button onClick={cancel} style={{ padding: '9px 18px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)', background: 'transparent', color: 'var(--red,#ef4444)', fontSize: '13px', cursor: 'pointer' }}>
@@ -781,7 +910,7 @@ function ResumoView({ content, loading }: { content: string; loading: boolean })
           </h2>
         )
         if (line.startsWith('### ')) return (
-          <h3 key={i} style={{ fontSize: '14px', fontWeight: 600, color: '#a09cf7', margin: '16px 0 6px' }}>
+          <h3 key={i} style={{ fontSize: '14px', fontWeight: 600, color: 'var(--accent,#6c63ff)', margin: '16px 0 6px' }}>
             {line.replace('### ', '')}
           </h3>
         )
@@ -791,7 +920,7 @@ function ResumoView({ content, loading }: { content: string; loading: boolean })
           </p>
         )
         if (line.startsWith('- ') || line.startsWith('• ')) return (
-          <div key={i} style={{ display: 'flex', gap: '8px', fontSize: '13px', color: '#c8cae6', lineHeight: 1.7, marginBottom: '4px', paddingLeft: '8px' }}>
+          <div key={i} style={{ display: 'flex', gap: '8px', fontSize: '13px', color: 'var(--text,#e8eaf6)', lineHeight: 1.7, marginBottom: '4px', paddingLeft: '8px' }}>
             <span style={{ color: 'var(--accent,#6c63ff)', flexShrink: 0 }}>•</span>
             <span>{line.replace(/^[-•] /, '')}</span>
           </div>
@@ -800,7 +929,7 @@ function ResumoView({ content, loading }: { content: string; loading: boolean })
         // Linha normal — processa negrito inline
         const parts = line.split(/(\*\*[^*]+\*\*)/g)
         return (
-          <p key={i} style={{ fontSize: '13px', color: '#c8cae6', lineHeight: 1.85, margin: '0 0 4px' }}>
+          <p key={i} style={{ fontSize: '13px', color: 'var(--text,#e8eaf6)', lineHeight: 1.85, margin: '0 0 4px' }}>
             {parts.map((part, j) =>
               part.startsWith('**') && part.endsWith('**')
                 ? <strong key={j} style={{ color: 'var(--text,#e8eaf6)', fontWeight: 600 }}>{part.replace(/\*\*/g, '')}</strong>
@@ -850,10 +979,10 @@ function FlashcardsView({ cards, loading }: { cards: Flashcard[]; loading: boole
               </>
             ) : (
               <>
-                <div style={{ fontSize: '10px', color: '#00d4aa', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>
+                <div style={{ fontSize: '10px', color: 'var(--accent2,#00d4aa)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>
                   Resposta
                 </div>
-                <div style={{ fontSize: '13px', color: '#c8cae6', lineHeight: 1.7 }}>
+                <div style={{ fontSize: '13px', color: 'var(--text,#e8eaf6)', lineHeight: 1.7 }}>
                   {card.back}
                 </div>
               </>
