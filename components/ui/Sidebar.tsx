@@ -14,7 +14,7 @@ const navItems = [
       { href: '/dashboard',            label: 'Dashboard',    icon: IconGrid },
       { href: '/dashboard/busca',      label: 'Busca + IA',   icon: IconSearch },
       { href: '/dashboard/resumos',    label: 'Resumos',      icon: IconBook },
-      { href: '/dashboard/flashcards', label: 'Flashcards',   icon: IconCards },
+      { href: '/dashboard/flashcards', label: 'Estudo Ativo', icon: IconCards },
     ],
   },
   {
