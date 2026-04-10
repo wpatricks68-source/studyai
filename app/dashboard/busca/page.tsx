@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { EditableResumo } from '@/components/study/EditableResumo'
 
 type GenType  = 'summary' | 'flashcards' | 'questions'
 type ViewMode = 'resumo' | 'flashcards' | 'questoes'
@@ -558,7 +559,11 @@ export default function BuscaPage() {
 
               {/* ── RESUMO ── */}
               {view === 'resumo' && (
-                <ResumoView content={session.resumo} loading={genTarget === 'summary'} />
+                <EditableResumo 
+                  content={session.resumo} 
+                  loading={genTarget === 'summary'} 
+                  sessionId={session.sessionId} 
+                />
               )}
 
               {/* ── FLASHCARDS ── */}
