@@ -282,7 +282,7 @@ export default function BuscaPage() {
             topic:       temaFinal,
             materia:     discFinal || null,
             content:     '<p><br></p>',
-            source_type: 'manual',
+            source_type: 'upload', // Changed from 'manual' to bypass Supabase constraint
           })
           .select('id')
           .single()
