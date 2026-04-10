@@ -49,6 +49,8 @@ export function EditableResumo({ content, sessionId, loading }: Props) {
   const [penColor, setPenColor] = React.useState('#ef4444') // default red pen
   const [penSize, setPenSize] = React.useState(2)
   const [hlColor, setHlColor] = React.useState('#ffff00')
+  const [foreColor, setForeColor] = React.useState('#e8eaf6')
+  const [fontSizeItem, setFontSizeItem] = React.useState('3')
 
   // Saved selection for highlight (selection is lost when clicking toolbar)
   const savedSelectionRef = React.useRef<Range | null>(null)
@@ -249,7 +251,7 @@ export function EditableResumo({ content, sessionId, loading }: Props) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxWidth: '800px', background: 'var(--surface)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxWidth: '800px', margin: '0 auto', background: 'var(--surface)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' }}>
       
       {/* TOOLBAR */}
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', padding: '12px 14px', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
@@ -289,6 +291,46 @@ export function EditableResumo({ content, sessionId, loading }: Props) {
               title="Escolher cor de realce"
             />
           </div>
+
+          <div style={{ width: '1px', height: '20px', background: 'var(--border)', margin: '0 4px' }} />
+
+          {/* Cor da Fonte */}
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <span style={{ fontSize: '13px', fontWeight: 700, color: foreColor, padding: '0 4px' }} title="Cor do texto">A</span>
+            <input
+              type="color"
+              value={foreColor}
+              onMouseDown={saveSelection}
+              onChange={e => {
+                setForeColor(e.target.value)
+                formatText('foreColor', e.target.value)
+              }}
+              style={{ width: '20px', height: '20px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', margin: '0 4px' }}
+              title="Alterar cor da fonte"
+            />
+          </div>
+
+          <div style={{ width: '1px', height: '20px', background: 'var(--border)', margin: '0 4px' }} />
+
+          {/* Tamanho da Fonte */}
+          <select 
+            value={fontSizeItem}
+            onMouseDown={saveSelection}
+            onChange={e => {
+               setFontSizeItem(e.target.value)
+               formatText('fontSize', e.target.value)
+            }}
+            style={{ background: 'transparent', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '12px', padding: '2px 4px', outline: 'none', cursor: 'pointer' }}
+            title="Tamanho da fonte"
+          >
+            <option value="1">Tamanho 1</option>
+            <option value="2">Tamanho 2</option>
+            <option value="3">Tamanho 3</option>
+            <option value="4">Tamanho 4</option>
+            <option value="5">Tamanho 5</option>
+            <option value="6">Tamanho 6</option>
+            <option value="7">Tamanho 7</option>
+          </select>
         </div>
 
         <div style={{ width: '1px', height: '24px', background: 'var(--border)', margin: '0 4px' }} />
