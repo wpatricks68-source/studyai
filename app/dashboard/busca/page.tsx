@@ -52,19 +52,56 @@ export default function BuscaPage() {
   const [qConfig,    setQConfig]    = useState<QuestoesConfig>({ quantidade: 10, tipo: 'misto' })
   const abortRef = useRef<AbortController | null>(null)
 
-  // ─── Persistir sessão no sessionStorage ───────────────────
   useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem('busca_session')
-      if (!raw) return
-      const { session: s, query: q, view: v } = JSON.parse(raw)
-      if (s?.resumo) {
-        setSession(s)
-        setQuery(q ?? '')
-        setView(v ?? 'resumo')
-        setPhase('done')
+    const loadSession = async () => {
+      const params = new URLSearchParams(window.location.search)
+      const idParam = params.get('id')
+      
+      if (idParam) {
+        setPhase('searching')
+        const supabase = createClient()
+        const [
+          { data, error },
+          { data: flashcardsData },
+          { data: questionsData }
+        ] = await Promise.all([
+          supabase.from('study_sessions').select('*').eq('id', idParam).single(),
+          supabase.from('flashcards').select('*').eq('session_id', idParam),
+          supabase.from('questions').select('*').eq('session_id', idParam)
+        ])
+        
+        if (data && !error) {
+          setSession({
+            query: data.topic,
+            resumo: data.content ?? '',
+            flashcards: Array.isArray(flashcardsData) ? flashcardsData : [],
+            questions: Array.isArray(questionsData) ? questionsData : [],
+            sources: [],
+            sessionId: data.id,
+            savedAt: new Date(data.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          })
+          setQuery(data.topic)
+          setView('resumo')
+          setPhase('done')
+        } else {
+          setPhase('idle')
+        }
+        return // skip sessionStorage if we tried loading by ID
       }
-    } catch {}
+      
+      try {
+        const raw = sessionStorage.getItem('busca_session')
+        if (!raw) return
+        const { session: s, query: q, view: v } = JSON.parse(raw)
+        if (s?.resumo) {
+          setSession(s)
+          setQuery(q ?? '')
+          setView(v ?? 'resumo')
+          setPhase('done')
+        }
+      } catch {}
+    }
+    loadSession()
   }, [])
 
   useEffect(() => {
