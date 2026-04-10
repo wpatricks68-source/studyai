@@ -27,23 +27,28 @@ interface QuestoesConfig {
 }
 
 interface SessionState {
-  query:      string
-  resumo:     string
-  flashcards: Flashcard[]
-  questions:  Question[]
-  sources:    Source[]
-  sessionId:  string | null
-  savedAt:    string | null
+  query:       string       // disciplina: tema
+  disciplina:  string
+  tema:        string
+  resumo:      string
+  flashcards:  Flashcard[]
+  questions:   Question[]
+  sources:     Source[]
+  sessionId:   string | null
+  savedAt:     string | null
 }
 
 // ─── Estado vazio inicial ───────────────────────────────────
 const EMPTY: SessionState = {
-  query: '', resumo: '', flashcards: [], questions: [],
+  query: '', disciplina: '', tema: '', resumo: '',
+  flashcards: [], questions: [],
   sources: [], sessionId: null, savedAt: null,
 }
 
 export default function BuscaPage() {
-  const [query,      setQuery]      = useState('')
+  const [disciplina, setDisciplina] = useState('')
+  const [tema,       setTema]       = useState('')
+  const [query,      setQuery]      = useState('') // disciplina: tema — mantido para compatibilidade
   const [session,    setSession]    = useState<SessionState>(EMPTY)
   const [view,       setView]       = useState<ViewMode>('resumo')
   const [phase,      setPhase]      = useState<'idle' | 'searching' | 'generating' | 'done'>('idle')
@@ -72,31 +77,39 @@ export default function BuscaPage() {
         ])
         
         if (data && !error) {
+          const mat  = data.materia ?? ''
+          const top  = data.topic ?? ''
+          setDisciplina(mat)
+          setTema(top)
+          setQuery(mat ? `${mat}: ${top}` : top)
           setSession({
-            query: data.topic,
-            resumo: data.content ?? '',
+            query:      mat ? `${mat}: ${top}` : top,
+            disciplina: mat,
+            tema:       top,
+            resumo:     data.content ?? '',
             flashcards: Array.isArray(flashcardsData) ? flashcardsData : [],
-            questions: Array.isArray(questionsData) ? questionsData : [],
-            sources: [],
-            sessionId: data.id,
-            savedAt: new Date(data.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+            questions:  Array.isArray(questionsData)  ? questionsData  : [],
+            sources:    [],
+            sessionId:  data.id,
+            savedAt:    new Date(data.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
           })
-          setQuery(data.topic)
           setView('resumo')
           setPhase('done')
         } else {
           setPhase('idle')
         }
-        return // skip sessionStorage if we tried loading by ID
+        return
       }
       
       try {
         const raw = sessionStorage.getItem('busca_session')
         if (!raw) return
-        const { session: s, query: q, view: v } = JSON.parse(raw)
+        const { session: s, query: q, disciplina: d, tema: t, view: v } = JSON.parse(raw)
         if (s?.resumo) {
           setSession(s)
           setQuery(q ?? '')
+          setDisciplina(d ?? '')
+          setTema(t ?? '')
           setView(v ?? 'resumo')
           setPhase('done')
         }
@@ -108,12 +121,12 @@ export default function BuscaPage() {
   useEffect(() => {
     if (phase === 'done' && session.resumo) {
       try {
-        sessionStorage.setItem('busca_session', JSON.stringify({ session, query, view }))
+        sessionStorage.setItem('busca_session', JSON.stringify({ session, query, disciplina, tema, view }))
       } catch {}
     } else if (phase === 'idle' && !session.resumo) {
       sessionStorage.removeItem('busca_session')
     }
-  }, [session, query, view, phase])
+  }, [session, query, disciplina, tema, view, phase])
 
   // ─── Cancelar busca em andamento ──────────────────────────
   function cancel() {
@@ -124,7 +137,11 @@ export default function BuscaPage() {
 
   // ─── BUSCA PRINCIPAL ──────────────────────────────────────
   const handleSearch = useCallback(async () => {
-    if (!query.trim() || phase !== 'idle') return
+    const temaFinal = tema.trim()
+    const discFinal = disciplina.trim()
+    if (!temaFinal || phase !== 'idle') return
+    const fullQuery = discFinal ? `${discFinal}: ${temaFinal}` : temaFinal
+    setQuery(fullQuery)
     setError('')
     setPhase('searching')
     setSession(EMPTY)
@@ -139,7 +156,7 @@ export default function BuscaPage() {
       const searchRes = await fetch('/api/search', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ query: query.trim() }),
+        body:    JSON.stringify({ query: fullQuery }),
         signal:  ac.signal,
       })
       if (!searchRes.ok) throw new Error('Falha na busca. Tente novamente.')
@@ -152,7 +169,6 @@ export default function BuscaPage() {
         snippet: (r.content ?? '').slice(0, 200),
       }))
 
-      // Conteúdo consolidado para a IA — estruturado e limpo
       const contextBlocks = rawResults.slice(0, 5).map((r, i) =>
         `[Fonte ${i + 1}] ${r.title}\n${(r.content ?? '').slice(0, 2000)}`
       ).join('\n\n---\n\n')
@@ -165,8 +181,7 @@ export default function BuscaPage() {
         throw new Error('Nenhum conteúdo encontrado. Tente um tema mais específico.')
       }
 
-      // Atualiza fontes imediatamente
-      setSession(prev => ({ ...prev, query: query.trim(), sources }))
+      setSession(prev => ({ ...prev, query: fullQuery, disciplina: discFinal, tema: temaFinal, sources }))
 
       // 2. Gera resumo com IA
       setPhase('generating')
@@ -177,7 +192,7 @@ export default function BuscaPage() {
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
           content: iaContext,
-          topic:   query.trim(),
+          topic:   fullQuery,
           type:    'summary',
         }),
         signal: ac.signal,
@@ -186,7 +201,7 @@ export default function BuscaPage() {
       const resumoData = await resumoRes.json()
       const resumo = resumoData.result ?? ''
 
-      // 3. Salva sessão no Supabase
+      // 3. Salva sessão no Supabase — agora com materia = disciplina
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       let sessionId: string | null = null
@@ -196,8 +211,9 @@ export default function BuscaPage() {
           .from('study_sessions')
           .insert({
             user_id:     user.id,
-            title:       query.trim(),
-            topic:       query.trim(),
+            title:       fullQuery,
+            topic:       temaFinal,
+            materia:     discFinal || null,
             content:     resumo,
             source_type: 'web',
           })
@@ -222,7 +238,7 @@ export default function BuscaPage() {
     } finally {
       setGenTarget(null)
     }
-  }, [query, phase])
+  }, [tema, disciplina, phase])
 
   // ─── GERAR FLASHCARDS ─────────────────────────────────────
   async function handleFlashcards() {
@@ -324,15 +340,17 @@ export default function BuscaPage() {
     const fd = new FormData()
     fd.append('file', file)
 
+    const discFinal = disciplina.trim()
+
     try {
       const res  = await fetch('/api/upload', { method: 'POST', body: fd })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
 
       const name = file.name.replace(/\.[^.]+$/, '')
-      setQuery(name)
+      setTema(name)
+      setQuery(discFinal ? `${discFinal}: ${name}` : name)
 
-      // Gera resumo do PDF
       setPhase('generating')
       setGenTarget('summary')
 
@@ -349,13 +367,23 @@ export default function BuscaPage() {
       if (user) {
         const { data: saved } = await supabase
           .from('study_sessions')
-          .insert({ user_id: user.id, title: name, topic: name, content: resumoData.result ?? '', source_type: 'upload' })
+          .insert({
+            user_id: user.id,
+            title: discFinal ? `${discFinal}: ${name}` : name,
+            topic: name,
+            materia: discFinal || null,
+            content: resumoData.result ?? '',
+            source_type: 'upload',
+          })
           .select('id').single()
         sessionId = saved?.id ?? null
       }
 
       setSession({
-        query: name, resumo: resumoData.result ?? '',
+        query:      discFinal ? `${discFinal}: ${name}` : name,
+        disciplina: discFinal,
+        tema:       name,
+        resumo:     resumoData.result ?? '',
         flashcards: [], questions: [],
         sources: [{ title: file.name, url: '', snippet: 'Arquivo enviado pelo usuário' }],
         sessionId,
@@ -382,27 +410,50 @@ export default function BuscaPage() {
       {/* ── Barra de busca ── */}
       <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border,#1f2640)', background: 'var(--surface,#111420)', flexShrink: 0 }}>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+
+          {/* Campo Disciplina */}
           <input
-            value={query}
-            onChange={e => setQuery(e.target.value)}
+            value={disciplina}
+            onChange={e => setDisciplina(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSearch()}
-            placeholder="Digite um tema para estudar... (ex: Princípio da Legalidade)"
+            placeholder="Disciplina (ex: Dir. Constitucional)"
             disabled={isLoading}
             style={{
-              flex: 1, background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)',
+              width: '210px', flexShrink: 0,
+              background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)',
               borderRadius: '10px', padding: '9px 14px', color: 'var(--text,#e8eaf6)',
               fontSize: '14px', outline: 'none', opacity: isLoading ? .6 : 1,
             }}
           />
+
+          <span style={{ color: 'var(--muted,#6b7194)', fontSize: '16px', flexShrink: 0 }}>›</span>
+
+          {/* Campo Tema */}
+          <input
+            value={tema}
+            onChange={e => setTema(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSearch()}
+            placeholder="Tema (ex: Princípio da Legalidade)"
+            disabled={isLoading}
+            style={{
+              flex: 1,
+              background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)',
+              borderRadius: '10px', padding: '9px 14px', color: 'var(--text,#e8eaf6)',
+              fontSize: '14px', outline: 'none', opacity: isLoading ? .6 : 1,
+            }}
+          />
+
+          {/* PDF */}
           <label style={{
             padding: '8px 14px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)',
-            color: isLoading ? 'var(--muted,#6b7194)' : 'var(--muted,#6b7194)',
+            color: 'var(--muted,#6b7194)',
             fontSize: '13px', cursor: isLoading ? 'default' : 'pointer', whiteSpace: 'nowrap',
             pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? .5 : 1,
           }}>
             PDF
             <input type="file" accept=".pdf,.txt,.md" style={{ display: 'none' }} onChange={handleUpload} disabled={isLoading} />
           </label>
+
           {isLoading ? (
             <button onClick={cancel} style={{ padding: '9px 18px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)', background: 'transparent', color: 'var(--red,#ef4444)', fontSize: '13px', cursor: 'pointer' }}>
               Cancelar
@@ -410,12 +461,12 @@ export default function BuscaPage() {
           ) : (
             <button
               onClick={handleSearch}
-              disabled={!query.trim()}
+              disabled={!tema.trim()}
               style={{
                 padding: '9px 20px', borderRadius: '8px', border: 'none',
-                background: !query.trim() ? 'var(--surface2,#181d2e)' : 'var(--accent,#6c63ff)',
-                color: !query.trim() ? 'var(--muted,#6b7194)' : '#fff',
-                fontSize: '13px', fontWeight: 600, cursor: !query.trim() ? 'default' : 'pointer',
+                background: !tema.trim() ? 'var(--surface2,#181d2e)' : 'var(--accent,#6c63ff)',
+                color: !tema.trim() ? 'var(--muted,#6b7194)' : '#fff',
+                fontSize: '13px', fontWeight: 600, cursor: !tema.trim() ? 'default' : 'pointer',
               }}
             >
               Buscar
@@ -456,14 +507,24 @@ export default function BuscaPage() {
               <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
             </svg>
           </div>
-          <div style={{ fontSize: '16px', fontWeight: 500, color: 'var(--text,#e8eaf6)' }}>Pesquise um tema para estudar</div>
-          <div style={{ fontSize: '13px', color: 'var(--muted,#6b7194)', textAlign: 'center', maxWidth: '360px', lineHeight: 1.7 }}>
-            Digite qualquer assunto do seu concurso. A IA buscará em fontes confiáveis e gerará um resumo completo, flashcards e questões.
+          <div style={{ fontSize: '16px', fontWeight: 500, color: 'var(--text,#e8eaf6)' }}>Pesquise por Disciplina e Tema</div>
+          <div style={{ fontSize: '13px', color: 'var(--muted,#6b7194)', textAlign: 'center', maxWidth: '400px', lineHeight: 1.7 }}>
+            Informe a disciplina (ex: Direito Administrativo) e o tema específico. A IA gera resumo, flashcards e questões salvos por disciplina.
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '4px' }}>
-            {['Princípio da Legalidade', 'Licitações Lei 14.133', 'Poderes da Administração', 'Habeas Corpus'].map(s => (
-              <button key={s} onClick={() => { setQuery(s); }} style={{ padding: '6px 14px', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', background: 'transparent', color: 'var(--muted,#6b7194)', fontSize: '12px', cursor: 'pointer' }}>
-                {s}
+            {[
+              { disc: 'Direito Constitucional',  tema: 'Princípio da Legalidade' },
+              { disc: 'Direito Administrativo',  tema: 'Licitações Lei 14.133' },
+              { disc: 'Direito Penal',           tema: 'Habeas Corpus' },
+              { disc: 'Direito Administrativo',  tema: 'Poderes da Administração' },
+            ].map(s => (
+              <button
+                key={s.tema}
+                onClick={() => { setDisciplina(s.disc); setTema(s.tema) }}
+                style={{ padding: '6px 14px', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', background: 'transparent', color: 'var(--muted,#6b7194)', fontSize: '12px', cursor: 'pointer', textAlign: 'left' }}
+              >
+                <span style={{ color: 'var(--accent,#6c63ff)', fontSize: '10px', display: 'block' }}>{s.disc}</span>
+                {s.tema}
               </button>
             ))}
           </div>
