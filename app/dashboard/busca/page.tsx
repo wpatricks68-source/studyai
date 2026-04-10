@@ -566,22 +566,7 @@ export default function BuscaPage() {
             <input type="file" accept=".pdf,.txt,.md" style={{ display: 'none' }} onChange={handleUpload} disabled={isLoading} />
           </label>
 
-          {/* Exportar PDF */}
-          {hasContent && (
-            <button
-              onClick={handleExportPDF}
-              title="Exportar todo o conteúdo em PDF"
-              style={{
-                padding: '8px 14px', borderRadius: '8px', border: '1px solid #6c63ff',
-                background: 'rgba(108,99,255,.12)', color: 'var(--accent,#6c63ff)',
-                fontSize: '13px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
-                display: 'flex', alignItems: 'center', gap: '5px',
-              }}
-            >
-              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M2 4h8l4 4v6a1 1 0 01-1 1H3a1 1 0 01-1-1V5a1 1 0 011-1z"/><path d="M10 4v4h4"/><path d="M6 10v3M4.5 11.5L6 13l1.5-1.5" strokeLinecap="round"/></svg>
-              Exportar PDF
-            </button>
-          )}
+
 
           {isLoading ? (
             <button onClick={cancel} style={{ padding: '9px 18px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)', background: 'transparent', color: 'var(--red,#ef4444)', fontSize: '13px', cursor: 'pointer' }}>
@@ -734,6 +719,23 @@ export default function BuscaPage() {
               >
                 {genTarget === 'questions' ? 'Gerando...' : `Questões ${session.questions.length > 0 ? `(${session.questions.length}) ✓` : ''}`}
               </button>
+
+              {/* Botão EXPORTAR PDF */}
+              {hasContent && (
+                <button
+                  onClick={handleExportPDF}
+                  title="Exportar todo o conteúdo em PDF"
+                  style={{
+                    padding: '5px 14px', borderRadius: '7px', border: '1px solid #6c63ff',
+                    background: 'rgba(108,99,255,.12)', color: 'var(--accent,#6c63ff)',
+                    fontSize: '12px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+                    display: 'flex', alignItems: 'center', gap: '5px', marginLeft: '8px'
+                  }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M2 4h8l4 4v6a1 1 0 01-1 1H3a1 1 0 01-1-1V5a1 1 0 011-1z"/><path d="M10 4v4h4"/><path d="M6 10v3M4.5 11.5L6 13l1.5-1.5" strokeLinecap="round"/></svg>
+                  Exportar PDF
+                </button>
+              )}
 
               {/* Status salvo */}
               {session.savedAt && (
