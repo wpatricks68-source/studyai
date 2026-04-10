@@ -42,8 +42,12 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
     if (!selected) return
     const supabase = createClient()
     const newCount = (selected.revisoes ?? 0) + 1
-    await supabase.from('study_sessions').update({ revisoes: newCount }).eq('id', selected.id)
-    const updated = { ...selected, revisoes: newCount }
+    const newDates = [...(selected.revisao_dates ?? []), new Date().toISOString()]
+    await supabase
+      .from('study_sessions')
+      .update({ revisoes: newCount, revisao_dates: newDates })
+      .eq('id', selected.id)
+    const updated = { ...selected, revisoes: newCount, revisao_dates: newDates }
     setSelected(updated)
     setList(prev => prev.map(s => s.id === selected.id ? updated : s))
   }
@@ -219,7 +223,7 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
             {/* Tab content */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '22px 28px' }}>
               {activeTab === 'resumo' && (
-                <div className="ed-library-content" style={{ fontSize: '14px', lineHeight: 1.9, color: '#c8cae6' }}>
+                <div className="ed-library-content" style={{ fontSize: '14px', lineHeight: 1.9, color: 'var(--text)' }}>
                   {(() => {
                     if (!selected.content) return 'Conteúdo não disponível.'
                     try {
@@ -282,6 +286,7 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
 
               {activeTab === 'progresso' && (
                 <div>
+                  {/* Stats cards */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: '10px', marginBottom: '20px' }}>
                     {[
                       { val: `${selected.revisoes}`, lbl: 'Revisões feitas', color: 'var(--accent)' },
@@ -294,7 +299,9 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
                       </div>
                     ))}
                   </div>
-                  <div style={{ marginBottom: '16px' }}>
+
+                  {/* Progress bar */}
+                  <div style={{ marginBottom: '20px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--muted)', marginBottom: '6px' }}>
                       <span>Frequência de revisão</span>
                       <span style={{ color: 'var(--text)' }}>{Math.min(100, (selected.revisoes ?? 0) * 20)}%</span>
@@ -303,6 +310,45 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
                       <div style={{ height: '100%', width: `${Math.min(100, (selected.revisoes ?? 0) * 20)}%`, background: 'var(--accent)', borderRadius: '3px', transition: 'width .6s' }} />
                     </div>
                   </div>
+
+                  {/* Revision history timeline */}
+                  {(selected.revisao_dates ?? []).length > 0 && (
+                    <div style={{ marginBottom: '20px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text)', marginBottom: '10px' }}>Histórico de revisões</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+                        {[...(selected.revisao_dates ?? [])].reverse().map((dateStr, i, arr) => {
+                          const d = new Date(dateStr)
+                          const isLast = i === arr.length - 1
+                          return (
+                            <div key={dateStr + i} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                              {/* Timeline spine */}
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                                <div style={{
+                                  width: '10px', height: '10px', borderRadius: '50%', marginTop: '3px',
+                                  background: i === 0 ? 'var(--accent)' : 'var(--border)',
+                                  border: i === 0 ? '2px solid var(--accent)' : '2px solid var(--muted)',
+                                  flexShrink: 0,
+                                }} />
+                                {!isLast && <div style={{ width: '2px', flex: 1, minHeight: '18px', background: 'var(--border)', margin: '2px 0' }} />}
+                              </div>
+                              {/* Date info */}
+                              <div style={{ paddingBottom: isLast ? 0 : '10px' }}>
+                                <div style={{ fontSize: '12px', color: i === 0 ? 'var(--text)' : 'var(--muted)', fontWeight: i === 0 ? 500 : 400 }}>
+                                  {d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                                </div>
+                                <div style={{ fontSize: '11px', color: 'var(--muted)' }}>
+                                  {d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                  {i === 0 && <span style={{ marginLeft: '6px', padding: '1px 6px', borderRadius: '8px', background: 'rgba(108,99,255,.15)', color: 'var(--accent)', fontSize: '10px' }}>mais recente</span>}
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Register button */}
                   <button
                     onClick={registerRevisao}
                     style={{ width: '100%', padding: '10px', borderRadius: '8px', border: 'none', background: 'var(--accent)', color: '#fff', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}
