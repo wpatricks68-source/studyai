@@ -43,13 +43,15 @@ function parseLegacyMarkdown(md: string) {
 }
 
 export function EditableResumo({ content, sessionId, loading }: Props) {
-  const [html, setHtml] = React.useState('')
   const [canvasData, setCanvasData] = React.useState('')
   
   const [mode, setMode] = React.useState<'text' | 'pen' | 'eraser'>('text')
-  const [penColor, setPenColor] = React.useState('#ef4444') // deafult red pen
+  const [penColor, setPenColor] = React.useState('#ef4444') // default red pen
   const [penSize, setPenSize] = React.useState(2)
-  const [hlColor, setHlColor] = React.useState('yellow')
+  const [hlColor, setHlColor] = React.useState('#ffff00')
+
+  // Saved selection for highlight (selection is lost when clicking toolbar)
+  const savedSelectionRef = React.useRef<Range | null>(null)
   
   const [isSaving, setIsSaving] = React.useState(false)
   const [errorMsg, setErrorMsg] = React.useState('')
@@ -61,19 +63,19 @@ export function EditableResumo({ content, sessionId, loading }: Props) {
   const isDrawing = React.useRef(false)
   const ctxRef = React.useRef<CanvasRenderingContext2D | null>(null)
 
-  // INIT
+  // INIT — set innerHTML directly only once to avoid re-renders wiping editor content
   React.useEffect(() => {
-    if (loading) return
+    if (loading || !editorRef.current) return
     try {
       const data = JSON.parse(content)
       if (data.type === 'rich') {
-        setHtml(data.html)
+        editorRef.current.innerHTML = data.html
         setCanvasData(data.canvas)
         return
       }
     } catch {
       // fallback
-      setHtml(parseLegacyMarkdown(content))
+      editorRef.current.innerHTML = parseLegacyMarkdown(content)
     }
   }, [content, loading])
 
@@ -182,13 +184,32 @@ export function EditableResumo({ content, sessionId, loading }: Props) {
     }
   }
 
+  // Save current text selection before focus is lost (e.g., clicking toolbar)
+  const saveSelection = () => {
+    const sel = window.getSelection()
+    if (sel && sel.rangeCount > 0) {
+      savedSelectionRef.current = sel.getRangeAt(0).cloneRange()
+    }
+  }
+
+  // Restore a previously saved selection
+  const restoreSelection = () => {
+    if (!savedSelectionRef.current) return
+    const sel = window.getSelection()
+    if (sel) {
+      sel.removeAllRanges()
+      sel.addRange(savedSelectionRef.current)
+    }
+  }
+
   // TEXT FORMATTING
   const formatText = (cmd: string, val?: string) => {
+    restoreSelection()
     document.execCommand(cmd, false, val)
     editorRef.current?.focus()
   }
 
-  // SAVE
+  // SAVE — reads innerHTML directly from the DOM (never from state)
   const handleSave = async () => {
     if (!sessionId || !editorRef.current || !canvasRef.current) return
     setIsSaving(true)
@@ -249,10 +270,24 @@ export function EditableResumo({ content, sessionId, loading }: Props) {
           <button onMouseDown={e => e.preventDefault()} onClick={() => formatText('underline')} style={{ padding: '6px', borderRadius: '6px', background: 'transparent', color: 'var(--muted)', cursor: 'pointer', border: 'none' }} title="Sublinhado"><Underline size={16}/></button>
           
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center', marginLeft: '4px' }}>
-            <button onMouseDown={e => e.preventDefault()} onClick={() => formatText('backColor', hlColor)} style={{ padding: '6px', borderRadius: '6px', background: 'transparent', color: hlColor, cursor: 'pointer', border: 'none' }} title="Realçar">
+            {/* onMouseDown saves selection BEFORE the click moves focus away */}
+            <button
+              onMouseDown={e => { e.preventDefault(); saveSelection() }}
+              onClick={() => formatText('backColor', hlColor)}
+              style={{ padding: '6px', borderRadius: '6px', background: 'transparent', color: hlColor, cursor: 'pointer', border: 'none' }}
+              title="Realçar"
+            >
               <Highlighter size={16}/>
             </button>
-            <input type="color" value={hlColor} onChange={e => setHlColor(e.target.value)} style={{ width: '20px', height: '20px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', margin: '0 4px' }} title="Escolher cor de realce" />
+            {/* Changing color just updates state — selection is saved on mousedown of the button */}
+            <input
+              type="color"
+              value={hlColor}
+              onMouseDown={saveSelection}
+              onChange={e => setHlColor(e.target.value)}
+              style={{ width: '20px', height: '20px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', margin: '0 4px' }}
+              title="Escolher cor de realce"
+            />
           </div>
         </div>
 
@@ -298,7 +333,8 @@ export function EditableResumo({ content, sessionId, loading }: Props) {
           ref={editorRef}
           contentEditable={mode === 'text'}
           suppressContentEditableWarning
-          dangerouslySetInnerHTML={{ __html: html }}
+          onMouseUp={saveSelection}
+          onKeyUp={saveSelection}
           style={{
             minHeight: '100%',
             outline: 'none',
