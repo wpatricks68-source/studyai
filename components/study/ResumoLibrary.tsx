@@ -48,6 +48,15 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
     setList(prev => prev.map(s => s.id === selected.id ? updated : s))
   }
 
+  async function deleteSession(e: React.MouseEvent, id: string) {
+    e.stopPropagation()
+    if (!confirm('Tem certeza que deseja excluir esta sessão?')) return
+    const supabase = createClient()
+    await supabase.from('study_sessions').delete().eq('id', id)
+    setList(prev => prev.filter(s => s.id !== id))
+    if (selected?.id === id) setSelected(null)
+  }
+
   const acertoCor = (v: number) => v >= 80 ? '#10b981' : v >= 65 ? '#f59e0b' : '#ef4444'
 
   return (
@@ -102,13 +111,25 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
               key={s.id}
               onClick={() => openSession(s)}
               style={{
+                position: 'relative',
                 borderRadius: '10px', border: `1px solid ${selected?.id === s.id ? 'var(--accent)' : 'var(--border)'}`,
                 padding: '12px 13px', marginBottom: '7px', cursor: 'pointer',
                 background: selected?.id === s.id ? 'rgba(108,99,255,.1)' : 'var(--surface2)',
                 transition: 'all .12s',
               }}
             >
-              <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)', marginBottom: '5px', lineHeight: 1.4 }}>
+              <button
+                onClick={(e) => deleteSession(e, s.id)}
+                style={{
+                  position: 'absolute', top: '8px', right: '8px',
+                  background: 'transparent', border: 'none', color: 'var(--muted)',
+                  cursor: 'pointer', padding: '4px', fontSize: '14px', lineHeight: 1
+                }}
+                title="Excluir sessão"
+              >
+                ✕
+              </button>
+              <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)', marginBottom: '5px', lineHeight: 1.4, paddingRight: '16px' }}>
                 {s.title}
               </div>
               <div style={{ display: 'flex', gap: '8px', fontSize: '11px', color: 'var(--muted)', flexWrap: 'wrap' }}>
@@ -158,7 +179,7 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
                     + Revisão
                   </button>
                   <a
-                    href={`/dashboard/busca?q=${encodeURIComponent(selected.title)}`}
+                    href={`/dashboard/busca?id=${selected.id}`}
                     style={{ padding: '6px 12px', borderRadius: '7px', border: 'none', background: 'var(--accent)', color: '#fff', fontSize: '12px', textDecoration: 'none' }}
                   >
                     Abrir editor
