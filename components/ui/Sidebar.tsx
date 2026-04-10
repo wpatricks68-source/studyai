@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 import type { Profile } from '@/types/database'
+import { ThemeToggle } from '@/components/ThemeToggle'
 
 const navItems = [
   {
@@ -58,13 +59,16 @@ export default function Sidebar({ user, profile }: { user: User; profile: Profil
       height: '100vh', overflow: 'hidden',
     }}>
       {/* Logo */}
-      <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid var(--border)' }}>
-        <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '-0.5px' }}>
-          StudyAI
+      <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '-0.5px' }}>
+            StudyAI
+          </div>
+          <div style={{ fontSize: '10px', color: 'var(--muted)', letterSpacing: '2px', textTransform: 'uppercase', marginTop: '2px' }}>
+            Concursos
+          </div>
         </div>
-        <div style={{ fontSize: '10px', color: 'var(--muted)', letterSpacing: '2px', textTransform: 'uppercase', marginTop: '2px' }}>
-          Concursos
-        </div>
+        <ThemeToggle />
       </div>
 
       {/* Nav */}
