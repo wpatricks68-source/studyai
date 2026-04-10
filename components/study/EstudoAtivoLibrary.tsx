@@ -294,7 +294,7 @@ function FlashcardsPanel({ cards }: { cards: Flashcard[] }) {
                 </>
               ) : (
                 <>
-                  <div style={{ fontSize: '10px', color: '#00d4aa', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--accent2,#00d4aa)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>
                     Verso
                   </div>
                   <div style={{ fontSize: '13px', color: 'var(--text)', lineHeight: 1.7 }}>
