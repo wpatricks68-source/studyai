@@ -58,6 +58,20 @@ export default function BuscaPage() {
   const [qConfig,    setQConfig]    = useState<QuestoesConfig>({ quantidade: 10, tipo: 'misto' })
   const abortRef = useRef<AbortController | null>(null)
 
+  // ─── Estados Manuais ────────────────────────────────────────
+  const [showManualFcModal, setShowManualFcModal] = useState(false)
+  const [manualFcFront, setManualFcFront] = useState('')
+  const [manualFcBack,  setManualFcBack]  = useState('')
+
+  const [showManualQModal, setShowManualQModal] = useState(false)
+  const [manualQTipo, setManualQTipo] = useState<'cv'|'mc'>('cv')
+  const [manualQQuestion, setManualQQuestion] = useState('')
+  const [manualQOptions, setManualQOptions] = useState(['', '', '', '', ''])
+  const [manualQCorrect, setManualQCorrect] = useState<number>(0)
+  const [manualQGabarito, setManualQGabarito] = useState<'C'|'E'>('C')
+  const [manualQExpl, setManualQExpl] = useState('')
+  const [isSavingManual, setIsSavingManual] = useState(false)
+
   useEffect(() => {
     const loadSession = async () => {
       const params = new URLSearchParams(window.location.search)
@@ -239,6 +253,62 @@ export default function BuscaPage() {
       setGenTarget(null)
     }
   }, [tema, disciplina, phase])
+
+  // ─── CRIAR MANUALMENTE ────────────────────────────────────
+  const handleManualCreate = useCallback(async () => {
+    const temaFinal = tema.trim()
+    const discFinal = disciplina.trim()
+    if (!temaFinal) {
+      setError('Insira pelo menos o tema para criar uma sessão.')
+      return
+    }
+
+    setPhase('searching')
+    setError('')
+    const fullQuery = discFinal ? `${discFinal}: ${temaFinal}` : temaFinal
+    setQuery(fullQuery)
+    
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      let sessionId: string | null = null
+
+      if (user) {
+        const { data: saved, error: insertError } = await supabase
+          .from('study_sessions')
+          .insert({
+            user_id:     user.id,
+            title:       fullQuery,
+            topic:       temaFinal,
+            materia:     discFinal || null,
+            content:     '<p><br></p>',
+            source_type: 'manual',
+          })
+          .select('id')
+          .single()
+        
+        if (insertError) throw insertError
+        sessionId = saved?.id ?? null
+      }
+
+      setSession({
+        query: fullQuery,
+        disciplina: discFinal,
+        tema: temaFinal,
+        resumo: '<p><br></p>',
+        flashcards: [],
+        questions: [],
+        sources: [{ title: 'Sessão Manual', url: '', snippet: 'Conteúdo inserido manualmente.' }],
+        sessionId,
+        savedAt: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      })
+      setView('resumo')
+      setPhase('done')
+    } catch (e: unknown) {
+      setError((e as Error).message || 'Erro ao inicializar sessão manual.')
+      setPhase('idle')
+    }
+  }, [tema, disciplina])
 
   // ─── GERAR FLASHCARDS ─────────────────────────────────────
   async function handleFlashcards() {
@@ -513,6 +583,85 @@ export default function BuscaPage() {
   const isLoading  = phase === 'searching' || phase === 'generating'
   const hasContent = phase === 'done' && session.resumo
 
+  // ─── SALVAR FLASHCARD MANUAL ──────────────────────────────
+  async function handleSaveManualFc() {
+    if (!manualFcFront.trim() || !manualFcBack.trim() || !session.sessionId) return
+    setIsSavingManual(true)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Usuário não autenticado.')
+
+      const { data, error: insertError } = await supabase.from('flashcards').insert({
+        user_id: user.id,
+        session_id: session.sessionId,
+        topic: session.tema,
+        materia: session.disciplina || null,
+        front: manualFcFront,
+        back: manualFcBack
+      }).select('*').single()
+      
+      if (insertError) throw insertError
+
+      if (data) setSession(prev => ({ ...prev, flashcards: [...prev.flashcards, data] }))
+      
+      setShowManualFcModal(false)
+      setManualFcFront('')
+      setManualFcBack('')
+    } catch (e: unknown) {
+      alert((e as Error).message || 'Erro ao salvar flashcard.')
+    } finally {
+      setIsSavingManual(false)
+    }
+  }
+
+  // ─── SALVAR QUESTÃO MANUAL ────────────────────────────────
+  async function handleSaveManualQ() {
+    if (!manualQQuestion.trim() || !session.sessionId) return
+    if (manualQTipo === 'mc' && manualQOptions.some(o => !o.trim())) {
+      alert('Preencha todas as opções da múltipla escolha.')
+      return
+    }
+
+    setIsSavingManual(true)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Usuário não autenticado.')
+
+      const payload = {
+        user_id: user.id,
+        session_id: session.sessionId,
+        topic: session.tema,
+        materia: session.disciplina || null,
+        tipo: manualQTipo,
+        question: manualQQuestion,
+        explanation: manualQExpl,
+        banca: 'Autoral',
+        options: manualQTipo === 'mc' ? manualQOptions : null,
+        correct: manualQTipo === 'mc' ? manualQCorrect : null,
+        gabarito: manualQTipo === 'cv' ? manualQGabarito : null
+      }
+
+      const { data, error: insertError } = await supabase.from('questions').insert(payload).select('*').single()
+      
+      if (insertError) throw insertError
+
+      if (data) setSession(prev => ({ ...prev, questions: [...prev.questions, data] }))
+      
+      setShowManualQModal(false)
+      setManualQQuestion('')
+      setManualQExpl('')
+      setManualQOptions(['', '', '', '', ''])
+      setManualQCorrect(0)
+      setManualQGabarito('C')
+    } catch (e: unknown) {
+      alert((e as Error).message || 'Erro ao salvar questão.')
+    } finally {
+      setIsSavingManual(false)
+    }
+  }
+
   // ─── RENDER ───────────────────────────────────────────────
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: 'var(--bg,#0a0c12)' }}>
@@ -573,18 +722,36 @@ export default function BuscaPage() {
               Cancelar
             </button>
           ) : (
-            <button
-              onClick={handleSearch}
-              disabled={!tema.trim()}
-              style={{
-                padding: '9px 20px', borderRadius: '8px', border: 'none',
-                background: !tema.trim() ? 'var(--surface2,#181d2e)' : 'var(--accent,#6c63ff)',
-                color: !tema.trim() ? 'var(--muted,#6b7194)' : '#fff',
-                fontSize: '13px', fontWeight: 600, cursor: !tema.trim() ? 'default' : 'pointer',
-              }}
-            >
-              Buscar
-            </button>
+            <>
+              {!hasContent && (
+                <button
+                  onClick={handleManualCreate}
+                  disabled={!tema.trim()}
+                  title="Criar arquivo vazio manualmente"
+                  style={{
+                    padding: '9px 14px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)',
+                    background: 'transparent', color: !tema.trim() ? 'var(--muted,#6b7194)' : 'var(--text,#e8eaf6)',
+                    fontSize: '13px', fontWeight: 600, cursor: !tema.trim() ? 'default' : 'pointer',
+                    display: 'flex', alignItems: 'center', gap: '5px'
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>
+                  Manual
+                </button>
+              )}
+              <button
+                onClick={handleSearch}
+                disabled={!tema.trim()}
+                style={{
+                  padding: '9px 20px', borderRadius: '8px', border: 'none',
+                  background: !tema.trim() ? 'var(--surface2,#181d2e)' : 'var(--accent,#6c63ff)',
+                  color: !tema.trim() ? 'var(--muted,#6b7194)' : '#fff',
+                  fontSize: '13px', fontWeight: 600, cursor: !tema.trim() ? 'default' : 'pointer',
+                }}
+              >
+                Buscar com IA
+              </button>
+            </>
           )}
         </div>
 
@@ -892,6 +1059,82 @@ export default function BuscaPage() {
         </div>
       )}
 
+      {/* MODAL FLASHCARD MANUAL */}
+      {showManualFcModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+          <div style={{ background: 'var(--surface,#111420)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border,#1f2640)', width: '400px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text,#e8eaf6)' }}>Novo Flashcard</div>
+            <div>
+              <div style={{ fontSize: '12px', color: 'var(--muted,#6b7194)', marginBottom: '6px' }}>Frente (Pergunta)</div>
+              <textarea value={manualFcFront} onChange={e => setManualFcFront(e.target.value)} style={{ width: '100%', height: '80px', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)', borderRadius: '8px', padding: '10px', color: 'var(--text,#e8eaf6)', fontSize: '13px', outline: 'none', resize: 'none' }} placeholder="O que é..." />
+            </div>
+            <div>
+              <div style={{ fontSize: '12px', color: 'var(--muted,#6b7194)', marginBottom: '6px' }}>Verso (Resposta)</div>
+              <textarea value={manualFcBack} onChange={e => setManualFcBack(e.target.value)} style={{ width: '100%', height: '80px', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)', borderRadius: '8px', padding: '10px', color: 'var(--text,#e8eaf6)', fontSize: '13px', outline: 'none', resize: 'none' }} placeholder="Significa..." />
+            </div>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }}>
+              <button onClick={() => setShowManualFcModal(false)} style={{ padding: '8px 16px', borderRadius: '8px', background: 'transparent', border: '1px solid var(--border,#1f2640)', color: 'var(--muted,#6b7194)', fontSize: '13px', cursor: 'pointer' }}>Cancelar</button>
+              <button onClick={handleSaveManualFc} disabled={isSavingManual || !manualFcFront.trim() || !manualFcBack.trim()} style={{ padding: '8px 16px', borderRadius: '8px', background: 'var(--accent,#6c63ff)', border: 'none', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: isSavingManual ? 'default' : 'pointer', opacity: (isSavingManual || !manualFcFront.trim() || !manualFcBack.trim()) ? 0.6 : 1 }}>Salvar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL QUESTÃO MANUAL */}
+      {showManualQModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+          <div style={{ background: 'var(--surface,#111420)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border,#1f2640)', width: '500px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text,#e8eaf6)' }}>Nova Questão</div>
+            
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text,#e8eaf6)' }}>
+                <input type="radio" checked={manualQTipo === 'cv'} onChange={() => setManualQTipo('cv')} /> Certo/Errado
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text,#e8eaf6)' }}>
+                <input type="radio" checked={manualQTipo === 'mc'} onChange={() => setManualQTipo('mc')} /> Múltipla Escolha
+              </label>
+            </div>
+
+            <div>
+              <div style={{ fontSize: '12px', color: 'var(--muted,#6b7194)', marginBottom: '6px' }}>Enunciado da Questão</div>
+              <textarea value={manualQQuestion} onChange={e => setManualQQuestion(e.target.value)} style={{ width: '100%', height: '80px', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)', borderRadius: '8px', padding: '10px', color: 'var(--text,#e8eaf6)', fontSize: '13px', outline: 'none', resize: 'none' }} placeholder="Digite a pergunta aqui..." />
+            </div>
+
+            {manualQTipo === 'cv' ? (
+              <div>
+                <div style={{ fontSize: '12px', color: 'var(--muted,#6b7194)', marginBottom: '6px' }}>Gabarito</div>
+                <select value={manualQGabarito} onChange={e => setManualQGabarito(e.target.value as 'C'|'E')} style={{ width: '100%', padding: '10px', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)', borderRadius: '8px', color: 'var(--text,#e8eaf6)', fontSize: '13px', outline: 'none' }}>
+                  <option value="C">Certo</option>
+                  <option value="E">Errado</option>
+                </select>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--muted,#6b7194)' }}>Opções (A, B, C, D, E)</div>
+                {manualQOptions.map((opt, idx) => (
+                  <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input type="radio" checked={manualQCorrect === idx} onChange={() => setManualQCorrect(idx)} title="Marcar como correta" />
+                    <input value={opt} onChange={e => {
+                      const newOpts = [...manualQOptions]; newOpts[idx] = e.target.value; setManualQOptions(newOpts)
+                    }} style={{ flex: 1, padding: '8px 10px', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)', borderRadius: '8px', color: 'var(--text,#e8eaf6)', fontSize: '13px', outline: 'none' }} placeholder={`Opção ${['A','B','C','D','E'][idx]}`} />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div>
+              <div style={{ fontSize: '12px', color: 'var(--muted,#6b7194)', marginBottom: '6px' }}>Explicação / Resolução (Opcional)</div>
+              <textarea value={manualQExpl} onChange={e => setManualQExpl(e.target.value)} style={{ width: '100%', height: '60px', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)', borderRadius: '8px', padding: '10px', color: 'var(--text,#e8eaf6)', fontSize: '13px', outline: 'none', resize: 'none' }} placeholder="Por que esta é a resposta correta?" />
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }}>
+              <button onClick={() => setShowManualQModal(false)} style={{ padding: '8px 16px', borderRadius: '8px', background: 'transparent', border: '1px solid var(--border,#1f2640)', color: 'var(--muted,#6b7194)', fontSize: '13px', cursor: 'pointer' }}>Cancelar</button>
+              <button onClick={handleSaveManualQ} disabled={isSavingManual || !manualQQuestion.trim()} style={{ padding: '8px 16px', borderRadius: '8px', background: 'var(--accent,#6c63ff)', border: 'none', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: isSavingManual ? 'default' : 'pointer', opacity: (isSavingManual || !manualQQuestion.trim()) ? 0.6 : 1 }}>Salvar Questão</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
@@ -945,15 +1188,23 @@ function ResumoView({ content, loading }: { content: string; loading: boolean })
 }
 
 // ─── Sub-componente: FLASHCARDS ────────────────────────────
-function FlashcardsView({ cards, loading }: { cards: Flashcard[]; loading: boolean }) {
+function FlashcardsView({ cards, loading, onOpenManual }: { cards: Flashcard[]; loading: boolean; onOpenManual?: () => void }) {
   const [flipped, setFlipped] = useState<Record<number, boolean>>({})
   if (loading) return <LoadingDots label="Criando flashcards..." />
-  if (cards.length === 0) return <div style={{ color: 'var(--muted,#6b7194)', fontSize: '13px' }}>Nenhum flashcard gerado ainda.</div>
 
   return (
     <div>
-      <div style={{ fontSize: '12px', color: 'var(--muted,#6b7194)', marginBottom: '16px' }}>
-        {cards.length} flashcard{cards.length !== 1 ? 's' : ''} — clique em cada card para ver a resposta
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+        <div style={{ fontSize: '12px', color: 'var(--muted,#6b7194)' }}>
+          {cards.length === 0
+            ? 'Nenhum flashcard gerado ainda. Clique no botão ao lado para criar o seu.'
+            : `${cards.length} flashcard${cards.length !== 1 ? 's' : ''} — clique em cada card para ver a resposta`}
+        </div>
+        {onOpenManual && (
+          <button onClick={onOpenManual} style={{ padding: '6px 14px', borderRadius: '8px', background: 'var(--accent,#6c63ff)', color: '#fff', fontSize: '12px', fontWeight: 600, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            + Novo Flashcard
+          </button>
+        )}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
         {cards.map((card, i) => (
@@ -997,17 +1248,12 @@ function FlashcardsView({ cards, loading }: { cards: Flashcard[]; loading: boole
 }
 
 // ─── Sub-componente: QUESTÕES ──────────────────────────────
-function QuestoesView({ questions, loading }: { questions: Question[]; loading: boolean }) {
+function QuestoesView({ questions, loading, onOpenManual }: { questions: Question[]; loading: boolean; onOpenManual?: () => void }) {
   const [answers,      setAnswers]      = useState<Record<number, string | number>>({})
   const [revealed,     setRevealed]     = useState<Record<number, boolean>>({})
   const [showGabarito, setShowGabarito] = useState(false)
 
   if (loading) return <LoadingDots label="Gerando questões..." />
-  if (questions.length === 0) return (
-    <div style={{ color: 'var(--muted,#6b7194)', fontSize: '13px', padding: '20px 0' }}>
-      Nenhuma questão gerada ainda.
-    </div>
-  )
 
   const totalRespondidas = Object.keys(revealed).length
   const totalCorretas    = Object.entries(revealed).filter(([qi, rev]) => {
@@ -1020,6 +1266,17 @@ function QuestoesView({ questions, loading }: { questions: Question[]; loading: 
 
   return (
     <div style={{ maxWidth: '760px' }}>
+      
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+        <div style={{ color: 'var(--muted,#6b7194)', fontSize: '13px' }}>
+          {questions.length === 0 ? 'Nenhuma questão gerada ainda. Clique para criar uma manualmente.' : ''}
+        </div>
+        {onOpenManual && (
+          <button onClick={onOpenManual} style={{ padding: '6px 14px', borderRadius: '8px', background: 'var(--accent,#6c63ff)', color: '#fff', fontSize: '12px', fontWeight: 600, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            + Nova Questão
+          </button>
+        )}
+      </div>
 
       {/* ── Placar ── */}
       {totalRespondidas > 0 && (
