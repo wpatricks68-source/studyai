@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Bold, Italic, Underline, Highlighter, PenTool, Eraser, Save, X, MousePointer2 } from "lucide-react"
+import { Bold, Italic, Underline, Highlighter, PenTool, Eraser, Save, MousePointer2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 interface Props {
@@ -114,7 +114,7 @@ export function EditableResumo({ content, sessionId, loading }: Props) {
     ro.observe(container)
     
     return () => ro.disconnect()
-  }, [loading, html])
+  }, [loading])
 
   // INITIAL DRAW ON CANVAS IF WE HAVE SAVED DATA
   React.useEffect(() => {
@@ -371,3 +371,4 @@ export function EditableResumo({ content, sessionId, loading }: Props) {
     </div>
   )
 }
+
