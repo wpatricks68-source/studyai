@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -90,6 +92,8 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
   const [selectedDisc,  setSelectedDisc]  = useState<string | null>(groups[0]?.disciplina ?? null)
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null)
   const [activeTab,     setActiveTab]     = useState<'flashcards' | 'questoes'>('flashcards')
+  const [isDeleting,    setIsDeleting]    = useState(false)
+  const router = useRouter()
 
   const discGroup   = groups.find(g => g.disciplina === selectedDisc) ?? null
   const topicGroup  = discGroup?.topics.find(t => t.topic === selectedTopic) ?? null
@@ -100,6 +104,60 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
     const g = groups.find(d => d.disciplina === disc)
     setSelectedTopic(g?.topics[0]?.topic ?? null)
     setActiveTab('flashcards')
+  }
+
+  const handleDeleteDisc = async (e: React.MouseEvent, g: DisciplinaGroup) => {
+    e.stopPropagation()
+    if (!confirm(`Tem certeza que deseja apagar a disciplina "${g.disciplina}" e todo o seu conteúdo de Estudo Ativo?`)) return
+    
+    setIsDeleting(true)
+    try {
+      const fcIds = g.topics.flatMap(t => t.flashcards).map(c => c.id)
+      const qIds = g.topics.flatMap(t => t.questions).map(q => q.id)
+      
+      const supabase = createClient()
+      if (fcIds.length > 0) {
+        // chunk to prevent url length issues
+        for (let i = 0; i < fcIds.length; i += 100) {
+          await supabase.from('flashcards').delete().in('id', fcIds.slice(i, i + 100))
+        }
+      }
+      if (qIds.length > 0) {
+        for (let i = 0; i < qIds.length; i += 100) {
+          await supabase.from('questions').delete().in('id', qIds.slice(i, i + 100))
+        }
+      }
+      
+      if (selectedDisc === g.disciplina) {
+        setSelectedDisc(null)
+        setSelectedTopic(null)
+      }
+      router.refresh()
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const handleDeleteTopic = async (e: React.MouseEvent, t: TopicGroup, discName: string) => {
+    e.stopPropagation()
+    if (!confirm(`Tem certeza que deseja apagar o tema "${t.topic}" e todo o seu conteúdo?`)) return
+    
+    setIsDeleting(true)
+    try {
+      const fcIds = t.flashcards.map(c => c.id)
+      const qIds = t.questions.map(q => q.id)
+      
+      const supabase = createClient()
+      if (fcIds.length > 0) await supabase.from('flashcards').delete().in('id', fcIds)
+      if (qIds.length > 0) await supabase.from('questions').delete().in('id', qIds)
+      
+      if (selectedTopic === t.topic && selectedDisc === discName) {
+        setSelectedTopic(null)
+      }
+      router.refresh()
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   if (groups.length === 0) {
@@ -115,7 +173,7 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden', background: 'var(--bg,#0a0c12)' }}>
+    <div style={{ display: 'flex', height: '100%', width: '100%', overflow: 'hidden', background: 'var(--bg,#0a0c12)', opacity: isDeleting ? 0.6 : 1, pointerEvents: isDeleting ? 'none' : 'auto' }}>
 
       {/* ── Painel esquerdo: disciplinas e temas ── */}
       <div style={{
@@ -148,17 +206,30 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px',
                 }}
               >
-                <span style={{ fontSize: '12px', fontWeight: 600, flex: 1, lineHeight: 1.4 }}>
-                  {g.disciplina}
-                </span>
-                <span style={{
-                  fontSize: '10px', padding: '1px 6px', borderRadius: '8px', flexShrink: 0,
-                  background: selectedDisc === g.disciplina ? 'rgba(108,99,255,.2)' : 'var(--surface2,#181d2e)',
-                  color: selectedDisc === g.disciplina ? 'var(--accent,#6c63ff)' : 'var(--muted,#6b7194)',
-                }}>
-                  {g.topics.length}
-                </span>
-              </button>
+                  <span style={{ fontSize: '12px', fontWeight: 600, flex: 1, lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {g.disciplina}
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{
+                      fontSize: '10px', padding: '1px 6px', borderRadius: '8px', flexShrink: 0,
+                      background: selectedDisc === g.disciplina ? 'rgba(108,99,255,.2)' : 'var(--surface2,#181d2e)',
+                      color: selectedDisc === g.disciplina ? 'var(--accent,#6c63ff)' : 'var(--muted,#6b7194)',
+                    }}>
+                      {g.topics.length}
+                    </span>
+                    <button
+                      onClick={(e) => handleDeleteDisc(e, g)}
+                      style={{
+                        background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: 'var(--muted,#6b7194)', opacity: .7, transition: 'all .15s'
+                      }}
+                      title="Excluir disciplina e tudo nela"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    </button>
+                  </div>
+                </button>
 
               {/* Temas da disciplina selecionada */}
               {selectedDisc === g.disciplina && (
@@ -176,12 +247,25 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px',
                       }}
                     >
-                      <span style={{ flex: 1 }}>{t.topic}</span>
-                      <span style={{ fontSize: '10px', flexShrink: 0, opacity: .7 }}>
-                        {t.flashcards.length > 0 && `${t.flashcards.length}fc`}
-                        {t.flashcards.length > 0 && t.questions.length > 0 && ' '}
-                        {t.questions.length > 0 && `${t.questions.length}q`}
-                      </span>
+                      <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.topic}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '10px', flexShrink: 0, opacity: .7 }}>
+                          {t.flashcards.length > 0 && `${t.flashcards.length}fc`}
+                          {t.flashcards.length > 0 && t.questions.length > 0 && ' '}
+                          {t.questions.length > 0 && `${t.questions.length}q`}
+                        </span>
+                        <button
+                          onClick={(e) => handleDeleteTopic(e, t, g.disciplina)}
+                          style={{
+                            background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: selectedTopic === t.topic ? 'var(--accent,#6c63ff)' : 'var(--muted,#6b7194)', opacity: .7, transition: 'all .15s'
+                          }}
+                          title="Excluir tema e questões/flashcards dele"
+                        >
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                        </button>
+                      </div>
                     </button>
                   ))}
                 </div>
