@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Bold, Italic, Underline, Highlighter, PenTool, Eraser, Save, MousePointer2 } from "lucide-react"
+import { Bold, Italic, Underline, Highlighter, PenTool, Eraser, Save, MousePointer2, Undo, Redo } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 interface Props {
@@ -64,6 +64,21 @@ export function EditableResumo({ content, sessionId, loading }: Props) {
   
   const isDrawing = React.useRef(false)
   const ctxRef = React.useRef<CanvasRenderingContext2D | null>(null)
+  
+  // Canvas History State for Undo/Redo
+  const [history, setHistory] = React.useState<string[]>([])
+  const [historyStep, setHistoryStep] = React.useState(-1)
+
+  const saveCanvasState = React.useCallback(() => {
+    if (!canvasRef.current) return
+    const data = canvasRef.current.toDataURL()
+    setHistory(prev => {
+      const newHistory = prev.slice(0, historyStep + 1)
+      newHistory.push(data)
+      setHistoryStep(newHistory.length - 1)
+      return newHistory
+    })
+  }, [historyStep])
 
   // INIT — set innerHTML directly only once to avoid re-renders wiping editor content
   React.useEffect(() => {
@@ -108,6 +123,7 @@ export function EditableResumo({ content, sessionId, loading }: Props) {
           if (ctx) {
              ctx.drawImage(oldImage, 0, 0)
              ctxRef.current = ctx
+             if (history.length === 0) saveCanvasState()
           }
         }
       }
@@ -116,7 +132,7 @@ export function EditableResumo({ content, sessionId, loading }: Props) {
     ro.observe(container)
     
     return () => ro.disconnect()
-  }, [loading])
+  }, [loading, saveCanvasState, history.length])
 
   // INITIAL DRAW ON CANVAS IF WE HAVE SAVED DATA
   React.useEffect(() => {
@@ -129,10 +145,11 @@ export function EditableResumo({ content, sessionId, loading }: Props) {
         img.onload = () => {
           ctx.clearRect(0,0, canvas.width, canvas.height)
           ctx.drawImage(img, 0, 0)
+          if (history.length === 0) saveCanvasState()
         }
       }
     }
-  }, [canvasData])
+  }, [canvasData]) // Removed saveCanvasState constraint intentionally
 
   // EVENT HANDLERS DRAWING
   const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
@@ -167,8 +184,11 @@ export function EditableResumo({ content, sessionId, loading }: Props) {
 
   const endDrawing = () => {
     if (mode === 'text') return
-    isDrawing.current = false
-    ctxRef.current?.closePath()
+    if (isDrawing.current) {
+      isDrawing.current = false
+      ctxRef.current?.closePath()
+      saveCanvasState()
+    }
   }
 
   const getCoordinates = (e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) => {
@@ -204,11 +224,56 @@ export function EditableResumo({ content, sessionId, loading }: Props) {
     }
   }
 
-  // TEXT FORMATTING
+  // TEXT FORMATTING & UNDO/REDO LOGIC
   const formatText = (cmd: string, val?: string) => {
     restoreSelection()
     document.execCommand(cmd, false, val)
     editorRef.current?.focus()
+  }
+
+  const restoreCanvasFromDataURL = (dataUrl: string) => {
+    if (!canvasRef.current) return
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    if (ctx) {
+      const img = new Image()
+      img.src = dataUrl
+      img.onload = () => {
+        ctx.clearRect(0,0, canvas.width, canvas.height)
+        ctx.drawImage(img, 0, 0)
+      }
+    }
+  }
+
+  const handleUndo = () => {
+    if (mode === 'text') {
+      formatText('undo')
+    } else {
+      if (historyStep > 0) {
+        const step = historyStep - 1
+        setHistoryStep(step)
+        restoreCanvasFromDataURL(history[step])
+      } else if (historyStep === 0) {
+        // Clear canvas if undoing first stroke
+        if (canvasRef.current) {
+          const ctx = canvasRef.current.getContext('2d')
+          ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
+        }
+        setHistoryStep(-1)
+      }
+    }
+  }
+
+  const handleRedo = () => {
+    if (mode === 'text') {
+      formatText('redo')
+    } else {
+      if (historyStep < history.length - 1) {
+        const step = historyStep + 1
+        setHistoryStep(step)
+        restoreCanvasFromDataURL(history[step])
+      }
+    }
   }
 
   // SAVE — reads innerHTML directly from the DOM (never from state)
@@ -256,6 +321,18 @@ export function EditableResumo({ content, sessionId, loading }: Props) {
       {/* TOOLBAR */}
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', padding: '12px 14px', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
         
+        {/* Undo / Redo */}
+        <div style={{ display: 'flex', gap: '2px', background: 'var(--surface2)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+          <button onClick={handleUndo} style={{ padding: '6px', borderRadius: '6px', background: 'transparent', color: 'var(--text)', cursor: 'pointer', border: 'none' }} title="Desfazer">
+            <Undo size={16} />
+          </button>
+          <button onClick={handleRedo} style={{ padding: '6px', borderRadius: '6px', background: 'transparent', color: 'var(--text)', cursor: 'pointer', border: 'none' }} title="Refazer">
+            <Redo size={16} />
+          </button>
+        </div>
+
+        <div style={{ width: '1px', height: '24px', background: 'var(--border)', margin: '0 4px' }} />
+
         {/* Type Tool */}
         <div style={{ display: 'flex', gap: '2px', background: 'var(--surface2)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border)' }}>
           <button onClick={() => toggleMode('text')} style={{ padding: '6px', borderRadius: '6px', background: mode === 'text' ? 'var(--border)' : 'transparent', color: mode === 'text' ? 'var(--text)' : 'var(--muted)', cursor: 'pointer', border: 'none' }} title="Modo Texto/Ponteiro">
@@ -271,8 +348,7 @@ export function EditableResumo({ content, sessionId, loading }: Props) {
           <button onMouseDown={e => e.preventDefault()} onClick={() => formatText('italic')} style={{ padding: '6px', borderRadius: '6px', background: 'transparent', color: 'var(--muted)', cursor: 'pointer', border: 'none' }} title="Itálico"><Italic size={16}/></button>
           <button onMouseDown={e => e.preventDefault()} onClick={() => formatText('underline')} style={{ padding: '6px', borderRadius: '6px', background: 'transparent', color: 'var(--muted)', cursor: 'pointer', border: 'none' }} title="Sublinhado"><Underline size={16}/></button>
           
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', marginLeft: '4px' }}>
-            {/* onMouseDown saves selection BEFORE the click moves focus away */}
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', marginLeft: '4px', background: 'var(--surface2)', borderRadius: '6px', padding: '0 4px border: 1px solid var(--border)' }}>
             <button
               onMouseDown={e => { e.preventDefault(); saveSelection() }}
               onClick={() => formatText('backColor', hlColor)}
@@ -281,15 +357,22 @@ export function EditableResumo({ content, sessionId, loading }: Props) {
             >
               <Highlighter size={16}/>
             </button>
-            {/* Changing color just updates state — selection is saved on mousedown of the button */}
             <input
               type="color"
               value={hlColor}
               onMouseDown={saveSelection}
               onChange={e => setHlColor(e.target.value)}
               style={{ width: '20px', height: '20px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', margin: '0 4px' }}
-              title="Escolher cor de realce"
+              title="Escolher cor"
             />
+            <button
+              onMouseDown={e => { e.preventDefault(); saveSelection() }}
+              onClick={() => formatText('backColor', 'transparent')}
+              style={{ padding: '6px', borderRadius: '6px', background: 'transparent', color: 'var(--muted)', cursor: 'pointer', border: 'none' }}
+              title="Limpar Realce"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
           </div>
 
           <div style={{ width: '1px', height: '20px', background: 'var(--border)', margin: '0 4px' }} />
