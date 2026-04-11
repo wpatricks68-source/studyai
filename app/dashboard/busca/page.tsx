@@ -954,23 +954,23 @@ export default function BuscaPage() {
             <div style={{ flex: 1, overflow: 'auto', padding: '24px 32px' }}>
 
               {/* ── RESUMO ── */}
-              {view === 'resumo' && (
+              <div style={{ display: view === 'resumo' ? 'block' : 'none', height: '100%' }}>
                 <EditableResumo 
                   content={session.resumo} 
                   loading={genTarget === 'summary'} 
                   sessionId={session.sessionId} 
                 />
-              )}
+              </div>
 
               {/* ── FLASHCARDS ── */}
-              {view === 'flashcards' && (
+              <div style={{ display: view === 'flashcards' ? 'block' : 'none', height: '100%' }}>
                 <FlashcardsView cards={session.flashcards} loading={genTarget === 'flashcards'} onOpenManual={() => setShowManualFcModal(true)} onGenerateAI={handleFlashcards} />
-              )}
+              </div>
 
               {/* ── QUESTÕES ── */}
-              {view === 'questoes' && (
+              <div style={{ display: view === 'questoes' ? 'block' : 'none', height: '100%' }}>
                 <QuestoesView questions={session.questions} loading={genTarget === 'questions'} onOpenManual={() => setShowManualQModal(true)} onGenerateAI={handleQuestions} />
-              )}
+              </div>
             </div>
           </div>
 
