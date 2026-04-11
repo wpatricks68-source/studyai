@@ -9,189 +9,23 @@ import type { PlannerSubject, Schedule, StudyCycle } from '@/types/database'
 const DAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
 const HOURS = Array.from({ length: 11 }, (_, i) => i + 8) // 08:00 - 18:00
 
-export default function CronogramaPage() {
-  const [loading, setLoading] = useState(true)
-  const [subjects, setSubjects] = useState<PlannerSubject[]>([])
-  const [schedules, setSchedules] = useState<Schedule[]>([])
-  const [cycles, setCycles] = useState<StudyCycle[]>([])
-
-  const [viewMode, setViewMode] = useState<'calendar' | 'cycle'>('calendar')
-
-  // Modals state
-  const [showSubjectModal, setShowSubjectModal] = useState(false)
-  const [showScheduleModal, setShowScheduleModal] = useState(false)
-  const [showCycleModal, setShowCycleModal] = useState(false)
-  
-  // Forms
-  const [subForm, setSubForm] = useState({ name: '', code: '', description: '', target_sessions: 20, color: '#6c63ff' })
-  const [schedForm, setSchedForm] = useState({ subject_id: '', day_of_week: 1, start_time: '08:00', end_time: '10:00' })
-  const [cycleForm, setCycleForm] = useState({ subject_id: '', duration_minutes: 60 })
-
-  const colors = ['#6c63ff', '#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#06b6d4']
-
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  async function loadData() {
-    setLoading(true)
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
-    const [subjRes, schedRes, cycRes] = await Promise.all([
-      supabase.from('planner_subjects').select('*').eq('user_id', user.id).order('created_at', { ascending: true }),
-      supabase.from('schedules').select('*').eq('user_id', user.id).eq('is_active', true),
-      supabase.from('study_cycles').select('*').eq('user_id', user.id).order('order_index', { ascending: true })
-    ])
-
-    setSubjects(subjRes.data ?? [])
-    setSchedules(schedRes.data ?? [])
-    setCycles(cycRes.data ?? [])
-    setLoading(false)
-  }
-
-  // ==== ACTIONS ====
-  async function handleAddSubject() {
-    if (!subForm.name) return
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
-    const { data, error } = await supabase.from('planner_subjects').insert({
-      user_id: user.id,
-      name: subForm.name,
-      code: subForm.code,
-      description: subForm.description,
-      target_sessions: subForm.target_sessions,
-      color: subForm.color
-    }).select().single()
-
-    if (error) {
-      console.error(error)
-      alert("Erro ao salvar disciplina. Verifique se as tabelas foram criadas no banco.")
-      return
-    }
-
-    if (data) setSubjects(prev => [...prev, data])
-    setShowSubjectModal(false)
-    setSubForm({ name: '', code: '', description: '', target_sessions: 20, color: '#6c63ff' })
-  }
-
-  async function handleAddSchedule() {
-    if (!schedForm.subject_id) return
-    const subj = subjects.find(s => s.id === schedForm.subject_id)
-    if (!subj) return
-
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
-    const { data } = await supabase.from('schedules').insert({
-      user_id: user.id,
-      subject: subj.name,
-      materia: subj.code,
-      day_of_week: schedForm.day_of_week,
-      start_time: schedForm.start_time,
-      end_time: schedForm.end_time,
-      color: subj.color,
-      is_active: true
-    }).select().single()
-
-    if (data) setSchedules(prev => [...prev, data])
-    setShowScheduleModal(false)
-  }
-
-  async function handleAddCycle() {
-    if (!cycleForm.subject_id) return
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
-    const nextOrder = cycles.length > 0 ? Math.max(...cycles.map(c => c.order_index)) + 1 : 0
-
-    const { data, error } = await supabase.from('study_cycles').insert({
-      user_id: user.id,
-      subject_id: cycleForm.subject_id,
-      duration_minutes: cycleForm.duration_minutes,
-      order_index: nextOrder
-    }).select().single()
-
-    if (error) {
-      console.error(error)
-      alert("Erro ao salvar ciclo. Verifique se as tabelas foram criadas no banco.")
-      return
-    }
-
-    if (data) setCycles(prev => [...prev, data])
-    setShowCycleModal(false)
-  }
-
-  async function removeSchedule(id: string) {
-    if(!confirm("Remover bloco?")) return
-    const supabase = createClient()
-    await supabase.from('schedules').update({ is_active: false }).eq('id', id)
-    setSchedules(s => s.filter(sc => sc.id !== id))
-  }
-
-  async function removeCycle(id: string) {
-    if(!confirm("Remover deste ciclo?")) return
-    const supabase = createClient()
-    await supabase.from('study_cycles').delete().eq('id', id)
-    setCycles(s => s.filter(sc => sc.id !== id))
-  }
-
-  async function removeSubject(id: string) {
-    if(!confirm("Tem certeza? Esta ação removerá a disciplina e seus vínculos no ciclo.")) return;
-    const supabase = createClient()
-    await supabase.from('planner_subjects').delete().eq('id', id)
-    setSubjects(s => s.filter(su => su.id !== id))
-    setCycles(s => s.filter(sc => sc.subject_id !== id))
-  }
-
-  // ==== HELPERS ====
-  function getBlocksForSlot(dayIndex: number, hourStr: string) {
-    const hrNum = parseInt(hourStr)
-    return schedules.filter(s => {
-      // Assuming DB day_of_week: 0=Dom, 1=Seg...
-      // Our DAYS array starts with Seg, so we match carefully.
-      // If dayIndex is 0 (Seg), s.day_of_week should be 1.
-      let dbDay = dayIndex + 1
-      if (dbDay > 6) dbDay = 0 // Dom
-
-      if (s.day_of_week !== dbDay) return false
-      const start = parseInt(s.start_time.split(':')[0])
-      const end = parseInt(s.end_time.split(':')[0])
-      return hrNum >= start && hrNum < end
-    })
-  }
-
-  const chartData = subjects.map(s => ({
-    name: s.name,
-    value: s.target_sessions || 1,
-    color: s.color,
-    sessions: s.target_sessions || 0
-  }))
-
-  const totalSessions = chartData.reduce((acc, curr) => acc + curr.sessions, 0)
-
-  // Modals Overlay Component
-  const Modal = ({ show, onClose, title, children }: { show: boolean, onClose: () => void, title: string, children: React.ReactNode }) => {
-    if (!show) return null
-    return (
-      <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-        <div style={{ width: '100%', maxWidth: '440px', background: 'var(--surface,#111420)', padding: '28px', borderRadius: '24px', border: '1px solid var(--border,#1f2640)', boxShadow: '0 20px 50px rgba(0,0,0,0.4)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: 600, color: '#fff' }}>{title}</h3>
-            <button onClick={onClose} style={{ background: 'var(--surface2,#181d2e)', border: 'none', color: 'var(--muted)', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={18} /></button>
-          </div>
-          {children}
+// Modals Overlay Component
+const Modal = ({ show, onClose, title, children }: { show: boolean, onClose: () => void, title: string, children: React.ReactNode }) => {
+  if (!show) return null
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+      <div style={{ width: '100%', maxWidth: '440px', background: 'var(--surface,#111420)', padding: '28px', borderRadius: '24px', border: '1px solid var(--border,#1f2640)', boxShadow: '0 20px 50px rgba(0,0,0,0.4)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+          <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text,#fff)' }}>{title}</h3>
+          <button onClick={onClose} style={{ background: 'var(--surface2,#181d2e)', border: 'none', color: 'var(--muted)', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={18} /></button>
         </div>
+        {children}
       </div>
-    )
-  }
+    </div>
+  )
+}
 
-  if (loading) {
+export default function CronogramaPage() {
      return (
        <div style={{ display: 'flex', flex: 1, height: '100vh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg,#0a0c12)', color: 'var(--accent,#6c63ff)' }}>
          <CircleDashed size={40} className="animate-spin" />
@@ -206,7 +40,7 @@ export default function CronogramaPage() {
       <div style={{ width: '360px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
         <div style={{ padding: '24px 24px 16px', borderBottom: '1px solid var(--border,#1f2640)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#fff', letterSpacing: '0.5px' }}>PAINEL DE DISCIPLINAS</h2>
+            <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text,#fff)', letterSpacing: '0.5px' }}>PAINEL DE DISCIPLINAS</h2>
             <div style={{ background: 'var(--surface2,#181d2e)', padding: '2px 8px', borderRadius: '6px', fontSize: '11px', color: 'var(--muted)' }}>{subjects.length}</div>
           </div>
         </div>
@@ -232,7 +66,7 @@ export default function CronogramaPage() {
                 <div style={{ minWidth: '28px', height: '28px', borderRadius: '8px', background: `${subj.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Disc size={14} color={subj.color} />
                 </div>
-                <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#fff', fontWeight: 600 }}>{subj.name}</div>
+                <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text,#fff)', fontWeight: 600 }}>{subj.name}</div>
               </div>
               <div style={{ textAlign: 'center', background: 'var(--surface2,#181d2e)', color: 'var(--accent,#6c63ff)', borderRadius: '6px', fontSize: '11px', fontWeight: 700, padding: '4px 0' }}>
                 {subj.code || '000'}
@@ -249,7 +83,7 @@ export default function CronogramaPage() {
         </div>
 
         <div style={{ padding: '24px' }}>
-          <button onClick={() => setShowSubjectModal(true)} style={{ width: '100%', padding: '14px', background: 'var(--accent,#6c63ff)', color: '#fff', borderRadius: '12px', border: 'none', fontWeight: 700, fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', cursor: 'pointer', transition: 'all .2s', boxShadow: '0 8px 20px rgba(108,99,255,0.3)' }}>
+          <button onClick={() => setShowSubjectModal(true)} style={{ width: '100%', padding: '14px', background: 'var(--accent,#6c63ff)', color: 'var(--text,#fff)', borderRadius: '12px', border: 'none', fontWeight: 700, fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', cursor: 'pointer', transition: 'all .2s', boxShadow: '0 8px 20px rgba(108,99,255,0.3)' }}>
             Nova Disciplina <Plus size={18} />
           </button>
         </div>
@@ -260,7 +94,7 @@ export default function CronogramaPage() {
         
         {/* Header com Toggle */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px', borderBottom: '1px solid var(--border,#1f2640)' }}>
-          <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#fff', letterSpacing: '0.5px' }}>PAINEL DE CRONOGRAMA</h2>
+          <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text,#fff)', letterSpacing: '0.5px' }}>PAINEL DE CRONOGRAMA</h2>
           
           <div style={{ display: 'flex', background: 'var(--bg,#0a0c12)', borderRadius: '10px', padding: '5px', gap: '4px' }}>
             <button onClick={() => setViewMode('calendar')} style={{ background: viewMode === 'calendar' ? 'var(--surface2,#181d2e)' : 'transparent', color: viewMode === 'calendar' ? 'var(--accent,#6c63ff)' : 'var(--muted,#6b7194)', padding: '8px 16px', borderRadius: '8px', border: 'none', fontSize: '13px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all .2s' }}>
@@ -284,7 +118,7 @@ export default function CronogramaPage() {
                  {/* Header Dias */}
                  <div style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface2,#181d2e)' }} />
                  {DAYS.map(d => (
-                   <div key={d} style={{ padding: '14px', textAlign: 'center', fontSize: '12px', fontWeight: 700, color: '#fff', borderBottom: '1px solid var(--border)', background: 'var(--surface2,#181d2e)', borderLeft: '1px solid var(--border)' }}>
+                   <div key={d} style={{ padding: '14px', textAlign: 'center', fontSize: '12px', fontWeight: 700, color: 'var(--text,#fff)', borderBottom: '1px solid var(--border)', background: 'var(--surface2,#181d2e)', borderLeft: '1px solid var(--border)' }}>
                      {d}
                    </div>
                  ))}
@@ -300,7 +134,7 @@ export default function CronogramaPage() {
                        return (
                          <div key={`${h}-${dayIndex}`} style={{ borderLeft: '1px solid var(--border)', borderBottom: '1px solid var(--border)', minHeight: '80px', padding: '6px', position: 'relative', background: 'rgba(255,255,255,0.01)' }}>
                            {blocks.map(b => (
-                             <div key={b.id} onClick={() => removeSchedule(b.id)} style={{ background: b.color, color: '#fff', padding: '10px', borderRadius: '10px', fontSize: '11px', fontWeight: 700, display: 'flex', flexDirection: 'column', gap: '4px', cursor: 'pointer', marginBottom: '6px', boxShadow: `0 8px 16px ${b.color}30`, border: '1px solid rgba(255,255,255,0.1)' }}>
+                             <div key={b.id} onClick={() => removeSchedule(b.id)} style={{ background: b.color, color: 'var(--text,#fff)', padding: '10px', borderRadius: '10px', fontSize: '11px', fontWeight: 700, display: 'flex', flexDirection: 'column', gap: '4px', cursor: 'pointer', marginBottom: '6px', boxShadow: `0 8px 16px ${b.color}30`, border: '1px solid rgba(255,255,255,0.1)' }}>
                                <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.subject}</div>
                                <div style={{ fontSize: '9px', opacity: 0.9, background: 'rgba(0,0,0,0.1)', padding: '2px 0', borderRadius: '4px', textAlign: 'center' }}>{b.start_time.slice(0,5)} - {b.end_time.slice(0,5)}</div>
                              </div>
@@ -330,8 +164,8 @@ export default function CronogramaPage() {
                  <div style={{ position: 'relative', width: '460px', height: '460px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {/* Grande Anel Central */}
                     <div style={{ position: 'absolute', width: '320px', height: '320px', borderRadius: '50%', border: '24px solid var(--surface2,#181d2e)', opacity: 0.5 }} />
-                    <div style={{ textAlign: 'center', zIndex: 10, background: 'var(--bg,#0a0c12)', padding: '30px', borderRadius: '50%', border: '2px dashed var(--border)', boxShadow: '0 0 40px rgba(0,0,0,0.3)' }}>
-                       <div style={{ fontSize: '18px', fontWeight: 800, color: '#fff' }}>CICLO DE</div>
+                    <div style={{ textAlign: 'center', zIndex: 10, background: 'var(--surface,#0a0c12)', padding: '30px', borderRadius: '50%', border: '2px dashed var(--border)', boxShadow: '0 0 40px rgba(0,0,0,0.3)' }}>
+                       <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text,#fff)' }}>CICLO DE</div>
                        <div style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 700, letterSpacing: '2px' }}>ESTUDO</div>
                        <div style={{ fontSize: '10px', color: 'var(--muted)', marginTop: '8px', fontWeight: 600 }}>{cycles.length} BLOCOS</div>
                     </div>
@@ -352,7 +186,7 @@ export default function CronogramaPage() {
                            top: `calc(50% + ${y}px)`,
                            transform: 'translate(-50%, -50%)',
                            background: subj.color,
-                           color: '#fff',
+                           color: 'var(--text,#fff)',
                            padding: '12px 18px',
                            borderRadius: '16px',
                            fontSize: '13px',
@@ -377,7 +211,7 @@ export default function CronogramaPage() {
       {/* ── PAINEL 3: ESTATÍSTICA (Direita) ── */}
       <div style={{ width: '300px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
         <div style={{ padding: '24px', borderBottom: '1px solid var(--border,#1f2640)' }}>
-          <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#fff', letterSpacing: '0.5px' }}>VISÃO GERAL</h2>
+          <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text,#fff)', letterSpacing: '0.5px' }}>VISÃO GERAL</h2>
         </div>
         
         <div style={{ flex: 1, padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', overflowY: 'auto' }}>
@@ -399,20 +233,20 @@ export default function CronogramaPage() {
                     ))}
                   </Pie>
                   <RechartsTooltip 
-                    contentStyle={{ background: '#111420', border: '1px solid #1f2640', borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}
-                    itemStyle={{ color: '#fff', fontSize: '12px', fontWeight: 600 }}
+                    contentStyle={{ background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)', borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}
+                    itemStyle={{ color: 'var(--text,#fff)', fontSize: '12px', fontWeight: 600 }}
                   />
                </PieChart>
              </ResponsiveContainer>
              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
-               <div style={{ fontSize: '28px', fontWeight: 800, color: '#fff', lineHeight: 1 }}>{subjects.length}</div>
+               <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--text,#fff)', lineHeight: 1 }}>{subjects.length}</div>
                <div style={{ fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px', marginTop: '4px' }}>Disciplinas</div>
              </div>
            </div>
 
            <div style={{ width: '100%', marginTop: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', alignItems: 'baseline' }}>
-                <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>Alocação Semanal</span>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text,#fff)' }}>Alocação Semanal</span>
                 <span style={{ fontSize: '11px', color: 'var(--muted)' }}>Total: {totalSessions} sessoes</span>
               </div>
               
@@ -424,7 +258,7 @@ export default function CronogramaPage() {
                       <span style={{ color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.name}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                       <span style={{ color: '#fff', fontWeight: 700 }}>{totalSessions > 0 ? Math.round((d.sessions / totalSessions) * 100) : 0}%</span>
+                       <span style={{ color: 'var(--text,#fff)', fontWeight: 700 }}>{totalSessions > 0 ? Math.round((d.sessions / totalSessions) * 100) : 0}%</span>
                        <div style={{ width: '40px', height: '4px', background: 'var(--surface2,#181d2e)', borderRadius: '2px', overflow: 'hidden' }}>
                           <div style={{ width: `${totalSessions > 0 ? (d.sessions / totalSessions) * 100 : 0}%`, height: '100%', background: d.color }} />
                        </div>
@@ -441,16 +275,16 @@ export default function CronogramaPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
             <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '6px', fontWeight: 700 }}>NOME DA DISCIPLINA</div>
-            <input value={subForm.name} onChange={e => setSubForm({...subForm, name: e.target.value})} placeholder="Ex: Direito Administrativo" style={{ width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', color: '#fff', outline: 'none', fontSize: '14px' }} />
+            <input value={subForm.name} onChange={e => setSubForm({...subForm, name: e.target.value})} placeholder="Ex: Direito Administrativo" style={{ width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', color: 'var(--text,#fff)', outline: 'none', fontSize: '14px' }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div>
               <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '6px', fontWeight: 700 }}>SIGLA / NÚM</div>
-              <input value={subForm.code} onChange={e => setSubForm({...subForm, code: e.target.value})} placeholder="Ex: DA1" style={{ width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', color: '#fff', outline: 'none', fontSize: '14px' }} />
+              <input value={subForm.code} onChange={e => setSubForm({...subForm, code: e.target.value})} placeholder="Ex: DA1" style={{ width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', color: 'var(--text,#fff)', outline: 'none', fontSize: '14px' }} />
             </div>
             <div>
                <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '6px', fontWeight: 700 }}>META SESSÕES</div>
-               <input type="number" value={subForm.target_sessions} onChange={e => setSubForm({...subForm, target_sessions: Number(e.target.value)})} style={{ width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', color: '#fff', outline: 'none', fontSize: '14px' }} />
+               <input type="number" value={subForm.target_sessions} onChange={e => setSubForm({...subForm, target_sessions: Number(e.target.value)})} style={{ width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', color: 'var(--text,#fff)', outline: 'none', fontSize: '14px' }} />
             </div>
           </div>
           <div>
@@ -461,7 +295,7 @@ export default function CronogramaPage() {
               ))}
             </div>
           </div>
-          <button onClick={handleAddSubject} style={{ marginTop: '10px', background: 'var(--accent,#6c63ff)', color: '#fff', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 700, cursor: 'pointer', boxShadow: '0 8px 20px rgba(108,99,255,0.3)' }}>Criar Disciplina</button>
+          <button onClick={handleAddSubject} style={{ marginTop: '10px', background: 'var(--accent,#6c63ff)', color: 'var(--text,#fff)', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 700, cursor: 'pointer', boxShadow: '0 8px 20px rgba(108,99,255,0.3)' }}>Criar Disciplina</button>
         </div>
       </Modal>
 
@@ -469,14 +303,14 @@ export default function CronogramaPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
             <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '6px', fontWeight: 700 }}>ESCOLHER DISCIPLINA</div>
-            <select value={schedForm.subject_id} onChange={e => setSchedForm({...schedForm, subject_id: e.target.value})} style={{ width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', color: '#fff', outline: 'none', fontSize: '14px' }}>
+            <select value={schedForm.subject_id} onChange={e => setSchedForm({...schedForm, subject_id: e.target.value})} style={{ width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', color: 'var(--text,#fff)', outline: 'none', fontSize: '14px' }}>
               <option value="">-- Selecionar --</option>
               {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
           <div>
             <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '6px', fontWeight: 700 }}>DIA DA SEMANA</div>
-            <select value={schedForm.day_of_week} onChange={e => setSchedForm({...schedForm, day_of_week: Number(e.target.value)})} style={{ width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', color: '#fff', outline: 'none', fontSize: '14px' }}>
+            <select value={schedForm.day_of_week} onChange={e => setSchedForm({...schedForm, day_of_week: Number(e.target.value)})} style={{ width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', color: 'var(--text,#fff)', outline: 'none', fontSize: '14px' }}>
                <option value={1}>Segunda-feira</option>
                <option value={2}>Terça-feira</option>
                <option value={3}>Quarta-feira</option>
@@ -489,14 +323,14 @@ export default function CronogramaPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
              <div>
                <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '6px', fontWeight: 700 }}>INÍCIO</div>
-               <input type="time" value={schedForm.start_time} onChange={e => setSchedForm({...schedForm, start_time: e.target.value})} style={{ width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', color: '#fff', outline: 'none', fontSize: '14px' }} />
+               <input type="time" value={schedForm.start_time} onChange={e => setSchedForm({...schedForm, start_time: e.target.value})} style={{ width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', color: 'var(--text,#fff)', outline: 'none', fontSize: '14px' }} />
              </div>
              <div>
                <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '6px', fontWeight: 700 }}>TÉRMINO</div>
-               <input type="time" value={schedForm.end_time} onChange={e => setSchedForm({...schedForm, end_time: e.target.value})} style={{ width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', color: '#fff', outline: 'none', fontSize: '14px' }} />
+               <input type="time" value={schedForm.end_time} onChange={e => setSchedForm({...schedForm, end_time: e.target.value})} style={{ width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', color: 'var(--text,#fff)', outline: 'none', fontSize: '14px' }} />
              </div>
           </div>
-          <button onClick={handleAddSchedule} style={{ marginTop: '10px', background: 'var(--accent,#6c63ff)', color: '#fff', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 700, cursor: 'pointer' }}>Agendar Horário</button>
+          <button onClick={handleAddSchedule} style={{ marginTop: '10px', background: 'var(--accent,#6c63ff)', color: 'var(--text,#fff)', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 700, cursor: 'pointer' }}>Agendar Horário</button>
         </div>
       </Modal>
 
@@ -504,14 +338,14 @@ export default function CronogramaPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
             <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '6px', fontWeight: 700 }}>ORDEM NO FLUXO</div>
-            <select value={cycleForm.subject_id} onChange={e => setCycleForm({...cycleForm, subject_id: e.target.value})} style={{ width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', color: '#fff', outline: 'none', fontSize: '14px' }}>
+            <select value={cycleForm.subject_id} onChange={e => setCycleForm({...cycleForm, subject_id: e.target.value})} style={{ width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', color: 'var(--text,#fff)', outline: 'none', fontSize: '14px' }}>
               <option value="">-- Disciplina --</option>
               {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
           <div>
             <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '6px', fontWeight: 700 }}>DURAÇÃO ESTIMADA</div>
-            <select value={cycleForm.duration_minutes} onChange={e => setCycleForm({...cycleForm, duration_minutes: Number(e.target.value)})} style={{ width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', color: '#fff', outline: 'none', fontSize: '14px' }}>
+            <select value={cycleForm.duration_minutes} onChange={e => setCycleForm({...cycleForm, duration_minutes: Number(e.target.value)})} style={{ width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', color: 'var(--text,#fff)', outline: 'none', fontSize: '14px' }}>
               <option value={30}>30 minutos</option>
               <option value={60}>1 hora</option>
               <option value={90}>1 hora e 30 minutos</option>
@@ -520,7 +354,7 @@ export default function CronogramaPage() {
               <option value={180}>3 horas</option>
             </select>
           </div>
-          <button onClick={handleAddCycle} style={{ marginTop: '10px', background: 'var(--accent,#6c63ff)', color: '#fff', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 700, cursor: 'pointer' }}>Anexar ao Ciclo</button>
+          <button onClick={handleAddCycle} style={{ marginTop: '10px', background: 'var(--accent,#6c63ff)', color: 'var(--text,#fff)', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 700, cursor: 'pointer' }}>Anexar ao Ciclo</button>
         </div>
       </Modal>
 
