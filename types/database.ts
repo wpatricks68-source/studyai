@@ -84,3 +84,25 @@ export interface TimerSession {
   duration_min: number
   started_at: string
 }
+
+export interface PlannerSubject {
+  id: string
+  user_id: string
+  name: string
+  code: string | null
+  description: string | null
+  status: 'Ativo' | 'Em Breve' | 'Pausado' | string
+  target_sessions: number | null
+  completed_sessions: number | null
+  color: string
+  created_at: string
+}
+
+export interface StudyCycle {
+  id: string
+  user_id: string
+  subject_id: string
+  duration_minutes: number
+  order_index: number
+  created_at: string
+}
