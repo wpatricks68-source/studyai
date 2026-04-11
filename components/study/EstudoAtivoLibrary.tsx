@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { Play, Square, Timer, Clock, ChevronRight, RotateCcw, AlertCircle } from 'lucide-react'
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -93,7 +94,77 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null)
   const [activeTab,     setActiveTab]     = useState<'flashcards' | 'questoes'>('flashcards')
   const [isDeleting,    setIsDeleting]    = useState(false)
+  const [sessionActive, setSessionActive] = useState(false)
+  const [timerMode,    setTimerMode]     = useState<'chrono' | 'timer'>('chrono')
+  const [seconds,      setSeconds]       = useState(0)
+  const [timerInput,   setTimerInput]    = useState(20) // Default 20 mins
   const router = useRouter()
+
+  // Lógica do Timer
+  useEffect(() => {
+    let interval: any
+    if (sessionActive) {
+      interval = setInterval(() => {
+        setSeconds(s => {
+          if (timerMode === 'timer') {
+            if (s <= 0) {
+              setSessionActive(false)
+              alert("Tempo esgotado!")
+              return 0
+            }
+            return s - 1
+          }
+          return s + 1
+        })
+      }, 1000)
+    }
+    return () => clearInterval(interval)
+  }, [sessionActive, timerMode])
+
+  const startSession = () => {
+    if (timerMode === 'timer') {
+      setSeconds(timerInput * 60)
+    } else {
+      setSeconds(0)
+    }
+    setSessionActive(true)
+  }
+
+  const endSession = async () => {
+    if (!confirm("Deseja encerrar esta sessão e registrar o tempo nas estatísticas?")) return
+    setSessionActive(false)
+    
+    // Calcular minutos decorridos
+    let finalSeconds = seconds
+    if (timerMode === 'timer') {
+      finalSeconds = (timerInput * 60) - seconds
+    }
+    const mins = Math.max(1, Math.round(finalSeconds / 60))
+
+    // Tentar encontrar uma session_id para o tópico atual
+    const firstItem = topicGroup?.flashcards[0] || topicGroup?.questions[0]
+    if (firstItem?.session_id) {
+      const supabase = createClient()
+      // Pegar duração atual
+      const { data: sess } = await supabase.from('study_sessions').select('duration_min').eq('id', firstItem.session_id).single()
+      const currentMin = sess?.duration_min || 0
+      
+      await supabase.from('study_sessions')
+        .update({ duration_min: currentMin + mins })
+        .eq('id', firstItem.session_id)
+      
+      alert(`Sessão encerrada! +${mins} min registrados nas estatísticas.`)
+    } else {
+      alert("Sessão encerrada. (Não foi possível vincular a uma matéria específica para salvar o tempo).")
+    }
+    setSeconds(0)
+  }
+
+  const formatTime = (s: number) => {
+    const min = Math.floor(s / 60)
+    const sec = s % 60
+    return `${min}:${sec.toString().padStart(2, '0')}`
+  }
 
   const discGroup   = groups.find(g => g.disciplina === selectedDisc) ?? null
   const topicGroup  = discGroup?.topics.find(t => t.topic === selectedTopic) ?? null
@@ -289,8 +360,52 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
               <div style={{ fontSize: '11px', color: 'var(--accent,#6c63ff)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>
                 {selectedDisc}
               </div>
-              <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text,#e8eaf6)', marginBottom: '10px' }}>
+              <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text,#e8eaf6)', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 {topicGroup.topic}
+
+                {/* Session Controller */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  {!sessionActive ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--surface2,#181d2e)', padding: '4px 8px', borderRadius: '10px', border: '1px solid var(--border,#1f2640)' }}>
+                      <select 
+                        value={timerMode} 
+                        onChange={e => setTimerMode(e.target.value as any)}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: '11px', fontWeight: 600, outline: 'none', cursor: 'pointer' }}
+                      >
+                        <option value="chrono">Cronômetro</option>
+                        <option value="timer">Temporizador</option>
+                      </select>
+                      {timerMode === 'timer' && (
+                        <input 
+                          type="number" 
+                          value={timerInput} 
+                          onChange={e => setTimerInput(Number(e.target.value))}
+                          style={{ width: '40px', background: 'transparent', border: 'none', color: '#fff', fontSize: '11px', textAlign: 'center', fontWeight: 700, borderLeft: '1px solid var(--border)', marginLeft: '4px' }}
+                          title="Minutos"
+                        />
+                      )}
+                      <button 
+                        onClick={startSession}
+                        style={{ background: 'var(--accent,#6c63ff)', border: 'none', color: '#fff', borderRadius: '6px', padding: '5px 10px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <Play size={12} fill="currentColor" /> Iniciar
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--surface2,#181d2e)', padding: '5px 12px', borderRadius: '10px', border: '1px solid var(--accent,#6c63ff)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent,#6c63ff)' }}>
+                        {timerMode === 'chrono' ? <Clock size={14} /> : <Timer size={14} />}
+                        <span style={{ fontFamily: 'monospace', fontSize: '14px', fontWeight: 700 }}>{formatTime(seconds)}</span>
+                      </div>
+                      <button 
+                        onClick={endSession}
+                        style={{ background: 'var(--red,#ef4444)', border: 'none', color: '#fff', borderRadius: '6px', padding: '4px 8px', fontSize: '10px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <Square size={10} fill="currentColor" /> Encerrar
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Tabs */}
@@ -334,6 +449,19 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
 
 function FlashcardsPanel({ cards }: { cards: Flashcard[] }) {
   const [flipped, setFlipped] = useState<Record<string, boolean>>({})
+  const [difficulties, setDifficulties] = useState<Record<string, number>>({})
+
+  const handleDifficulty = async (cardId: string, level: number) => {
+    // level: 1=Easy, 2=Regular, 3=Hard
+    setDifficulties(prev => ({ ...prev, [cardId]: level }))
+    
+    // Update DB
+    const supabase = createClient()
+    await supabase.from('flashcards').update({ difficulty: level }).eq('id', cardId)
+    
+    // Flip back
+    setFlipped(prev => ({ ...prev, [cardId]: false }))
+  }
 
   if (cards.length === 0) {
     return (
@@ -345,47 +473,116 @@ function FlashcardsPanel({ cards }: { cards: Flashcard[] }) {
 
   return (
     <div>
+      <style>{`
+        .scene {
+          perspective: 1000px;
+        }
+        .card-inner {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          text-align: center;
+          transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+          transform-style: preserve-3d;
+          min-height: 160px;
+          cursor: pointer;
+        }
+        .card-flipped {
+          transform: rotateY(180deg);
+        }
+        .card-front, .card-back {
+          position: absolute;
+          width: 100%;
+          height: 100%;
+          -webkit-backface-visibility: hidden;
+          backface-visibility: hidden;
+          border-radius: 12px;
+          padding: 20px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          border: 1px solid var(--border,#1f2640);
+        }
+        .card-back {
+          transform: rotateY(180deg);
+          box-shadow: inset 0 0 40px rgba(0,0,0,0.2);
+        }
+      `}</style>
+
       <div style={{ fontSize: '12px', color: 'var(--muted,#6b7194)', marginBottom: '16px' }}>
-        {cards.length} flashcard{cards.length !== 1 ? 's' : ''} — clique para ver a resposta
+        {cards.length} flashcard{cards.length !== 1 ? 's' : ''} — clique para virar e avaliar
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
         {cards.map((card) => {
           const isFlipped = !!flipped[card.id]
+          const diff = difficulties[card.id] || 0
+          
+          let bg = 'var(--surface,#111420)'
+          let dotColor = 'var(--accent,#6c63ff)'
+          if (diff === 1) { bg = 'rgba(16,185,129,0.1)'; dotColor = '#10b981' }
+          if (diff === 2) { bg = 'rgba(245,158,11,0.1)'; dotColor = '#f59e0b' }
+          if (diff === 3) { bg = 'rgba(239,68,68,0.1)';   dotColor = '#ef4444' }
+
           return (
-            <div
-              key={card.id}
-              onClick={() => setFlipped(f => ({ ...f, [card.id]: !f[card.id] }))}
-              style={{
-                background: 'var(--surface,#111420)',
-                border: `1px solid ${isFlipped ? 'var(--accent2,#00d4aa)' : 'var(--border,#1f2640)'}`,
-                borderRadius: '12px', padding: '18px 16px', cursor: 'pointer',
-                minHeight: '120px', display: 'flex', flexDirection: 'column', justifyContent: 'center',
-                transition: 'border-color .2s, transform .15s', userSelect: 'none',
-                transform: isFlipped ? 'scale(1.01)' : 'scale(1)',
-              }}
-            >
-              {!isFlipped ? (
-                <>
-                  <div style={{ fontSize: '10px', color: 'var(--accent,#6c63ff)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>
-                    Frente
+            <div key={card.id} className="scene" style={{ height: '160px' }}>
+              <div 
+                className={`card-inner ${isFlipped ? 'card-flipped' : ''}`}
+                onClick={() => !isFlipped && setFlipped(f => ({ ...f, [card.id]: true }))}
+              >
+                {/* FRONT */}
+                <div className="card-front" style={{ background: bg, borderColor: diff > 0 ? dotColor : 'var(--border,#1f2640)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                    <div style={{ fontSize: '10px', color: dotColor, textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>
+                      Frente
+                    </div>
+                    {diff > 0 && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: dotColor }} />}
                   </div>
-                  <div style={{ fontSize: '13px', color: 'var(--text,#e8eaf6)', lineHeight: 1.65, fontWeight: 500 }}>
-                    {card.front}
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ fontSize: '14px', color: 'var(--text,#e8eaf6)', lineHeight: 1.6, fontWeight: 500 }}>
+                      {card.front}
+                    </div>
                   </div>
-                  <div style={{ fontSize: '10px', color: 'var(--muted,#6b7194)', marginTop: '12px' }}>
-                    Toque para ver a resposta
+                  {!isFlipped && (
+                    <div style={{ fontSize: '9px', color: 'var(--muted,#6b7194)', marginTop: '8px', textTransform: 'uppercase' }}>
+                      Clique para ver resposta
+                    </div>
+                  )}
+                </div>
+
+                {/* BACK */}
+                <div className="card-back" style={{ background: 'var(--surface2,#181d2e)', borderColor: 'var(--accent2,#00d4aa)' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--accent2,#00d4aa)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px', fontWeight: 700 }}>
+                    Resposta
                   </div>
-                </>
-              ) : (
-                <>
-                  <div style={{ fontSize: '10px', color: 'var(--accent2,#00d4aa)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>
-                    Verso
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', padding: '4px 0' }}>
+                    <div style={{ fontSize: '13px', color: 'var(--text,#e8eaf6)', lineHeight: 1.6 }}>
+                      {card.back}
+                    </div>
                   </div>
-                  <div style={{ fontSize: '13px', color: 'var(--text,#e8eaf6)', lineHeight: 1.7 }}>
-                    {card.back}
+                  
+                  {/* Difficulty Buttons */}
+                  <div style={{ display: 'flex', gap: '4px', marginTop: '12px' }} onClick={e => e.stopPropagation()}>
+                    <button 
+                      onClick={() => handleDifficulty(card.id, 3)}
+                      style={{ flex: 1, padding: '6px', borderRadius: '6px', border: 'none', background: '#ef4444', color: '#fff', fontSize: '9px', fontWeight: 800, cursor: 'pointer' }}
+                    >
+                      DIFÍCIL
+                    </button>
+                    <button 
+                      onClick={() => handleDifficulty(card.id, 2)}
+                      style={{ flex: 1, padding: '6px', borderRadius: '6px', border: 'none', background: '#f59e0b', color: '#fff', fontSize: '9px', fontWeight: 800, cursor: 'pointer' }}
+                    >
+                      REGULAR
+                    </button>
+                    <button 
+                      onClick={() => handleDifficulty(card.id, 1)}
+                      style={{ flex: 1, padding: '6px', borderRadius: '6px', border: 'none', background: '#10b981', color: '#fff', fontSize: '9px', fontWeight: 800, cursor: 'pointer' }}
+                    >
+                      FÁCIL
+                    </button>
                   </div>
-                </>
-              )}
+                </div>
+              </div>
             </div>
           )
         })}
