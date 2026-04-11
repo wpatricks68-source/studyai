@@ -26,6 +26,172 @@ const Modal = ({ show, onClose, title, children }: { show: boolean, onClose: () 
 }
 
 export default function CronogramaPage() {
+  const [loading, setLoading] = useState(true)
+  const [subjects, setSubjects] = useState<PlannerSubject[]>([])
+  const [schedules, setSchedules] = useState<Schedule[]>([])
+  const [cycles, setCycles] = useState<StudyCycle[]>([])
+
+  const [viewMode, setViewMode] = useState<'calendar' | 'cycle'>('calendar')
+
+  // Modals state
+  const [showSubjectModal, setShowSubjectModal] = useState(false)
+  const [showScheduleModal, setShowScheduleModal] = useState(false)
+  const [showCycleModal, setShowCycleModal] = useState(false)
+  
+  // Forms
+  const [subForm, setSubForm] = useState({ name: '', code: '', description: '', target_sessions: 20, color: '#6c63ff' })
+  const [schedForm, setSchedForm] = useState({ subject_id: '', day_of_week: 1, start_time: '08:00', end_time: '10:00' })
+  const [cycleForm, setCycleForm] = useState({ subject_id: '', duration_minutes: 60 })
+
+  const colors = ['#6c63ff', '#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#06b6d4']
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  async function loadData() {
+    setLoading(true)
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const [subjRes, schedRes, cycRes] = await Promise.all([
+      supabase.from('planner_subjects').select('*').eq('user_id', user.id).order('created_at', { ascending: true }),
+      supabase.from('schedules').select('*').eq('user_id', user.id).eq('is_active', true),
+      supabase.from('study_cycles').select('*').eq('user_id', user.id).order('order_index', { ascending: true })
+    ])
+
+    setSubjects(subjRes.data ?? [])
+    setSchedules(schedRes.data ?? [])
+    setCycles(cycRes.data ?? [])
+    setLoading(false)
+  }
+
+  // ==== ACTIONS ====
+  async function handleAddSubject() {
+    if (!subForm.name) return
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const { data, error } = await supabase.from('planner_subjects').insert({
+      user_id: user.id,
+      name: subForm.name,
+      code: subForm.code,
+      description: subForm.description,
+      target_sessions: subForm.target_sessions,
+      color: subForm.color
+    }).select().single()
+
+    if (error) {
+      console.error(error)
+      alert("Erro ao salvar disciplina. Verifique se as tabelas foram criadas no banco.")
+      return
+    }
+
+    if (data) setSubjects(prev => [...prev, data])
+    setShowSubjectModal(false)
+    setSubForm({ name: '', code: '', description: '', target_sessions: 20, color: '#6c63ff' })
+  }
+
+  async function handleAddSchedule() {
+    if (!schedForm.subject_id) return
+    const subj = subjects.find(s => s.id === schedForm.subject_id)
+    if (!subj) return
+
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const { data } = await supabase.from('schedules').insert({
+      user_id: user.id,
+      subject: subj.name,
+      materia: subj.code,
+      day_of_week: schedForm.day_of_week,
+      start_time: schedForm.start_time,
+      end_time: schedForm.end_time,
+      color: subj.color,
+      is_active: true
+    }).select().single()
+
+    if (data) setSchedules(prev => [...prev, data])
+    setShowScheduleModal(false)
+  }
+
+  async function handleAddCycle() {
+    if (!cycleForm.subject_id) return
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const nextOrder = cycles.length > 0 ? Math.max(...cycles.map(c => c.order_index)) + 1 : 0
+
+    const { data, error } = await supabase.from('study_cycles').insert({
+      user_id: user.id,
+      subject_id: cycleForm.subject_id,
+      duration_minutes: cycleForm.duration_minutes,
+      order_index: nextOrder
+    }).select().single()
+
+    if (error) {
+      console.error(error)
+      alert("Erro ao salvar ciclo. Verifique se as tabelas foram criadas no banco.")
+      return
+    }
+
+    if (data) setCycles(prev => [...prev, data])
+    setShowCycleModal(false)
+  }
+
+  async function removeSchedule(id: string) {
+    if(!confirm("Remover bloco?")) return
+    const supabase = createClient()
+    await supabase.from('schedules').update({ is_active: false }).eq('id', id)
+    setSchedules(s => s.filter(sc => sc.id !== id))
+  }
+
+  async function removeCycle(id: string) {
+    if(!confirm("Remover deste ciclo?")) return
+    const supabase = createClient()
+    await supabase.from('study_cycles').delete().eq('id', id)
+    setCycles(s => s.filter(sc => sc.id !== id))
+  }
+
+  async function removeSubject(id: string) {
+    if(!confirm("Tem certeza? Esta ação removerá a disciplina e seus vínculos no ciclo.")) return;
+    const supabase = createClient()
+    await supabase.from('planner_subjects').delete().eq('id', id)
+    setSubjects(s => s.filter(su => su.id !== id))
+    setCycles(s => s.filter(sc => sc.subject_id !== id))
+  }
+
+  // ==== HELPERS ====
+  function getBlocksForSlot(dayIndex: number, hourStr: string) {
+    const hrNum = parseInt(hourStr)
+    return schedules.filter(s => {
+      // Assuming DB day_of_week: 0=Dom, 1=Seg...
+      // Our DAYS array starts with Seg, so we match carefully.
+      // If dayIndex is 0 (Seg), s.day_of_week should be 1.
+      let dbDay = dayIndex + 1
+      if (dbDay > 6) dbDay = 0 // Dom
+
+      if (s.day_of_week !== dbDay) return false
+      const start = parseInt(s.start_time.split(':')[0])
+      const end = parseInt(s.end_time.split(':')[0])
+      return hrNum >= start && hrNum < end
+    })
+  }
+
+  const chartData = subjects.map(s => ({
+    name: s.name,
+    value: s.target_sessions || 1,
+    color: s.color,
+    sessions: s.target_sessions || 0
+  }))
+
+  const totalSessions = chartData.reduce((acc, curr) => acc + curr.sessions, 0)
+
+  if (loading) {
      return (
        <div style={{ display: 'flex', flex: 1, height: '100vh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg,#0a0c12)', color: 'var(--accent,#6c63ff)' }}>
          <CircleDashed size={40} className="animate-spin" />
