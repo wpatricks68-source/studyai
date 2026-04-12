@@ -288,12 +288,8 @@ export default function BuscaPage() {
 
       const iaContext = sources.length > 0
         ? sources
-            .map((s, i) => `Fonte ${i + 1}: ${s.title}
-${s.snippet}
-${s.url}`)
-            .join('
-
-')
+            .map((s, i) => `Fonte ${i + 1}: ${s.title}\n${s.snippet}\n${s.url}`)
+            .join('\n\n')
         : fullQuery
 
       setSession(prev => ({
