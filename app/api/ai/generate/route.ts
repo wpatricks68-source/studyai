@@ -273,6 +273,7 @@ async function callWithSmartFallback(
   qtd: number,
 ) {
   const chain = buildFallbackChain(preferredProvider, preferredModel)
+  const errors: string[] = []
 
   for (let i = 0; i < chain.length; i++) {
     const { provider, model } = chain[i]
@@ -291,9 +292,20 @@ async function callWithSmartFallback(
             : '',
       }
     } catch (error) {
+      const info = getErrorInfo(error)
+
+      console.error(
+        `[generate] Falha em ${provider}/${model} | status=${info.status ?? 'sem_status'} | erro=${info.message}`
+      )
+
+      errors.push(`${provider}/${model}: ${info.message}`)
+
       if (!shouldFallbackToAnotherProvider(error)) throw error
     }
   }
+
+  throw new Error(`Todos os provedores falharam. Detalhes: ${errors.join(' | ')}`)
+}
 
   throw new Error('Todos os provedores falharam (limite ou erro).')
 }
