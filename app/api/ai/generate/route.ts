@@ -9,7 +9,7 @@ type TipoQuestoes = 'cv' | 'mc' | 'misto'
 type Provider     = 'claude' | 'gpt' | 'gemini' | 'auto'
 
 // ─── Modelos disponíveis por provider ─────────────────────────
-export const PROVIDER_MODELS: Record<Exclude<Provider, 'auto'>, { id: string; label: string; tier: 'paid' | 'free' }[]> = {
+const PROVIDER_MODELS: Record<Exclude<Provider, 'auto'>, { id: string; label: string; tier: 'paid' | 'free' }[]> = {
   claude: [
     { id: 'claude-opus-4-6',    label: 'Claude Opus 4.6',    tier: 'paid' },
     { id: 'claude-sonnet-4-5',  label: 'Claude Sonnet 4.5',  tier: 'paid' },
