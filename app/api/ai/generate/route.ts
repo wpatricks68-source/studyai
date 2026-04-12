@@ -187,6 +187,116 @@ async function callAuto(prompt: string, type: GenType, qtd: number): Promise<{ r
 }
 
 // ─── Route handler ────────────────────────────────────────────
+function getErrorInfo(error: unknown) {
+  const message = (error as Error)?.message ?? 'Erro desconhecido'
+  const lower = message.toLowerCase()
+  const status =
+    (error as { status?: number; statusCode?: number })?.status ??
+    (error as { statusCode?: number })?.statusCode
+
+  return { message, lower, status }
+}
+
+function shouldFallbackToAnotherProvider(error: unknown): boolean {
+  const { lower, status } = getErrorInfo(error)
+
+  return (
+    status === 429 ||
+    status === 401 ||
+    lower.includes('rate') ||
+    lower.includes('quota') ||
+    lower.includes('credit') ||
+    lower.includes('billing') ||
+    lower.includes('insufficient_quota') ||
+    lower.includes('resource_exhausted') ||
+    lower.includes('too many requests') ||
+    lower.includes('authentication') ||
+    lower.includes('api key')
+  )
+}
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function callProviderWithRetry(
+  provider: Exclude<Provider, 'auto'>,
+  model: string,
+  prompt: string,
+  type: GenType,
+  qtd: number,
+): Promise<string> {
+  try {
+    return await callProvider(provider, model, prompt, type, qtd)
+  } catch (error) {
+    if (!shouldFallbackToAnotherProvider(error)) throw error
+    await sleep(1200)
+    return await callProvider(provider, model, prompt, type, qtd)
+  }
+}
+
+function getDefaultModel(provider: Exclude<Provider, 'auto'>): string {
+  return PROVIDER_MODELS[provider]?.[0]?.id ?? ''
+}
+
+function buildFallbackChain(
+  preferredProvider: Provider,
+  preferredModel?: string,
+): { provider: Exclude<Provider, 'auto'>; model: string }[] {
+  if (preferredProvider === 'auto') {
+    return AUTO_CASCADE
+  }
+
+  const chain: { provider: Exclude<Provider, 'auto'>; model: string }[] = []
+
+  const p = preferredProvider as Exclude<Provider, 'auto'>
+
+  chain.push({
+    provider: p,
+    model: preferredModel || getDefaultModel(p),
+  })
+
+  for (const item of AUTO_CASCADE) {
+    if (item.provider !== p) {
+      chain.push(item)
+    }
+  }
+
+  return chain
+}
+
+async function callWithSmartFallback(
+  preferredProvider: Provider,
+  preferredModel: string | undefined,
+  prompt: string,
+  type: GenType,
+  qtd: number,
+) {
+  const chain = buildFallbackChain(preferredProvider, preferredModel)
+
+  for (let i = 0; i < chain.length; i++) {
+    const { provider, model } = chain[i]
+
+    try {
+      const result = await callProviderWithRetry(provider, model, prompt, type, qtd)
+
+      return {
+        result,
+        usedProvider: provider,
+        usedModel: model,
+        fallbackUsed: i > 0 || preferredProvider === 'auto',
+        fallbackMessage:
+          i > 0
+            ? `Usamos ${provider.toUpperCase()} automaticamente devido a limite ou indisponibilidade.`
+            : '',
+      }
+    } catch (error) {
+      if (!shouldFallbackToAnotherProvider(error)) throw error
+    }
+  }
+
+  throw new Error('Todos os provedores falharam (limite ou erro).')
+}
 export async function POST(req: NextRequest) {
   try {
     // 1. Autenticação
