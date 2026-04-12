@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
 
 export async function GET() {
+  // ⚠️ Bloqueado em produção — apenas ambiente local
+  if (process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production') {
+    return NextResponse.json({ error: 'Rota de debug desabilitada em produção.' }, { status: 403 })
+  }
+
   const results: Record<string, string> = {}
 
   // 1. Checa variáveis de ambiente
