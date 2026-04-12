@@ -171,28 +171,6 @@ async function callProvider(
   throw new Error(`Provider desconhecido: ${provider}`)
 }
 
-function shouldFallbackToGemini(error: unknown): boolean {
-  const msg = (error as Error)?.message?.toLowerCase?.() ?? ''
-  const status =
-    (error as { status?: number; statusCode?: number })?.status ??
-    (error as { statusCode?: number })?.statusCode
-
-  return (
-    status === 429 ||
-    status === 401 ||
-    msg.includes('rate') ||
-    msg.includes('quota') ||
-    msg.includes('credit') ||
-    msg.includes('billing') ||
-    msg.includes('insufficient_quota') ||
-    msg.includes('authentication') ||
-    msg.includes('api key') ||
-    msg.includes('invalid x-api-key') ||
-    msg.includes('not configured') ||
-    msg.includes('não configurada') ||
-    msg.includes('overloaded')
-  )
-}
 
 // ─── Auto cascade ─────────────────────────────────────────────
 async function callAuto(prompt: string, type: GenType, qtd: number): Promise<{ result: string; usedProvider: string; usedModel: string }> {
@@ -248,41 +226,13 @@ export async function POST(req: NextRequest) {
     let fallbackUsed = false
     let fallbackMessage = ''
 
-    // 3. Chamar provider
-    if (provider === 'auto') {
-      const autoRes = await callAuto(prompt, type, qtd)
-      result        = autoRes.result
-      usedProvider  = autoRes.usedProvider as Provider
-      usedModel     = autoRes.usedModel
-    } else {
-      // Resolve modelo padrão se não informado
-      if (!usedModel) {
-        const models = PROVIDER_MODELS[provider as Exclude<Provider,'auto'>]
-        usedModel = models?.[0]?.id ?? ''
-      }
-
-      try {
-        result = await callProvider(provider as Exclude<Provider,'auto'>, usedModel, prompt, type, qtd)
-      } catch (primaryError) {
-        const canFallback =
-          provider !== 'gemini' &&
-          shouldFallbackToGemini(primaryError)
-
-        if (!canFallback) throw primaryError
-
-        const geminiFallbackModel = 'gemini-2.0-flash'
-        console.warn(
-          `[generate] Provider principal falhou (${provider}/${usedModel}). ` +
-          `Aplicando fallback para gemini/${geminiFallbackModel}: ${(primaryError as Error).message}`
-        )
-
-        result = await callProvider('gemini', geminiFallbackModel, prompt, type, qtd)
-        usedProvider = 'gemini'
-        usedModel = geminiFallbackModel
-        fallbackUsed = true
-        fallbackMessage = `O provedor ${provider.toUpperCase()} ficou indisponível no momento. Usamos Gemini automaticamente para concluir sua solicitação.`
-      }
-    }
+    // 3. Chamar provider com retry e fallback inteligente
+    const smartRes = await callWithSmartFallback(provider, model, prompt, type, qtd)
+    result = smartRes.result
+    usedProvider = smartRes.usedProvider
+    usedModel = smartRes.usedModel
+    fallbackUsed = smartRes.fallbackUsed
+    fallbackMessage = smartRes.fallbackMessage
 
     console.log(
       `[generate] OK — provider: ${usedProvider}, modelo: ${usedModel}, tipo: ${type}, fallback: ${fallbackUsed ? 'sim' : 'não'}`
@@ -352,7 +302,7 @@ export async function POST(req: NextRequest) {
     }
     if (code === 429 || msg.toLowerCase().includes('rate') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('billing') || msg.toLowerCase().includes('credit')) {
       return NextResponse.json(
-        { error: 'Limite de uso da IA atingido. Aguarde alguns instantes e tente novamente.' },
+        { error: 'Os provedores de IA atingiram limite temporário. Aguarde um pouco e tente novamente.' },
         { status: 429 }
       )
     }
@@ -366,4 +316,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Erro: ${msg}` }, { status: 500 })
   }
 }
+
 
