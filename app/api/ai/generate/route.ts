@@ -1,10 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 
 type GenType      = 'summary' | 'flashcards' | 'questions'
 type TipoQuestoes = 'cv' | 'mc' | 'misto'
+type Provider     = 'claude' | 'gpt' | 'gemini' | 'auto'
 
+// ─── Modelos disponíveis por provider ─────────────────────────
+export const PROVIDER_MODELS: Record<Exclude<Provider, 'auto'>, { id: string; label: string; tier: 'paid' | 'free' }[]> = {
+  claude: [
+    { id: 'claude-opus-4-6',    label: 'Claude Opus 4.6',    tier: 'paid' },
+    { id: 'claude-sonnet-4-5',  label: 'Claude Sonnet 4.5',  tier: 'paid' },
+    { id: 'claude-haiku-3-5',   label: 'Claude Haiku 3.5',   tier: 'paid' },
+    { id: 'claude-3-opus-20240229',   label: 'Claude 3 Opus',       tier: 'paid' },
+    { id: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet', tier: 'paid' },
+    { id: 'claude-3-haiku-20240307',  label: 'Claude 3 Haiku',      tier: 'free' },
+  ],
+  gpt: [
+    { id: 'gpt-4o',             label: 'GPT-4o',             tier: 'paid' },
+    { id: 'gpt-4o-mini',        label: 'GPT-4o Mini',        tier: 'free' },
+    { id: 'gpt-4-turbo',        label: 'GPT-4 Turbo',        tier: 'paid' },
+    { id: 'gpt-4',              label: 'GPT-4',              tier: 'paid' },
+    { id: 'gpt-3.5-turbo',      label: 'GPT-3.5 Turbo',      tier: 'free' },
+  ],
+  gemini: [
+    { id: 'gemini-2.0-flash',          label: 'Gemini 2.0 Flash',        tier: 'free' },
+    { id: 'gemini-2.0-flash-lite',     label: 'Gemini 2.0 Flash Lite',   tier: 'free' },
+    { id: 'gemini-1.5-pro',            label: 'Gemini 1.5 Pro',          tier: 'paid' },
+    { id: 'gemini-1.5-flash',          label: 'Gemini 1.5 Flash',        tier: 'free' },
+    { id: 'gemini-1.5-flash-8b',       label: 'Gemini 1.5 Flash 8B',     tier: 'free' },
+  ],
+}
+
+// ─── Cascade automático (gratuito) ───────────────────────────
+const AUTO_CASCADE: { provider: Exclude<Provider,'auto'>; model: string }[] = [
+  { provider: 'gemini', model: 'gemini-2.0-flash' },
+  { provider: 'gpt',    model: 'gpt-4o-mini' },
+  { provider: 'claude', model: 'claude-3-haiku-20240307' },
+]
+
+// ─── Prompt builder ───────────────────────────────────────────
 function buildPrompt(
   type: GenType,
   topic: string,
@@ -84,28 +121,91 @@ Regras:
 - Varie o nível de dificuldade entre as questões`
 }
 
+// ─── Chamada Claude (Anthropic) ────────────────────────────────
+async function callClaude(prompt: string, model: string, type: GenType, qtd: number): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY não configurada')
+  const anthropic = new Anthropic({ apiKey })
+  const message = await anthropic.messages.create({
+    model,
+    max_tokens: type === 'summary' ? 3000 : type === 'questions' ? Math.max(2000, qtd * 200) : 2000,
+    messages: [{ role: 'user', content: prompt }],
+  })
+  return message.content[0]?.type === 'text' ? message.content[0].text : ''
+}
+
+// ─── Chamada GPT (OpenAI) ─────────────────────────────────────
+async function callGPT(prompt: string, model: string, type: GenType, qtd: number): Promise<string> {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) throw new Error('OPENAI_API_KEY não configurada')
+  const openai = new OpenAI({ apiKey })
+  const completion = await openai.chat.completions.create({
+    model,
+    max_tokens: type === 'summary' ? 3000 : type === 'questions' ? Math.max(2000, qtd * 200) : 2000,
+    messages: [{ role: 'user', content: prompt }],
+  })
+  return completion.choices[0]?.message?.content ?? ''
+}
+
+// ─── Chamada Gemini (Google) ──────────────────────────────────
+async function callGemini(prompt: string, model: string): Promise<string> {
+  const apiKey = process.env.GOOGLE_AI_API_KEY
+  if (!apiKey) throw new Error('GOOGLE_AI_API_KEY não configurada')
+  const genAI = new GoogleGenerativeAI(apiKey)
+  const genModel = genAI.getGenerativeModel({ model })
+  const result = await genModel.generateContent(prompt)
+  return result.response.text()
+}
+
+// ─── Dispatcher ───────────────────────────────────────────────
+async function callProvider(
+  provider: Exclude<Provider, 'auto'>,
+  model: string,
+  prompt: string,
+  type: GenType,
+  qtd: number,
+): Promise<string> {
+  if (provider === 'claude') return callClaude(prompt, model, type, qtd)
+  if (provider === 'gpt')    return callGPT(prompt, model, type, qtd)
+  if (provider === 'gemini') return callGemini(prompt, model)
+  throw new Error(`Provider desconhecido: ${provider}`)
+}
+
+// ─── Auto cascade ─────────────────────────────────────────────
+async function callAuto(prompt: string, type: GenType, qtd: number): Promise<{ result: string; usedProvider: string; usedModel: string }> {
+  const errors: string[] = []
+  for (const { provider, model } of AUTO_CASCADE) {
+    try {
+      const result = await callProvider(provider, model, prompt, type, qtd)
+      if (result) return { result, usedProvider: provider, usedModel: model }
+    } catch (e) {
+      errors.push(`${provider}/${model}: ${(e as Error).message}`)
+    }
+  }
+  throw new Error(`Nenhum provider disponível no modo Auto. Erros: ${errors.join(' | ')}`)
+}
+
+// ─── Route handler ────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
-    // 1. Verificar API key ANTES de qualquer coisa
-    const apiKey = process.env.ANTHROPIC_API_KEY
-    if (!apiKey) {
-      console.error('[generate] ANTHROPIC_API_KEY ausente nas env vars')
-      return NextResponse.json(
-        { error: 'Chave da Anthropic não configurada. Adicione ANTHROPIC_API_KEY nas variáveis de ambiente.' },
-        { status: 500 }
-      )
-    }
-
-    // 2. Autenticação
+    // 1. Autenticação
     const supabase = createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
     }
 
-    // 3. Parse body
+    // 2. Parse body
     const body = await req.json()
-    const { content, topic, type, sessionId, quantidade, tipoQuestoes } = body
+    const {
+      content, topic, type, sessionId, quantidade, tipoQuestoes,
+      provider = 'claude',
+      model,
+    }: {
+      content: string; topic: string; type: GenType; sessionId?: string
+      quantidade?: number; tipoQuestoes?: TipoQuestoes
+      provider?: Provider; model?: string
+    } = body
 
     if (!content?.trim()) {
       return NextResponse.json({ error: 'content é obrigatório' }, { status: 400 })
@@ -115,21 +215,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `type inválido: ${type}` }, { status: 400 })
     }
 
-    const qtd: number        = typeof quantidade   === 'number' ? quantidade   : 10
-    const tq: TipoQuestoes   = ['cv','mc','misto'].includes(tipoQuestoes) ? tipoQuestoes : 'misto'
+    const qtd: number = typeof quantidade === 'number' ? quantidade : 10
+    const tq: TipoQuestoes = ['cv','mc','misto'].includes(tipoQuestoes ?? '') ? tipoQuestoes! : 'misto'
+    const prompt = buildPrompt(type, topic ?? '', content, qtd, tq)
 
-    // 4. Chamar a API da Anthropic
-    const anthropic = new Anthropic({ apiKey })
-    const prompt = buildPrompt(type as GenType, topic ?? '', content, qtd, tq)
+    let result = ''
+    let usedProvider = provider
+    let usedModel    = model ?? ''
 
-    const message = await anthropic.messages.create({
-      model: 'claude-opus-4-6',
-      max_tokens: type === 'summary' ? 3000 : type === 'questions' ? Math.max(2000, qtd * 200) : 2000,
-      messages: [{ role: 'user', content: prompt }],
-    })
+    // 3. Chamar provider
+    if (provider === 'auto') {
+      const autoRes = await callAuto(prompt, type, qtd)
+      result        = autoRes.result
+      usedProvider  = autoRes.usedProvider as Provider
+      usedModel     = autoRes.usedModel
+    } else {
+      // Resolve modelo padrão se não informado
+      if (!usedModel) {
+        const models = PROVIDER_MODELS[provider as Exclude<Provider,'auto'>]
+        usedModel = models?.[0]?.id ?? ''
+      }
+      result = await callProvider(provider as Exclude<Provider,'auto'>, usedModel, prompt, type, qtd)
+    }
 
-    const result = message.content[0]?.type === 'text' ? message.content[0].text : ''
-    console.log(`[generate] OK — modelo: claude-opus-4-6, tipo: ${type}`)
+    console.log(`[generate] OK — provider: ${usedProvider}, modelo: ${usedModel}, tipo: ${type}`)
 
     if (!result) {
       return NextResponse.json(
@@ -138,7 +247,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 5. Salvar flashcards no banco (best-effort)
+    // 4. Salvar flashcards no banco (best-effort)
     if (type === 'flashcards' && sessionId) {
       try {
         const cleaned = result.replace(/```json|```/g, '').trim()
@@ -156,10 +265,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 6. Salvar questões no banco (best-effort)
+    // 5. Salvar questões no banco (best-effort)
     if (type === 'questions' && sessionId) {
       try {
-        const cleaned = result.replace(/```json|```/g, '').trim()
+        const cleaned = result.replace(/```json[\s\S]*?```|```/g, '').trim()
         const qs: Array<{
           question: string; tipo: string; options?: string[]
           correct?: number; gabarito?: string; explanation?: string; banca?: string
@@ -180,22 +289,22 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ result })
+    return NextResponse.json({ result, provider: usedProvider, model: usedModel })
 
   } catch (error: unknown) {
     const msg  = (error as Error).message ?? 'Erro desconhecido'
     const code = (error as { status?: number }).status
     console.error('[generate] Erro final:', msg)
 
-    if (msg.includes('API key') || msg.includes('invalid x-api-key') || msg.includes('authentication')) {
+    if (msg.includes('API key') || msg.includes('invalid x-api-key') || msg.includes('authentication') || msg.includes('não configurada')) {
       return NextResponse.json(
-        { error: 'Chave da Anthropic inválida. Verifique ANTHROPIC_API_KEY nas variáveis de ambiente.' },
+        { error: `Chave de API inválida ou não configurada: ${msg}` },
         { status: 500 }
       )
     }
     if (msg.includes('rate') || code === 429) {
       return NextResponse.json(
-        { error: 'Limite de uso da Anthropic atingido. Aguarde alguns instantes e tente novamente.' },
+        { error: 'Limite de uso da IA atingido. Aguarde alguns instantes e tente novamente.' },
         { status: 429 }
       )
     }

@@ -4,8 +4,42 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { EditableResumo } from '@/components/study/EditableResumo'
 
-type GenType  = 'summary' | 'flashcards' | 'questions'
-type ViewMode = 'resumo' | 'flashcards' | 'questoes'
+type GenType   = 'summary' | 'flashcards' | 'questions'
+type ViewMode  = 'resumo' | 'flashcards' | 'questoes'
+type AIProvider = 'auto' | 'gpt' | 'gemini' | 'claude'
+
+// ─── Modelos por provider ────────────────────────────────────
+const PROVIDER_MODELS: Record<Exclude<AIProvider,'auto'>, { id: string; label: string; tier: 'paid'|'free' }[]> = {
+  claude: [
+    { id: 'claude-opus-4-6',            label: 'Claude Opus 4.6',      tier: 'paid' },
+    { id: 'claude-sonnet-4-5',          label: 'Claude Sonnet 4.5',    tier: 'paid' },
+    { id: 'claude-haiku-3-5',           label: 'Claude Haiku 3.5',     tier: 'paid' },
+    { id: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet',    tier: 'paid' },
+    { id: 'claude-3-opus-20240229',     label: 'Claude 3 Opus',        tier: 'paid' },
+    { id: 'claude-3-haiku-20240307',    label: 'Claude 3 Haiku (Free)',tier: 'free' },
+  ],
+  gpt: [
+    { id: 'gpt-4o',        label: 'GPT-4o',             tier: 'paid' },
+    { id: 'gpt-4o-mini',   label: 'GPT-4o Mini (Free)', tier: 'free' },
+    { id: 'gpt-4-turbo',   label: 'GPT-4 Turbo',        tier: 'paid' },
+    { id: 'gpt-4',         label: 'GPT-4',              tier: 'paid' },
+    { id: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo',      tier: 'free' },
+  ],
+  gemini: [
+    { id: 'gemini-2.0-flash',      label: 'Gemini 2.0 Flash (Free)',  tier: 'free' },
+    { id: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite',    tier: 'free' },
+    { id: 'gemini-1.5-pro',        label: 'Gemini 1.5 Pro',           tier: 'paid' },
+    { id: 'gemini-1.5-flash',      label: 'Gemini 1.5 Flash (Free)',  tier: 'free' },
+    { id: 'gemini-1.5-flash-8b',   label: 'Gemini 1.5 Flash 8B',      tier: 'free' },
+  ],
+}
+
+const PROVIDER_META: Record<AIProvider, { label: string; color: string; bg: string; icon: string }> = {
+  auto:   { label: 'Auto Gratuito', color: '#10b981', bg: 'rgba(16,185,129,.15)', icon: '✦' },
+  gpt:    { label: 'GPT',          color: '#10a37f', bg: 'rgba(16,163,127,.15)', icon: '⬡' },
+  gemini: { label: 'Gemini',       color: '#4285f4', bg: 'rgba(66,133,244,.15)', icon: '◈' },
+  claude: { label: 'Claude',       color: '#cc785c', bg: 'rgba(204,120,92,.15)', icon: '◆' },
+}
 
 interface Source { title: string; url: string; snippet: string }
 
@@ -57,6 +91,22 @@ export default function BuscaPage() {
   const [showQModal, setShowQModal] = useState(false)
   const [qConfig,    setQConfig]    = useState<QuestoesConfig>({ quantidade: 10, tipo: 'misto' })
   const abortRef = useRef<AbortController | null>(null)
+
+  // ─── Provider & Model ──────────────────────────────────────
+  const [aiProvider, setAiProvider] = useState<AIProvider>('claude')
+  const [aiModel,    setAiModel]    = useState<string>('claude-opus-4-6')
+  const [usedProvider, setUsedProvider] = useState<string>('')
+  const [usedModel,    setUsedModel]    = useState<string>('')
+
+  // Quando muda provider, resetar modelo para o primeiro disponível
+  function handleProviderChange(p: AIProvider) {
+    setAiProvider(p)
+    if (p !== 'auto') {
+      setAiModel(PROVIDER_MODELS[p][0].id)
+    } else {
+      setAiModel('')
+    }
+  }
 
   // ─── Estados Manuais ────────────────────────────────────────
   const [showManualFcModal, setShowManualFcModal] = useState(false)
@@ -227,15 +277,19 @@ export default function BuscaPage() {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
-          content: iaContext,
-          topic:   fullQuery,
-          type:    'summary',
+          content:  iaContext,
+          topic:    fullQuery,
+          type:     'summary',
+          provider: aiProvider,
+          model:    aiProvider !== 'auto' ? aiModel : undefined,
         }),
         signal: ac.signal,
       })
       if (!resumoRes.ok) throw new Error('Erro ao gerar resumo com IA.')
       const resumoData = await resumoRes.json()
       const resumo = resumoData.result ?? ''
+      if (resumoData.provider) setUsedProvider(resumoData.provider)
+      if (resumoData.model)    setUsedModel(resumoData.model)
 
       // 3. Salva sessão no Supabase — agora com materia = disciplina
       const supabase = createClient()
@@ -350,6 +404,8 @@ export default function BuscaPage() {
           topic:     session.query,
           type:      'flashcards',
           sessionId: session.sessionId,
+          provider:  aiProvider,
+          model:     aiProvider !== 'auto' ? aiModel : undefined,
         }),
       })
       if (!res.ok) throw new Error('Erro ao gerar flashcards.')
@@ -390,12 +446,14 @@ export default function BuscaPage() {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
-          content:       session.resumo,
-          topic:         session.query,
-          type:          'questions',
-          sessionId:     session.sessionId,
-          quantidade:    cfg.quantidade,
-          tipoQuestoes:  cfg.tipo,
+          content:      session.resumo,
+          topic:        session.query,
+          type:         'questions',
+          sessionId:    session.sessionId,
+          quantidade:   cfg.quantidade,
+          tipoQuestoes: cfg.tipo,
+          provider:     aiProvider,
+          model:        aiProvider !== 'auto' ? aiModel : undefined,
         }),
       })
       if (!res.ok) {
@@ -449,7 +507,13 @@ export default function BuscaPage() {
       const resumoRes = await fetch('/api/ai/generate', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ content: data.content, topic: name, type: 'summary' }),
+        body:    JSON.stringify({
+          content:  data.content,
+          topic:    name,
+          type:     'summary',
+          provider: aiProvider,
+          model:    aiProvider !== 'auto' ? aiModel : undefined,
+        }),
       })
       const resumoData = await resumoRes.json()
 
@@ -685,6 +749,8 @@ export default function BuscaPage() {
   }
 
   // ─── RENDER ───────────────────────────────────────────────
+  const currentMeta = PROVIDER_META[aiProvider]
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: 'var(--bg,#0a0c12)' }}>
 
@@ -781,31 +847,104 @@ export default function BuscaPage() {
                 disabled={!tema.trim()}
                 style={{
                   padding: '9px 20px', borderRadius: '8px', border: 'none',
-                  background: !tema.trim() ? 'var(--surface2,#181d2e)' : 'var(--accent,#6c63ff)',
+                  background: !tema.trim() ? 'var(--surface2,#181d2e)' : currentMeta.color,
                   color: !tema.trim() ? 'var(--muted,#6b7194)' : '#fff',
                   fontSize: '13px', fontWeight: 600, cursor: !tema.trim() ? 'default' : 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '6px',
                 }}
               >
-                Buscar com IA
+                <span style={{ fontSize: '14px' }}>{currentMeta.icon}</span>
+                Buscar com {aiProvider === 'auto' ? 'IA Auto' : currentMeta.label}
               </button>
             </>
+          )}
+        </div>
+
+        {/* ── Seletor de Provider ── */}
+        <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '11px', color: 'var(--muted,#6b7194)', marginRight: '2px', whiteSpace: 'nowrap' }}>IA:</span>
+
+          {(['auto','gpt','gemini','claude'] as AIProvider[]).map(p => {
+            const meta = PROVIDER_META[p]
+            const active = aiProvider === p
+            return (
+              <button
+                key={p}
+                onClick={() => handleProviderChange(p)}
+                disabled={isLoading}
+                style={{
+                  padding: '5px 13px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
+                  border: `1px solid ${active ? meta.color : 'var(--border,#1f2640)'}`,
+                  background: active ? meta.bg : 'transparent',
+                  color: active ? meta.color : 'var(--muted,#6b7194)',
+                  cursor: isLoading ? 'default' : 'pointer',
+                  opacity: isLoading ? .6 : 1,
+                  transition: 'all .15s',
+                  display: 'flex', alignItems: 'center', gap: '5px',
+                }}
+              >
+                <span style={{ fontSize: '13px' }}>{meta.icon}</span>
+                {meta.label}
+              </button>
+            )
+          })}
+
+          {/* Dropdown de modelo (quando não é Auto) */}
+          {aiProvider !== 'auto' && (
+            <select
+              value={aiModel}
+              onChange={e => setAiModel(e.target.value)}
+              disabled={isLoading}
+              style={{
+                marginLeft: '4px',
+                padding: '5px 10px', borderRadius: '8px', fontSize: '12px',
+                border: `1px solid ${currentMeta.color}`,
+                background: 'var(--surface2,#181d2e)',
+                color: currentMeta.color,
+                cursor: 'pointer',
+                opacity: isLoading ? .6 : 1,
+                outline: 'none',
+              }}
+            >
+              {PROVIDER_MODELS[aiProvider].map(m => (
+                <option key={m.id} value={m.id} style={{ background: '#181d2e', color: '#e8eaf6' }}>
+                  {m.label}{m.tier === 'free' ? ' ✓' : ''}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {/* Badge do provider/modelo usado na última geração */}
+          {usedProvider && phase === 'done' && (
+            <span style={{
+              marginLeft: 'auto', fontSize: '10px', color: 'var(--muted,#6b7194)',
+              display: 'flex', alignItems: 'center', gap: '4px',
+              border: '1px solid var(--border,#1f2640)', borderRadius: '12px',
+              padding: '3px 10px',
+            }}>
+              Gerado por <strong style={{ color: PROVIDER_META[usedProvider as AIProvider]?.color ?? 'var(--text,#e8eaf6)' }}>
+                {PROVIDER_META[usedProvider as AIProvider]?.label ?? usedProvider}
+              </strong>
+              {usedModel && (
+                <span style={{ opacity: .6 }}>· {usedModel.split('-').slice(0,3).join('-')}</span>
+              )}
+            </span>
           )}
         </div>
 
         {/* Status da busca */}
         {isLoading && (
           <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '12px', height: '12px', borderRadius: '50%', border: '2px solid var(--accent,#6c63ff)', borderTopColor: 'transparent', animation: 'spin .7s linear infinite' }} />
+            <div style={{ width: '12px', height: '12px', borderRadius: '50%', border: `2px solid ${currentMeta.color}`, borderTopColor: 'transparent', animation: 'spin .7s linear infinite' }} />
             <span style={{ fontSize: '12px', color: 'var(--muted,#6b7194)' }}>
               {phase === 'searching'
                 ? 'Pesquisando na web...'
                 : genTarget === 'summary'
-                  ? 'Gerando resumo com IA...'
+                  ? `Gerando resumo com ${currentMeta.label}...`
                   : genTarget === 'flashcards'
-                    ? 'Criando flashcards...'
-                    : 'Gerando questões...'}
+                    ? `Criando flashcards com ${currentMeta.label}...`
+                    : `Gerando questões com ${currentMeta.label}...`}
             </span>
-
           </div>
         )}
 

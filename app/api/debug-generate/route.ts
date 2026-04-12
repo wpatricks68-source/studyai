@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
+  // ⚠️ Bloqueado em produção — apenas ambiente local
+  if (process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production') {
+    return NextResponse.json({ error: 'Rota de debug desabilitada em produção.' }, { status: 403 })
+  }
+
   const log: string[] = []
 
   try {
