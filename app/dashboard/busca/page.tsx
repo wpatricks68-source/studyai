@@ -247,70 +247,101 @@ export default function BuscaPage() {
   }, [])
 
   // ─── BUSCA PRINCIPAL ──────────────────────────────────────
-  const resumoRes = await fetch('/api/ai/generate', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    content: iaContext,
-    topic: fullQuery,
-    type: 'summary',
-    provider: aiProvider,
-    model: aiProvider !== 'auto' ? aiModel : undefined,
-  }),
-  signal: ac.signal,
-})
+  const handleSearch = useCallback(async () => {
+    const temaFinal = tema.trim()
+    const discFinal = disciplina.trim()
 
-let resumo = ''
-let resumoData: any = null
+    if (!temaFinal) {
+      setError('Insira um tema para pesquisar.')
+      return
+    }
 
-if (resumoRes.ok) {
-  resumoData = await resumoRes.json()
-  resumo = resumoData.result ?? ''
+    if (phase === 'searching' || phase === 'generating') return
 
-  if (resumoData.provider) setUsedProvider(resumoData.provider)
-  if (resumoData.model) setUsedModel(resumoData.model)
+    const fullQuery = discFinal ? `${discFinal}: ${temaFinal}` : temaFinal
 
-  if (resumoData.fallbackUsed && resumoData.fallbackMessage) {
-    setAiNotice(resumoData.fallbackMessage)
-  } else {
+    setQuery(fullQuery)
+    setError('')
     setAiNotice('')
-  }
-} else {
-  resumo = buildBasicSummary(fullQuery, iaContext)
-  setUsedProvider('gemini')
-  setUsedModel('fallback-local')
-  setAiNotice('IA indisponível no momento. Exibindo resumo básico temporário.')
-}
-      setSession(prev => ({ ...prev, query: fullQuery, disciplina: discFinal, tema: temaFinal, sources }))
+    setPhase('searching')
+    setGenTarget(null)
+    setView('resumo')
 
-      // 2. Gera resumo com IA
+    const ac = new AbortController()
+    abortRef.current = ac
+
+    try {
+      const searchRes = await fetch('/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: fullQuery }),
+        signal: ac.signal,
+      })
+
+      if (!searchRes.ok) {
+        const d = await searchRes.json().catch(() => ({}))
+        throw new Error(d.error || 'Erro ao pesquisar na web.')
+      }
+
+      const searchData = await searchRes.json()
+      const sources: Source[] = Array.isArray(searchData.results) ? searchData.results : []
+
+      const iaContext = sources.length > 0
+        ? sources
+            .map((s, i) => `Fonte ${i + 1}: ${s.title}
+${s.snippet}
+${s.url}`)
+            .join('
+
+')
+        : fullQuery
+
+      setSession(prev => ({
+        ...prev,
+        query: fullQuery,
+        disciplina: discFinal,
+        tema: temaFinal,
+        sources,
+      }))
+
       setPhase('generating')
       setGenTarget('summary')
 
       const resumoRes = await fetch('/api/ai/generate', {
-        method:  'POST',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
-          content:  iaContext,
-          topic:    fullQuery,
-          type:     'summary',
+        body: JSON.stringify({
+          content: iaContext,
+          topic: fullQuery,
+          type: 'summary',
           provider: aiProvider,
-          model:    aiProvider !== 'auto' ? aiModel : undefined,
+          model: aiProvider !== 'auto' ? aiModel : undefined,
         }),
         signal: ac.signal,
       })
-      if (!resumoRes.ok) throw new Error('Erro ao gerar resumo com IA.')
-      const resumoData = await resumoRes.json()
-      const resumo = resumoData.result ?? ''
-      if (resumoData.provider) setUsedProvider(resumoData.provider)
-      if (resumoData.model)    setUsedModel(resumoData.model)
-      if (resumoData.fallbackUsed && resumoData.fallbackMessage) {
-        setAiNotice(resumoData.fallbackMessage)
+
+      let resumo = ''
+      let resumoData: any = null
+
+      if (resumoRes.ok) {
+        resumoData = await resumoRes.json()
+        resumo = resumoData.result ?? ''
+
+        if (resumoData.provider) setUsedProvider(resumoData.provider)
+        if (resumoData.model) setUsedModel(resumoData.model)
+
+        if (resumoData.fallbackUsed && resumoData.fallbackMessage) {
+          setAiNotice(resumoData.fallbackMessage)
+        } else {
+          setAiNotice('')
+        }
       } else {
-        setAiNotice('')
+        resumo = buildBasicSummary(fullQuery, iaContext)
+        setUsedProvider('gemini')
+        setUsedModel('fallback-local')
+        setAiNotice('IA indisponível no momento. Exibindo resumo básico temporário.')
       }
 
-      // 3. Salva sessão no Supabase — agora com materia = disciplina
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       let sessionId: string | null = null
@@ -319,27 +350,31 @@ if (resumoRes.ok) {
         const { data: saved } = await supabase
           .from('study_sessions')
           .insert({
-            user_id:     user.id,
-            title:       fullQuery,
-            topic:       temaFinal,
-            materia:     discFinal || null,
-            content:     resumo,
+            user_id: user.id,
+            title: fullQuery,
+            topic: temaFinal,
+            materia: discFinal || null,
+            content: resumo,
             source_type: 'web',
           })
           .select('id')
           .single()
+
         sessionId = saved?.id ?? null
       }
 
       setSession(prev => ({
         ...prev,
+        query: fullQuery,
+        disciplina: discFinal,
+        tema: temaFinal,
         resumo,
         sessionId,
         savedAt: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
       }))
+
       setPhase('done')
       setGenTarget(null)
-
     } catch (e: unknown) {
       if ((e as Error).name === 'AbortError') return
       setError((e as Error).message || 'Erro inesperado. Tente novamente.')
@@ -347,7 +382,7 @@ if (resumoRes.ok) {
     } finally {
       setGenTarget(null)
     }
-  }, [tema, disciplina, phase])
+  }, [tema, disciplina, phase, aiProvider, aiModel])
 
   // ─── CRIAR MANUALMENTE ────────────────────────────────────
   const handleManualCreate = useCallback(async () => {
@@ -640,7 +675,7 @@ if (resumoRes.ok) {
           <div class="quest">
             <div class="q-header">
               <span class="q-num">Q${qi + 1}</span>
-              <span class="q-tipo">${q.tipo === 'cv' ? 'CERTO / ERRADO' : 'MÚkTIPLA ESCOLHA'}</span>
+              <span class="q-tipo">${q.tipo === 'cv' ? 'CERTO / ERRADO' : 'MÚLTIPLA ESCOLHA'}</span>
               ${q.banca ? `<span class="q-banca">${q.banca}</span>` : ''}
             </div>
             <p class="q-enunciado">${q.question}</p>
@@ -1786,3 +1821,4 @@ function LoadingDots({ label }: { label: string }) {
     </div>
   )
 }
+
