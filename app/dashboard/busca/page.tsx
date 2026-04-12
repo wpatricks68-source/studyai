@@ -79,6 +79,29 @@ const EMPTY: SessionState = {
   sources: [], sessionId: null, savedAt: null,
 }
 
+function buildBasicSummary(topic: string, content: string) {
+  const clean = content
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  const excerpt = clean.slice(0, 1800)
+
+  return `## ${topic}
+
+### Visão geral
+Resumo temporário gerado sem IA por indisponibilidade do provedor.
+
+### Conteúdo base
+${excerpt}
+
+### Pontos principais
+- Tema identificado: ${topic}
+- Conteúdo coletado com sucesso
+- A geração avançada com IA está temporariamente indisponível
+
+### Observação
+Tente novamente mais tarde para obter um resumo completo com IA.`
+}
 export default function BuscaPage() {
   const [disciplina, setDisciplina] = useState('')
   const [tema,       setTema]       = useState('')
@@ -224,52 +247,40 @@ export default function BuscaPage() {
   }, [])
 
   // ─── BUSCA PRINCIPAL ──────────────────────────────────────
-  const handleSearch = useCallback(async () => {
-    const temaFinal = tema.trim()
-    const discFinal = disciplina.trim()
-    if (!temaFinal || phase !== 'idle') return
-    const fullQuery = discFinal ? `${discFinal}: ${temaFinal}` : temaFinal
-    setQuery(fullQuery)
-    setError('')
+  const resumoRes = await fetch('/api/ai/generate', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    content: iaContext,
+    topic: fullQuery,
+    type: 'summary',
+    provider: aiProvider,
+    model: aiProvider !== 'auto' ? aiModel : undefined,
+  }),
+  signal: ac.signal,
+})
+
+let resumo = ''
+let resumoData: any = null
+
+if (resumoRes.ok) {
+  resumoData = await resumoRes.json()
+  resumo = resumoData.result ?? ''
+
+  if (resumoData.provider) setUsedProvider(resumoData.provider)
+  if (resumoData.model) setUsedModel(resumoData.model)
+
+  if (resumoData.fallbackUsed && resumoData.fallbackMessage) {
+    setAiNotice(resumoData.fallbackMessage)
+  } else {
     setAiNotice('')
-    setPhase('searching')
-    setSession(EMPTY)
-    setView('resumo')
-    try { sessionStorage.removeItem('busca_session') } catch {}
-
-    const ac = new AbortController()
-    abortRef.current = ac
-
-    try {
-      // 1. Busca na web
-      const searchRes = await fetch('/api/search', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ query: fullQuery }),
-        signal:  ac.signal,
-      })
-      if (!searchRes.ok) throw new Error('Falha na busca. Tente novamente.')
-      const searchData = await searchRes.json()
-
-      const rawResults: Array<{ title: string; url: string; content: string }> = searchData.results ?? []
-      const sources: Source[] = rawResults.slice(0, 5).map(r => ({
-        title:   r.title,
-        url:     r.url,
-        snippet: (r.content ?? '').slice(0, 200),
-      }))
-
-      const contextBlocks = rawResults.slice(0, 5).map((r, i) =>
-        `[Fonte ${i + 1}] ${r.title}\n${(r.content ?? '').slice(0, 2000)}`
-      ).join('\n\n---\n\n')
-
-      const iaContext = searchData.answer
-        ? `Síntese encontrada:\n${searchData.answer}\n\n---\n\nFontes completas:\n${contextBlocks}`
-        : contextBlocks
-
-      if (!iaContext.trim()) {
-        throw new Error('Nenhum conteúdo encontrado. Tente um tema mais específico.')
-      }
-
+  }
+} else {
+  resumo = buildBasicSummary(fullQuery, iaContext)
+  setUsedProvider('gemini')
+  setUsedModel('fallback-local')
+  setAiNotice('IA indisponível no momento. Exibindo resumo básico temporário.')
+}
       setSession(prev => ({ ...prev, query: fullQuery, disciplina: discFinal, tema: temaFinal, sources }))
 
       // 2. Gera resumo com IA
