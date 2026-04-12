@@ -97,6 +97,7 @@ export default function BuscaPage() {
   const [aiModel,    setAiModel]    = useState<string>('claude-opus-4-6')
   const [usedProvider, setUsedProvider] = useState<string>('')
   const [usedModel,    setUsedModel]    = useState<string>('')
+  const [aiNotice, setAiNotice] = useState('')
 
   // Quando muda provider, resetar modelo para o primeiro disponível
   function handleProviderChange(p: AIProvider) {
@@ -209,6 +210,7 @@ export default function BuscaPage() {
     setPhase('idle')
     setGenTarget(null)
     setError('')
+    setAiNotice('')
     try { sessionStorage.removeItem('busca_session') } catch {}
     
     // Remove id from URL if present
@@ -229,6 +231,7 @@ export default function BuscaPage() {
     const fullQuery = discFinal ? `${discFinal}: ${temaFinal}` : temaFinal
     setQuery(fullQuery)
     setError('')
+    setAiNotice('')
     setPhase('searching')
     setSession(EMPTY)
     setView('resumo')
@@ -290,6 +293,11 @@ export default function BuscaPage() {
       const resumo = resumoData.result ?? ''
       if (resumoData.provider) setUsedProvider(resumoData.provider)
       if (resumoData.model)    setUsedModel(resumoData.model)
+      if (resumoData.fallbackUsed && resumoData.fallbackMessage) {
+        setAiNotice(resumoData.fallbackMessage)
+      } else {
+        setAiNotice('')
+      }
 
       // 3. Salva sessão no Supabase — agora com materia = disciplina
       const supabase = createClient()
@@ -341,6 +349,7 @@ export default function BuscaPage() {
 
     setPhase('searching')
     setError('')
+    setAiNotice('')
     const fullQuery = discFinal ? `${discFinal}: ${temaFinal}` : temaFinal
     setQuery(fullQuery)
     
@@ -394,6 +403,7 @@ export default function BuscaPage() {
 
     setGenTarget('flashcards')
     setError('')
+    setAiNotice('')
 
     try {
       const res = await fetch('/api/ai/generate', {
@@ -410,6 +420,14 @@ export default function BuscaPage() {
       })
       if (!res.ok) throw new Error('Erro ao gerar flashcards.')
       const data = await res.json()
+
+      if (data.provider) setUsedProvider(data.provider)
+      if (data.model) setUsedModel(data.model)
+      if (data.fallbackUsed && data.fallbackMessage) {
+        setAiNotice(data.fallbackMessage)
+      } else {
+        setAiNotice('')
+      }
 
       let cards: Flashcard[] = []
       try {
@@ -440,6 +458,7 @@ export default function BuscaPage() {
     setView('questoes')
     setGenTarget('questions')
     setError('')
+    setAiNotice('')
 
     try {
       const res = await fetch('/api/ai/generate', {
@@ -461,6 +480,14 @@ export default function BuscaPage() {
         throw new Error(d.error || 'Erro ao gerar questões.')
       }
       const data = await res.json()
+
+      if (data.provider) setUsedProvider(data.provider)
+      if (data.model) setUsedModel(data.model)
+      if (data.fallbackUsed && data.fallbackMessage) {
+        setAiNotice(data.fallbackMessage)
+      } else {
+        setAiNotice('')
+      }
 
       let qs: Question[] = []
       try {
@@ -486,6 +513,7 @@ export default function BuscaPage() {
     if (!file) return
     setPhase('searching')
     setError('')
+    setAiNotice('')
 
     const fd = new FormData()
     fd.append('file', file)
@@ -516,6 +544,14 @@ export default function BuscaPage() {
         }),
       })
       const resumoData = await resumoRes.json()
+
+      if (resumoData.provider) setUsedProvider(resumoData.provider)
+      if (resumoData.model) setUsedModel(resumoData.model)
+      if (resumoData.fallbackUsed && resumoData.fallbackMessage) {
+        setAiNotice(resumoData.fallbackMessage)
+      } else {
+        setAiNotice('')
+      }
 
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
@@ -952,6 +988,12 @@ export default function BuscaPage() {
         {error && (
           <div style={{ marginTop: '10px', padding: '8px 12px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.25)', borderRadius: '8px', fontSize: '12px', color: '#f87171' }}>
             {error}
+          </div>
+        )}
+
+        {aiNotice && (
+          <div style={{ marginTop: '10px', padding: '8px 12px', background: 'rgba(245,158,11,.10)', border: '1px solid rgba(245,158,11,.28)', borderRadius: '8px', fontSize: '12px', color: '#fbbf24' }}>
+            {aiNotice}
           </div>
         )}
       </div>
