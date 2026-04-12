@@ -307,7 +307,6 @@ async function callWithSmartFallback(
   throw new Error(`Todos os provedores falharam. Detalhes: ${errors.join(' | ')}`)
 }
 
-  }
 export async function POST(req: NextRequest) {
   try {
     // 1. Autenticação
