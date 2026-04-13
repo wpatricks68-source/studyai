@@ -16,9 +16,11 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
 
   const materias = Array.from(new Set(sessions.map(s => s.materia).filter(Boolean))) as string[]
 
-  const filtered = list.filter(s => {
-    const matchQ   = !query || s.title.toLowerCase().includes(query.toLowerCase()) ||
-                     (s.tags ?? []).some(t => t.toLowerCase().includes(query.toLowerCase()))
+    const q = query.toLowerCase()
+    const matchQ   = !query || 
+                     s.title.toLowerCase().includes(q) ||
+                     (s.materia?.toLowerCase() ?? '').includes(q) ||
+                     (s.tags ?? []).some(t => t.toLowerCase().includes(q))
     const matchMat = filterMat === 'all' || s.materia === filterMat
     return matchQ && matchMat
   })
