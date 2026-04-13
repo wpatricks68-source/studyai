@@ -16,6 +16,7 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
 
   const materias = Array.from(new Set(sessions.map(s => s.materia).filter(Boolean))) as string[]
 
+  const filtered = list.filter(s => {
     const q = query.toLowerCase()
     const matchQ   = !query || 
                      s.title.toLowerCase().includes(q) ||
