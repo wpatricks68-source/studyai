@@ -648,7 +648,7 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                         <button
                           onClick={() => {
-                            const nextId = getNextBestCard(activeCardId)
+                            const nextId = getNextBestCard(undefined, undefined, activeCardId)
                             if (nextId) setActiveCardId(nextId)
                           }}
                           style={{
@@ -665,7 +665,7 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
                         </div>
                         <button
                           onClick={() => {
-                            const nextId = getNextBestCard(activeCardId)
+                            const nextId = getNextBestCard(undefined, undefined, activeCardId)
                             if (nextId) setActiveCardId(nextId)
                           }}
                           style={{
