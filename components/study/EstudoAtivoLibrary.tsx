@@ -470,7 +470,6 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
           </>
         )}
       </div>
-      </div>
 
       {/* ── Focus Mode Overlay ── */}
       {showFocusMode && topicGroup && (
