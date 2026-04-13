@@ -14,6 +14,7 @@ interface Flashcard {
   topic: string | null
   materia: string | null
   session_id: string | null
+  difficulty?: number | null
 }
 
 interface Question {
@@ -321,9 +322,6 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
                       <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.topic}</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ fontSize: '10px', flexShrink: 0, opacity: .7 }}>
-                          {t.flashcards.length > 0 && `${t.flashcards.length}fc`}
-                          {t.flashcards.length > 0 && t.questions.length > 0 && ' '}
-                          {t.questions.length > 0 && `${t.questions.length}q`}
                         </span>
                         <button
                           onClick={(e) => handleDeleteTopic(e, t, g.disciplina)}
@@ -449,7 +447,23 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
 
 function FlashcardsPanel({ cards }: { cards: Flashcard[] }) {
   const [flipped, setFlipped] = useState<Record<string, boolean>>({})
-  const [difficulties, setDifficulties] = useState<Record<string, number>>({})
+  const [difficulties, setDifficulties] = useState<Record<string, number>>(() => {
+    const initial: Record<string, number> = {}
+    cards.forEach(c => {
+      if (c.difficulty) initial[c.id] = c.difficulty
+    })
+    return initial
+  })
+
+  // Sincronizar quando os cards mudarem (ex: troca de tema)
+  useEffect(() => {
+    const next: Record<string, number> = {}
+    cards.forEach(c => {
+      if (c.difficulty) next[c.id] = c.difficulty
+    })
+    setDifficulties(next)
+    setFlipped({})
+  }, [cards])
 
   const handleDifficulty = async (cardId: string, level: number) => {
     // level: 1=Easy, 2=Regular, 3=Hard
