@@ -533,16 +533,15 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
             </div>
           </div>
 
-          {/* Content Area */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '40px 20px', display: 'flex', justifyContent: 'center' }}>
-            <div style={{ width: '100%', maxWidth: fcLayout === 'grid' || activeTab === 'questoes' ? '1200px' : '600px' }}>
+            <div style={{ width: '100%', maxWidth: fcLayout === 'grid' || activeTab === 'questoes' ? '1200px' : '820px' }}>
               {activeTab === 'flashcards' ? (
                 fcLayout === 'grid' ? (
                   <FlashcardsPanel cards={topicGroup.flashcards} />
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '30px' }}>
-                    <div style={{ width: '100%', height: '340px' }}>
-                      <FlashcardsPanel cards={[topicGroup.flashcards[focusIndex]]} />
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '30px', margin: '0 auto', maxWidth: '800px' }}>
+                    <div style={{ width: '100%' }}>
+                      <FlashcardsPanel cards={[topicGroup.flashcards[focusIndex]]} isLarge={true} />
                     </div>
                     
                     {/* Carousel Controls */}
@@ -591,7 +590,7 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
 
 // ─── Flashcards Panel ────────────────────────────────────────
 
-function FlashcardsPanel({ cards }: { cards: Flashcard[] }) {
+function FlashcardsPanel({ cards, isLarge = false }: { cards: Flashcard[], isLarge?: boolean }) {
   const [flipped, setFlipped] = useState<Record<string, boolean>>({})
   const [difficulties, setDifficulties] = useState<Record<string, number>>(() => {
     const initial: Record<string, number> = {}
@@ -644,7 +643,7 @@ function FlashcardsPanel({ cards }: { cards: Flashcard[] }) {
           text-align: center;
           transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
           transform-style: preserve-3d;
-          min-height: 160px;
+          min-height: ${isLarge ? '380px' : '160px'};
           cursor: pointer;
         }
         .card-flipped {
@@ -672,7 +671,7 @@ function FlashcardsPanel({ cards }: { cards: Flashcard[] }) {
       <div style={{ fontSize: '12px', color: 'var(--muted,#6b7194)', marginBottom: '16px' }}>
         {cards.length} flashcard{cards.length !== 1 ? 's' : ''} — clique para virar e avaliar
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isLarge ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
         {cards.map((card) => {
           const isFlipped = !!flipped[card.id]
           const diff = difficulties[card.id] || 0
@@ -684,7 +683,7 @@ function FlashcardsPanel({ cards }: { cards: Flashcard[] }) {
           if (diff === 3) { bg = 'rgba(239,68,68,0.1)';   dotColor = '#ef4444' }
 
           return (
-            <div key={card.id} className="scene" style={{ height: '160px' }}>
+            <div key={card.id} className="scene" style={{ height: isLarge ? '380px' : '160px' }}>
               <div 
                 className={`card-inner ${isFlipped ? 'card-flipped' : ''}`}
                 onClick={() => !isFlipped && setFlipped(f => ({ ...f, [card.id]: true }))}
@@ -692,13 +691,13 @@ function FlashcardsPanel({ cards }: { cards: Flashcard[] }) {
                 {/* FRONT */}
                 <div className="card-front" style={{ background: bg, borderColor: diff > 0 ? dotColor : 'var(--border,#1f2640)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                    <div style={{ fontSize: '10px', color: dotColor, textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>
+                    <div style={{ fontSize: isLarge ? '13px' : '10px', color: dotColor, textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>
                       Frente
                     </div>
                     {diff > 0 && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: dotColor }} />}
                   </div>
-                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ fontSize: '14px', color: 'var(--text,#e8eaf6)', lineHeight: 1.6, fontWeight: 500 }}>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isLarge ? '0 30px' : '0' }}>
+                    <div style={{ fontSize: isLarge ? '24px' : '14px', color: 'var(--text,#e8eaf6)', lineHeight: 1.6, fontWeight: 600 }}>
                       {card.front}
                     </div>
                   </div>
@@ -711,32 +710,32 @@ function FlashcardsPanel({ cards }: { cards: Flashcard[] }) {
 
                 {/* BACK */}
                 <div className="card-back" style={{ background: 'var(--surface2,#181d2e)', borderColor: 'var(--accent2,#00d4aa)' }}>
-                  <div style={{ fontSize: '10px', color: 'var(--accent2,#00d4aa)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px', fontWeight: 700 }}>
+                  <div style={{ fontSize: isLarge ? '13px' : '10px', color: 'var(--accent2,#00d4aa)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px', fontWeight: 700 }}>
                     Resposta
                   </div>
-                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', padding: '4px 0' }}>
-                    <div style={{ fontSize: '13px', color: 'var(--text,#e8eaf6)', lineHeight: 1.6 }}>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', padding: isLarge ? '10px 30px' : '4px 0' }}>
+                    <div style={{ fontSize: isLarge ? '20px' : '13px', color: 'var(--text,#e8eaf6)', lineHeight: 1.6 }}>
                       {card.back}
                     </div>
                   </div>
                   
                   {/* Difficulty Buttons */}
-                  <div style={{ display: 'flex', gap: '4px', marginTop: '12px' }} onClick={e => e.stopPropagation()}>
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }} onClick={e => e.stopPropagation()}>
                     <button 
                       onClick={() => handleDifficulty(card.id, 3)}
-                      style={{ flex: 1, padding: '6px', borderRadius: '6px', border: 'none', background: '#ef4444', color: '#fff', fontSize: '9px', fontWeight: 800, cursor: 'pointer' }}
+                      style={{ flex: 1, padding: isLarge ? '12px' : '6px', borderRadius: '8px', border: 'none', background: '#ef4444', color: '#fff', fontSize: isLarge ? '12px' : '9px', fontWeight: 800, cursor: 'pointer' }}
                     >
                       DIFÍCIL
                     </button>
                     <button 
                       onClick={() => handleDifficulty(card.id, 2)}
-                      style={{ flex: 1, padding: '6px', borderRadius: '6px', border: 'none', background: '#f59e0b', color: '#fff', fontSize: '9px', fontWeight: 800, cursor: 'pointer' }}
+                      style={{ flex: 1, padding: isLarge ? '12px' : '6px', borderRadius: '8px', border: 'none', background: '#f59e0b', color: '#fff', fontSize: isLarge ? '12px' : '9px', fontWeight: 800, cursor: 'pointer' }}
                     >
                       REGULAR
                     </button>
                     <button 
                       onClick={() => handleDifficulty(card.id, 1)}
-                      style={{ flex: 1, padding: '6px', borderRadius: '6px', border: 'none', background: '#10b981', color: '#fff', fontSize: '9px', fontWeight: 800, cursor: 'pointer' }}
+                      style={{ flex: 1, padding: isLarge ? '12px' : '6px', borderRadius: '8px', border: 'none', background: '#10b981', color: '#fff', fontSize: isLarge ? '12px' : '9px', fontWeight: 800, cursor: 'pointer' }}
                     >
                       FÁCIL
                     </button>
