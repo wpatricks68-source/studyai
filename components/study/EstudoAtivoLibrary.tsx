@@ -107,6 +107,9 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
 
   const router = useRouter()
 
+  const discGroup   = groups.find(g => g.disciplina === selectedDisc) ?? null
+  const topicGroup  = discGroup?.topics.find(t => t.topic === selectedTopic) ?? null
+
   // Lógica do Timer
   useEffect(() => {
     let interval: any
@@ -184,8 +187,6 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
     return `${min}:${sec.toString().padStart(2, '0')}`
   }
 
-  const discGroup   = groups.find(g => g.disciplina === selectedDisc) ?? null
-  const topicGroup  = discGroup?.topics.find(t => t.topic === selectedTopic) ?? null
 
   // Auto-select first topic when discipline changes
   const handleSelectDisc = (disc: string) => {
