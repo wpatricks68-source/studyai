@@ -106,6 +106,7 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
   const [sessionQueue, setSessionQueue] = useState<string[]>([])
   const [cardSchedules, setCardSchedules] = useState<Record<string, number>>({})
   const [activeCardId, setActiveCardId] = useState<string | null>(null)
+  const [liveDifficulties, setLiveDifficulties] = useState<Record<string, number>>({})
 
   const router = useRouter()
 
@@ -146,64 +147,71 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
     return () => window.removeEventListener('keydown', handleKeys)
   }, [showFocusMode, fcLayout, activeTab, topicGroup, sessionQueue, cardSchedules])
 
-  // Initialize/Reset session queue when focus mode starts or topic changes
+  // Initialize/Reset session queue and difficulties when topic changes or focus mode starts
   useEffect(() => {
-    if (showFocusMode && topicGroup) {
+    if (topicGroup) {
       const ids = topicGroup.flashcards.map(c => c.id)
-      setSessionQueue(ids)
-      setCardSchedules({})
-      setActiveCardId(ids[0] || null)
+      const initialDiffs: Record<string, number> = {}
+      topicGroup.flashcards.forEach(c => { if (c.difficulty) initialDiffs[c.id] = c.difficulty })
+      
+      setLiveDifficulties(initialDiffs)
+      
+      if (showFocusMode) {
+        setSessionQueue(ids)
+        setCardSchedules({})
+        setActiveCardId(ids[0] || null)
+      }
     }
-  }, [showFocusMode, selectedTopic])
+  }, [showFocusMode, selectedTopic, topicGroup?.flashcards.length])
 
-  const getNextBestCard = (excludeId?: string) => {
-    if (sessionQueue.length === 0) return null
+  const getNextBestCard = (customQueue?: string[], customSchedules?: Record<string, number>, excludeId?: string) => {
+    const queue = customQueue || sessionQueue
+    const schedules = customSchedules || cardSchedules
+    
+    if (queue.length === 0) return null
     const now = Date.now()
     
-    // 1. Filtrar cards que já podem ser mostrados
-    const available = sessionQueue.filter(id => !cardSchedules[id] || now >= cardSchedules[id])
+    const available = queue.filter(id => !schedules[id] || now >= schedules[id])
     
     if (available.length > 0) {
-      // Prioridade: DIFÍCIL (3) > REGULAR (2) > NOVO (0)
-      // Como o estado de dificuldades agora viaja nas props, pegamos do flashcards array
-      const getPrio = (id: string) => {
-        const card = topicGroup?.flashcards.find(c => c.id === id)
-        return card?.difficulty || 0
-      }
-      
+      const getPrio = (id: string) => liveDifficulties[id] || 0
       const sorted = [...available].sort((a, b) => getPrio(b) - getPrio(a))
-      
-      // Se tiver mais de um, tenta não repetir o atual
-      if (sorted.length > 1 && excludeId) {
-        return sorted[0] === excludeId ? sorted[1] : sorted[0]
-      }
+      if (sorted.length > 1 && excludeId) return sorted[0] === excludeId ? sorted[1] : sorted[0]
       return sorted[0]
     }
     
-    // Se nenhum estiver "pronto", pega o que estiver mais perto de liberar
-    const nextToReady = [...sessionQueue].sort((a, b) => (cardSchedules[a] || 0) - (cardSchedules[b] || 0))
+    const nextToReady = [...queue].sort((a, b) => (schedules[a] || 0) - (schedules[b] || 0))
     return nextToReady[0]
   }
 
   const handleRate = (cardId: string, level: number) => {
     const now = Date.now()
     const newSchedules = { ...cardSchedules }
+    let newQueue = [...sessionQueue]
     
+    // Atualizar estado de dificuldades local imediatamente para feedback visual
+    setLiveDifficulties(prev => ({ ...prev, [cardId]: level }))
+
     if (level === 1) { // FÁCIL: Retirar da fila
-      setSessionQueue(prev => prev.filter(id => id !== cardId))
+      newQueue = newQueue.filter(id => id !== cardId)
+      setSessionQueue(newQueue)
     } else if (level === 2) { // REGULAR: 10 min
       newSchedules[cardId] = now + 10 * 60 * 1000
+      setCardSchedules(newSchedules)
     } else if (level === 3) { // DIFÍCIL: 1 min
       newSchedules[cardId] = now + 1 * 60 * 1000
+      setCardSchedules(newSchedules)
     }
     
-    setCardSchedules(newSchedules)
-    
-    // Pular para o próximo automaticamente
+    // Pular para o próximo automaticamente usando os novos estados calculados
     setTimeout(() => {
-      const nextId = getNextBestCard(cardId)
+      const nextId = getNextBestCard(newQueue, newSchedules, cardId)
       setActiveCardId(nextId)
-    }, 400) // Pequeno delay para a animação de flip
+    }, 450)
+
+    // Update DB as síncrono
+    const supabase = createClient()
+    supabase.from('flashcards').update({ difficulty: level }).eq('id', cardId).then()
   }
 
   const startSession = () => {
@@ -527,7 +535,11 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
             {/* Conteúdo */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
               {activeTab === 'flashcards' ? (
-                <FlashcardsPanel cards={topicGroup.flashcards} />
+                <FlashcardsPanel 
+                  cards={topicGroup.flashcards} 
+                  externalDifficulties={liveDifficulties}
+                  onRate={(id, level) => handleRate(id, level)}
+                />
               ) : (
                 <QuestoesPanel questions={topicGroup.questions} />
               )}
@@ -601,13 +613,18 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
             <div style={{ width: '100%', maxWidth: fcLayout === 'grid' || activeTab === 'questoes' ? '1200px' : '820px' }}>
               {activeTab === 'flashcards' ? (
                 fcLayout === 'grid' ? (
-                  <FlashcardsPanel cards={topicGroup.flashcards} onRate={(id, level) => handleRate(id, level)} />
+                  <FlashcardsPanel 
+                    cards={topicGroup.flashcards} 
+                    externalDifficulties={liveDifficulties}
+                    onRate={(id, level) => handleRate(id, level)} 
+                  />
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '30px', margin: '0 auto', maxWidth: '800px' }}>
                     <div style={{ width: '100%' }}>
                       {activeCardId ? (
                         <FlashcardsPanel 
                           cards={[topicGroup.flashcards.find(c => c.id === activeCardId)!]} 
+                          externalDifficulties={liveDifficulties}
                           isLarge={true} 
                           onRate={(id, level) => handleRate(id, level)}
                         />
@@ -679,29 +696,26 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
 
 // ─── Flashcards Panel ────────────────────────────────────────
 
-function FlashcardsPanel({ cards, isLarge = false, onRate }: { cards: Flashcard[], isLarge?: boolean, onRate?: (id: string, level: number) => void }) {
+function FlashcardsPanel({ cards, isLarge = false, onRate, externalDifficulties }: { cards: Flashcard[], isLarge?: boolean, onRate?: (id: string, level: number) => void, externalDifficulties?: Record<string, number> }) {
   const [flipped, setFlipped] = useState<Record<string, boolean>>({})
-  const [difficulties, setDifficulties] = useState<Record<string, number>>(() => {
-    const initial: Record<string, number> = {}
-    cards.forEach(c => {
-      if (c.difficulty) initial[c.id] = c.difficulty
-    })
-    return initial
-  })
+  const [internalDifficulties, setInternalDifficulties] = useState<Record<string, number>>({})
 
-  // Sincronizar quando os cards mudarem (ex: troca de tema)
+  // Merge internal and external difficulties
+  const difficulties = externalDifficulties || internalDifficulties
+
   useEffect(() => {
-    const next: Record<string, number> = {}
-    cards.forEach(c => {
-      if (c.difficulty) next[c.id] = c.difficulty
-    })
-    setDifficulties(next)
+    if (!externalDifficulties) {
+      const initial: Record<string, number> = {}
+      cards.forEach(c => { if (c.difficulty) initial[c.id] = c.difficulty })
+      setInternalDifficulties(initial)
+    }
     setFlipped({})
-  }, [cards])
+  }, [cards, externalDifficulties])
 
   const handleDifficulty = async (cardId: string, level: number) => {
-    // level: 1=Easy, 2=Regular, 3=Hard
-    setDifficulties(prev => ({ ...prev, [cardId]: level }))
+    if (!externalDifficulties) {
+      setInternalDifficulties(prev => ({ ...prev, [cardId]: level }))
+    }
     
     // Update DB
     const supabase = createClient()
