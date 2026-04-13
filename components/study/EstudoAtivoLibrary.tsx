@@ -103,7 +103,9 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
   // Focus Mode States
   const [showFocusMode, setShowFocusMode] = useState(false)
   const [fcLayout, setFcLayout] = useState<'grid' | 'single'>('single')
-  const [focusIndex, setFocusIndex] = useState(0)
+  const [sessionQueue, setSessionQueue] = useState<string[]>([])
+  const [cardSchedules, setCardSchedules] = useState<Record<string, number>>({})
+  const [activeCardId, setActiveCardId] = useState<string | null>(null)
 
   const router = useRouter()
 
@@ -135,12 +137,74 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
   useEffect(() => {
     if (!showFocusMode || activeTab !== 'flashcards' || fcLayout !== 'single' || !topicGroup) return
     const handleKeys = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') setFocusIndex(i => Math.max(0, i - 1))
-      if (e.key === 'ArrowRight') setFocusIndex(i => Math.min(topicGroup.flashcards.length - 1, i + 1))
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        const nextId = getNextBestCard()
+        if (nextId) setActiveCardId(nextId)
+      }
     }
     window.addEventListener('keydown', handleKeys)
     return () => window.removeEventListener('keydown', handleKeys)
-  }, [showFocusMode, fcLayout, activeTab, topicGroup])
+  }, [showFocusMode, fcLayout, activeTab, topicGroup, sessionQueue, cardSchedules])
+
+  // Initialize/Reset session queue when focus mode starts or topic changes
+  useEffect(() => {
+    if (showFocusMode && topicGroup) {
+      const ids = topicGroup.flashcards.map(c => c.id)
+      setSessionQueue(ids)
+      setCardSchedules({})
+      setActiveCardId(ids[0] || null)
+    }
+  }, [showFocusMode, selectedTopic])
+
+  const getNextBestCard = (excludeId?: string) => {
+    if (sessionQueue.length === 0) return null
+    const now = Date.now()
+    
+    // 1. Filtrar cards que já podem ser mostrados
+    const available = sessionQueue.filter(id => !cardSchedules[id] || now >= cardSchedules[id])
+    
+    if (available.length > 0) {
+      // Prioridade: DIFÍCIL (3) > REGULAR (2) > NOVO (0)
+      // Como o estado de dificuldades agora viaja nas props, pegamos do flashcards array
+      const getPrio = (id: string) => {
+        const card = topicGroup?.flashcards.find(c => c.id === id)
+        return card?.difficulty || 0
+      }
+      
+      const sorted = [...available].sort((a, b) => getPrio(b) - getPrio(a))
+      
+      // Se tiver mais de um, tenta não repetir o atual
+      if (sorted.length > 1 && excludeId) {
+        return sorted[0] === excludeId ? sorted[1] : sorted[0]
+      }
+      return sorted[0]
+    }
+    
+    // Se nenhum estiver "pronto", pega o que estiver mais perto de liberar
+    const nextToReady = [...sessionQueue].sort((a, b) => (cardSchedules[a] || 0) - (cardSchedules[b] || 0))
+    return nextToReady[0]
+  }
+
+  const handleRate = (cardId: string, level: number) => {
+    const now = Date.now()
+    const newSchedules = { ...cardSchedules }
+    
+    if (level === 1) { // FÁCIL: Retirar da fila
+      setSessionQueue(prev => prev.filter(id => id !== cardId))
+    } else if (level === 2) { // REGULAR: 10 min
+      newSchedules[cardId] = now + 10 * 60 * 1000
+    } else if (level === 3) { // DIFÍCIL: 1 min
+      newSchedules[cardId] = now + 1 * 60 * 1000
+    }
+    
+    setCardSchedules(newSchedules)
+    
+    // Pular para o próximo automaticamente
+    setTimeout(() => {
+      const nextId = getNextBestCard(cardId)
+      setActiveCardId(nextId)
+    }, 400) // Pequeno delay para a animação de flip
+  }
 
   const startSession = () => {
     if (timerMode === 'timer') {
@@ -382,7 +446,7 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
                 {/* Session Controller */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <button
-                    onClick={() => { setFocusIndex(0); setShowFocusMode(true) }}
+                    onClick={() => { setShowFocusMode(true) }}
                     style={{
                       background: 'rgba(108,99,255,0.1)', border: '1px solid rgba(108,99,255,0.3)',
                       color: 'var(--accent,#6c63ff)', borderRadius: '10px', padding: '6px 14px',
@@ -537,42 +601,67 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
             <div style={{ width: '100%', maxWidth: fcLayout === 'grid' || activeTab === 'questoes' ? '1200px' : '820px' }}>
               {activeTab === 'flashcards' ? (
                 fcLayout === 'grid' ? (
-                  <FlashcardsPanel cards={topicGroup.flashcards} />
+                  <FlashcardsPanel cards={topicGroup.flashcards} onRate={(id, level) => handleRate(id, level)} />
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '30px', margin: '0 auto', maxWidth: '800px' }}>
                     <div style={{ width: '100%' }}>
-                      <FlashcardsPanel cards={[topicGroup.flashcards[focusIndex]]} isLarge={true} />
+                      {activeCardId ? (
+                        <FlashcardsPanel 
+                          cards={[topicGroup.flashcards.find(c => c.id === activeCardId)!]} 
+                          isLarge={true} 
+                          onRate={(id, level) => handleRate(id, level)}
+                        />
+                      ) : (
+                        <div style={{ padding: '60px', textAlign: 'center', background: '#111420', borderRadius: '16px', border: '1px solid #1f2640' }}>
+                          <div style={{ fontSize: '40px', marginBottom: '16px' }}>🎉</div>
+                          <div style={{ fontSize: '18px', fontWeight: 600, color: '#fff' }}>Parabéns!</div>
+                          <div style={{ fontSize: '14px', color: '#6b7194', marginTop: '8px' }}>
+                            Você revisou todos os cards marcados como fáceis nesta sessão. 
+                            {sessionQueue.length > 0 ? ' Os restantes estão em intervalo.' : ''}
+                          </div>
+                          <button onClick={() => setShowFocusMode(false)} style={{ marginTop: '24px', padding: '10px 24px', borderRadius: '8px', background: '#6c63ff', color: '#fff', border: 'none', fontWeight: 600, cursor: 'pointer' }}>
+                            Sair do Foco
+                          </button>
+                        </div>
+                      )}
                     </div>
                     
                     {/* Carousel Controls */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                      <button
-                        onClick={() => setFocusIndex(i => Math.max(0, i - 1))}
-                        disabled={focusIndex === 0}
-                        style={{
-                          width: '44px', height: '44px', borderRadius: '50%', border: '1px solid #1f2640',
-                          background: '#111420', color: focusIndex === 0 ? '#333' : '#fff', cursor: focusIndex === 0 ? 'default' : 'pointer',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center'
-                        }}
-                      >
-                        <ChevronLeft size={24} />
-                      </button>
-                      <div style={{ fontSize: '14px', fontWeight: 600, color: '#6b7194', minWidth: '80px', textAlign: 'center' }}>
-                        {focusIndex + 1} / {topicGroup.flashcards.length}
+                    {activeCardId && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                        <button
+                          onClick={() => {
+                            const nextId = getNextBestCard(activeCardId)
+                            if (nextId) setActiveCardId(nextId)
+                          }}
+                          style={{
+                            width: '44px', height: '44px', borderRadius: '50%', border: '1px solid #1f2640',
+                            background: '#111420', color: '#fff', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                          }}
+                          title="Pular Card"
+                        >
+                          <RotateCcw size={20} />
+                        </button>
+                        <div style={{ fontSize: '14px', fontWeight: 600, color: '#6b7194', minWidth: '120px', textAlign: 'center' }}>
+                          Restantes: {sessionQueue.length}
+                        </div>
+                        <button
+                          onClick={() => {
+                            const nextId = getNextBestCard(activeCardId)
+                            if (nextId) setActiveCardId(nextId)
+                          }}
+                          style={{
+                            width: '44px', height: '44px', borderRadius: '50%', border: '1px solid #1f2640',
+                            background: '#111420', color: '#fff', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                          }}
+                          title="Próximo"
+                        >
+                          <ChevronRight size={24} />
+                        </button>
                       </div>
-                      <button
-                        onClick={() => setFocusIndex(i => Math.min(topicGroup.flashcards.length - 1, i + 1))}
-                        disabled={focusIndex === topicGroup.flashcards.length - 1}
-                        style={{
-                          width: '44px', height: '44px', borderRadius: '50%', border: '1px solid #1f2640',
-                          background: '#111420', color: focusIndex === topicGroup.flashcards.length - 1 ? '#333' : '#fff', 
-                          cursor: focusIndex === topicGroup.flashcards.length - 1 ? 'default' : 'pointer',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center'
-                        }}
-                      >
-                        <ChevronRight size={24} />
-                      </button>
-                    </div>
+                    )}
                   </div>
                 )
               ) : (
@@ -590,7 +679,7 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
 
 // ─── Flashcards Panel ────────────────────────────────────────
 
-function FlashcardsPanel({ cards, isLarge = false }: { cards: Flashcard[], isLarge?: boolean }) {
+function FlashcardsPanel({ cards, isLarge = false, onRate }: { cards: Flashcard[], isLarge?: boolean, onRate?: (id: string, level: number) => void }) {
   const [flipped, setFlipped] = useState<Record<string, boolean>>({})
   const [difficulties, setDifficulties] = useState<Record<string, number>>(() => {
     const initial: Record<string, number> = {}
@@ -618,6 +707,9 @@ function FlashcardsPanel({ cards, isLarge = false }: { cards: Flashcard[], isLar
     const supabase = createClient()
     await supabase.from('flashcards').update({ difficulty: level }).eq('id', cardId)
     
+    // Call callback if exists
+    if (onRate) onRate(cardId, level)
+
     // Flip back
     setFlipped(prev => ({ ...prev, [cardId]: false }))
   }
