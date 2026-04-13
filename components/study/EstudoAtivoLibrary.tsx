@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { Play, Square, Timer, Clock, ChevronRight, RotateCcw, AlertCircle } from 'lucide-react'
+import { Play, Square, Timer, Clock, ChevronRight, RotateCcw, AlertCircle, Maximize2, LayoutGrid, Smartphone, X, ChevronLeft } from 'lucide-react'
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -99,6 +99,12 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
   const [timerMode,    setTimerMode]     = useState<'chrono' | 'timer'>('chrono')
   const [seconds,      setSeconds]       = useState(0)
   const [timerInput,   setTimerInput]    = useState(20) // Default 20 mins
+  
+  // Focus Mode States
+  const [showFocusMode, setShowFocusMode] = useState(false)
+  const [fcLayout, setFcLayout] = useState<'grid' | 'single'>('single')
+  const [focusIndex, setFocusIndex] = useState(0)
+
   const router = useRouter()
 
   // Lógica do Timer
@@ -121,6 +127,17 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
     }
     return () => clearInterval(interval)
   }, [sessionActive, timerMode])
+
+  // Keyboard navigation for focus mode
+  useEffect(() => {
+    if (!showFocusMode || activeTab !== 'flashcards' || fcLayout !== 'single' || !topicGroup) return
+    const handleKeys = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') setFocusIndex(i => Math.max(0, i - 1))
+      if (e.key === 'ArrowRight') setFocusIndex(i => Math.min(topicGroup.flashcards.length - 1, i + 1))
+    }
+    window.addEventListener('keydown', handleKeys)
+    return () => window.removeEventListener('keydown', handleKeys)
+  }, [showFocusMode, fcLayout, activeTab, topicGroup])
 
   const startSession = () => {
     if (timerMode === 'timer') {
@@ -363,6 +380,20 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
 
                 {/* Session Controller */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <button
+                    onClick={() => { setFocusIndex(0); setShowFocusMode(true) }}
+                    style={{
+                      background: 'rgba(108,99,255,0.1)', border: '1px solid rgba(108,99,255,0.3)',
+                      color: 'var(--accent,#6c63ff)', borderRadius: '10px', padding: '6px 14px',
+                      fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: '8px', transition: 'all .15s'
+                    }}
+                    onMouseOver={e => e.currentTarget.style.background = 'rgba(108,99,255,0.18)'}
+                    onMouseOut={e => e.currentTarget.style.background = 'rgba(108,99,255,0.1)'}
+                  >
+                    <Maximize2 size={14} /> Foco Total
+                  </button>
+
                   {!sessionActive ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--surface2,#181d2e)', padding: '4px 8px', borderRadius: '10px', border: '1px solid var(--border,#1f2640)' }}>
                       <select 
@@ -439,6 +470,121 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
           </>
         )}
       </div>
+      </div>
+
+      {/* ── Focus Mode Overlay ── */}
+      {showFocusMode && topicGroup && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: '#050505', display: 'flex', flexDirection: 'column',
+          color: '#e8eaf6'
+        }}>
+          {/* Top Bar */}
+          <div style={{
+            height: '60px', padding: '0 24px', display: 'flex', alignItems: 'center',
+            justifyContent: 'space-between', borderBottom: '1px solid #1f2640',
+            background: '#0a0c12'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ fontSize: '14px', fontWeight: 600, color: '#fff' }}>{topicGroup.topic}</div>
+              <div style={{ fontSize: '11px', color: '#6b7194', textTransform: 'uppercase', letterSpacing: '1px' }}>{selectedDisc}</div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+              {activeTab === 'flashcards' && (
+                <div style={{ display: 'flex', background: '#111420', borderRadius: '8px', padding: '3px', border: '1px solid #1f2640' }}>
+                  <button
+                    onClick={() => setFcLayout('grid')}
+                    style={{
+                      padding: '5px 12px', borderRadius: '6px', border: 'none', cursor: 'pointer',
+                      background: fcLayout === 'grid' ? '#6c63ff' : 'transparent',
+                      color: fcLayout === 'grid' ? '#fff' : '#6b7194',
+                      display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: 600
+                    }}
+                  >
+                    <LayoutGrid size={14} /> Ver Todos
+                  </button>
+                  <button
+                    onClick={() => setFcLayout('single')}
+                    style={{
+                      padding: '5px 12px', borderRadius: '6px', border: 'none', cursor: 'pointer',
+                      background: fcLayout === 'single' ? '#6c63ff' : 'transparent',
+                      color: fcLayout === 'single' ? '#fff' : '#6b7194',
+                      display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: 600
+                    }}
+                  >
+                    <Smartphone size={14} /> Um por Vez
+                  </button>
+                </div>
+              )}
+              
+              <button
+                onClick={() => setShowFocusMode(false)}
+                style={{
+                  background: '#1f2640', border: 'none', color: '#fff', borderRadius: '8px',
+                  width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', transition: 'all .15s'
+                }}
+                onMouseOver={e => e.currentTarget.style.background = '#2a3152'}
+                onMouseOut={e => e.currentTarget.style.background = '#1f2640'}
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+
+          {/* Content Area */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '40px 20px', display: 'flex', justifyContent: 'center' }}>
+            <div style={{ width: '100%', maxWidth: fcLayout === 'grid' || activeTab === 'questoes' ? '1200px' : '600px' }}>
+              {activeTab === 'flashcards' ? (
+                fcLayout === 'grid' ? (
+                  <FlashcardsPanel cards={topicGroup.flashcards} />
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '30px' }}>
+                    <div style={{ width: '100%', height: '340px' }}>
+                      <FlashcardsPanel cards={[topicGroup.flashcards[focusIndex]]} />
+                    </div>
+                    
+                    {/* Carousel Controls */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                      <button
+                        onClick={() => setFocusIndex(i => Math.max(0, i - 1))}
+                        disabled={focusIndex === 0}
+                        style={{
+                          width: '44px', height: '44px', borderRadius: '50%', border: '1px solid #1f2640',
+                          background: '#111420', color: focusIndex === 0 ? '#333' : '#fff', cursor: focusIndex === 0 ? 'default' : 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        }}
+                      >
+                        <ChevronLeft size={24} />
+                      </button>
+                      <div style={{ fontSize: '14px', fontWeight: 600, color: '#6b7194', minWidth: '80px', textAlign: 'center' }}>
+                        {focusIndex + 1} / {topicGroup.flashcards.length}
+                      </div>
+                      <button
+                        onClick={() => setFocusIndex(i => Math.min(topicGroup.flashcards.length - 1, i + 1))}
+                        disabled={focusIndex === topicGroup.flashcards.length - 1}
+                        style={{
+                          width: '44px', height: '44px', borderRadius: '50%', border: '1px solid #1f2640',
+                          background: '#111420', color: focusIndex === topicGroup.flashcards.length - 1 ? '#333' : '#fff', 
+                          cursor: focusIndex === topicGroup.flashcards.length - 1 ? 'default' : 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        }}
+                      >
+                        <ChevronRight size={24} />
+                      </button>
+                    </div>
+                  </div>
+                )
+              ) : (
+                <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+                  <QuestoesPanel questions={topicGroup.questions} />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
