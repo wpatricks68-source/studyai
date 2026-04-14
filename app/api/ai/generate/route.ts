@@ -11,23 +11,19 @@ type Provider     = 'claude' | 'gpt' | 'gemini' | 'auto'
 // ─── Modelos disponíveis por provider ─────────────────────────
 const PROVIDER_MODELS: Record<Exclude<Provider, 'auto'>, { id: string; label: string; tier: 'paid' | 'free' }[]> = {
   claude: [
-    { id: 'claude-opus-4-6',    label: 'Claude Opus 4.6',    tier: 'paid' },
-    { id: 'claude-sonnet-4-5',  label: 'Claude Sonnet 4.5',  tier: 'paid' },
-    { id: 'claude-haiku-3-5',   label: 'Claude Haiku 3.5',   tier: 'paid' },
-    { id: 'claude-3-opus-20240229',   label: 'Claude 3 Opus',       tier: 'paid' },
     { id: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet', tier: 'paid' },
-    { id: 'claude-3-haiku-20240307',  label: 'Claude 3 Haiku',      tier: 'free' },
+    { id: 'claude-3-5-haiku-20241022',  label: 'Claude 3.5 Haiku',  tier: 'paid' },
+    { id: 'claude-3-opus-20240229',    label: 'Claude 3 Opus',     tier: 'paid' },
+    { id: 'claude-3-haiku-20240307',   label: 'Claude 3 Haiku',    tier: 'free' },
   ],
   gpt: [
     { id: 'gpt-4o',             label: 'GPT-4o',             tier: 'paid' },
     { id: 'gpt-4o-mini',        label: 'GPT-4o Mini',        tier: 'free' },
     { id: 'gpt-4-turbo',        label: 'GPT-4 Turbo',        tier: 'paid' },
-    { id: 'gpt-4',              label: 'GPT-4',              tier: 'paid' },
     { id: 'gpt-3.5-turbo',      label: 'GPT-3.5 Turbo',      tier: 'free' },
   ],
   gemini: [
     { id: 'gemini-2.0-flash',          label: 'Gemini 2.0 Flash',        tier: 'free' },
-    { id: 'gemini-2.0-flash-lite',     label: 'Gemini 2.0 Flash Lite',   tier: 'free' },
     { id: 'gemini-1.5-pro',            label: 'Gemini 1.5 Pro',          tier: 'paid' },
     { id: 'gemini-1.5-flash',          label: 'Gemini 1.5 Flash',        tier: 'free' },
     { id: 'gemini-1.5-flash-8b',       label: 'Gemini 1.5 Flash 8B',     tier: 'free' },
@@ -90,7 +86,7 @@ Use markdown. Mínimo de 500 palavras. Foque no que cai em prova.`
 
   if (type === 'flashcards') return `${base}
 
-TAREFA: Crie exatamente 12 flashcards sobre o tema acima.
+TAREFA: Crie exatamente ${quantidade} flashcards sobre o tema acima.
 Retorne APENAS um array JSON válido, sem texto antes ou depois, sem markdown.
 
 [{"front": "pergunta objetiva aqui", "back": "resposta direta e completa aqui"}]`

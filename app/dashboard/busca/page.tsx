@@ -11,23 +11,19 @@ type AIProvider = 'auto' | 'gpt' | 'gemini' | 'claude'
 // ─── Modelos por provider ────────────────────────────────────
 const PROVIDER_MODELS: Record<Exclude<AIProvider,'auto'>, { id: string; label: string; tier: 'paid'|'free' }[]> = {
   claude: [
-    { id: 'claude-opus-4-6',            label: 'Claude Opus 4.6',      tier: 'paid' },
-    { id: 'claude-sonnet-4-5',          label: 'Claude Sonnet 4.5',    tier: 'paid' },
-    { id: 'claude-haiku-3-5',           label: 'Claude Haiku 3.5',     tier: 'paid' },
-    { id: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet',    tier: 'paid' },
-    { id: 'claude-3-opus-20240229',     label: 'Claude 3 Opus',        tier: 'paid' },
-    { id: 'claude-3-haiku-20240307',    label: 'Claude 3 Haiku (Free)',tier: 'free' },
+    { id: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet', tier: 'paid' },
+    { id: 'claude-3-5-haiku-20241022',  label: 'Claude 3.5 Haiku',  tier: 'paid' },
+    { id: 'claude-3-opus-20240229',    label: 'Claude 3 Opus',     tier: 'paid' },
+    { id: 'claude-3-haiku-20240307',   label: 'Claude 3 Haiku (Free)',tier: 'free' },
   ],
   gpt: [
     { id: 'gpt-4o',        label: 'GPT-4o',             tier: 'paid' },
     { id: 'gpt-4o-mini',   label: 'GPT-4o Mini (Free)', tier: 'free' },
     { id: 'gpt-4-turbo',   label: 'GPT-4 Turbo',        tier: 'paid' },
-    { id: 'gpt-4',         label: 'GPT-4',              tier: 'paid' },
-    { id: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo',      tier: 'free' },
+    { id: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo (Free)',tier: 'free' },
   ],
   gemini: [
     { id: 'gemini-2.0-flash',      label: 'Gemini 2.0 Flash (Free)',  tier: 'free' },
-    { id: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite',    tier: 'free' },
     { id: 'gemini-1.5-pro',        label: 'Gemini 1.5 Pro',           tier: 'paid' },
     { id: 'gemini-1.5-flash',      label: 'Gemini 1.5 Flash (Free)',  tier: 'free' },
     { id: 'gemini-1.5-flash-8b',   label: 'Gemini 1.5 Flash 8B',      tier: 'free' },
@@ -58,6 +54,10 @@ interface Question {
 interface QuestoesConfig {
   quantidade: 5 | 10 | 15 | 20
   tipo: 'cv' | 'mc' | 'misto'
+}
+
+interface FlashcardsConfig {
+  quantidade: 5 | 10 | 15 | 20
 }
 
 interface SessionState {
@@ -112,7 +112,9 @@ export default function BuscaPage() {
   const [genTarget,  setGenTarget]  = useState<GenType | null>(null)
   const [error,      setError]      = useState('')
   const [showQModal, setShowQModal] = useState(false)
+  const [showFcModal, setShowFcModal] = useState(false)
   const [qConfig,    setQConfig]    = useState<QuestoesConfig>({ quantidade: 10, tipo: 'misto' })
+  const [fcConfig,   setFcConfig]   = useState<FlashcardsConfig>({ quantidade: 10 })
   const abortRef = useRef<AbortController | null>(null)
 
   // ─── Provider & Model ──────────────────────────────────────
@@ -126,7 +128,11 @@ export default function BuscaPage() {
   function handleProviderChange(p: AIProvider) {
     setAiProvider(p)
     if (p !== 'auto') {
-      setAiModel(PROVIDER_MODELS[p][0].id)
+      const models = PROVIDER_MODELS[p]
+      const currentModelExists = models.some(m => m.id === aiModel)
+      if (!currentModelExists) {
+        setAiModel(models[0].id)
+      }
     } else {
       setAiModel('')
     }
@@ -440,9 +446,13 @@ export default function BuscaPage() {
   // ─── GERAR FLASHCARDS ─────────────────────────────────────
   async function handleFlashcards() {
     if (!session.resumo || genTarget) return
-    setView('flashcards')
-    if (session.flashcards.length > 0) return
+    if (session.flashcards.length > 0) { setView('flashcards'); return }
+    setShowFcModal(true)
+  }
 
+  async function generateFlashcards(cfg: FlashcardsConfig) {
+    setShowFcModal(false)
+    setView('flashcards')
     setGenTarget('flashcards')
     setError('')
     setAiNotice('')
@@ -452,15 +462,19 @@ export default function BuscaPage() {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
-          content:   session.resumo,
-          topic:     session.query,
-          type:      'flashcards',
-          sessionId: session.sessionId,
-          provider:  aiProvider,
-          model:     aiProvider !== 'auto' ? aiModel : undefined,
+          content:    session.resumo,
+          topic:      session.query,
+          type:       'flashcards',
+          sessionId:  session.sessionId,
+          quantidade: cfg.quantidade,
+          provider:   aiProvider,
+          model:      aiProvider !== 'auto' ? aiModel : undefined,
         }),
       })
-      if (!res.ok) throw new Error('Erro ao gerar flashcards.')
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        throw new Error(d.error || 'Erro ao gerar flashcards.')
+      }
       const data = await res.json()
 
       if (data.provider) setUsedProvider(data.provider)
@@ -475,14 +489,15 @@ export default function BuscaPage() {
       try {
         const cleaned = (data.result ?? '').replace(/```json|```/g, '').trim()
         cards = JSON.parse(cleaned)
+        if (!Array.isArray(cards)) throw new Error()
       } catch {
         throw new Error('Resposta da IA inválida. Tente novamente.')
       }
 
       setSession(prev => ({ ...prev, flashcards: cards }))
-      setView('flashcards')
     } catch (e: unknown) {
       setError((e as Error).message || 'Erro ao gerar flashcards.')
+      setView('resumo')
     } finally {
       setGenTarget(null)
     }
@@ -1237,7 +1252,7 @@ export default function BuscaPage() {
       {/* ── Modal de configuração de questões ── */}
       {showQModal && (
         <div style={{
-          position: 'fixed', inset: 0, zIndex: 50,
+          position: 'fixed', inset: 0, zIndex: 100,
           background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(4px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }} onClick={() => setShowQModal(false)}>
@@ -1313,6 +1328,64 @@ export default function BuscaPage() {
                 background: 'var(--accent,#6c63ff)', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
               }}>
                 Gerar {qConfig.quantidade} questões
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal de configuração de flashcards ── */}
+      {showFcModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 100,
+          background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }} onClick={() => setShowFcModal(false)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)',
+            borderRadius: '16px', padding: '28px 28px 24px', width: '380px', maxWidth: '90vw',
+          }}>
+            <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text,#e8eaf6)', marginBottom: '20px' }}>
+              Configurar Flashcards
+            </div>
+
+            {/* Quantidade */}
+            <div style={{ marginBottom: '24px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>
+                Quantidade de cards a gerar
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {([5, 10, 15, 20] as const).map(n => (
+                  <button key={n} onClick={() => setFcConfig(c => ({ ...c, quantidade: n }))}
+                    style={{
+                      flex: 1, padding: '10px 0', borderRadius: '8px', fontSize: '13px', fontWeight: 600,
+                      border: '1px solid', cursor: 'pointer', transition: 'all .12s',
+                      borderColor: fcConfig.quantidade === n ? 'var(--accent2,#00d4aa)' : 'var(--border,#1f2640)',
+                      background:  fcConfig.quantidade === n ? 'rgba(0,212,170,.12)' : 'transparent',
+                      color:       fcConfig.quantidade === n ? 'var(--accent2,#00d4aa)' : 'var(--muted,#6b7194)',
+                    }}>
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--muted,#6b7194)', marginTop: '12px', lineHeight: 1.5 }}>
+                Escolha quantos flashcards a IA deve criar com base no resumo atual.
+              </div>
+            </div>
+
+            {/* Ações */}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setShowFcModal(false)} style={{
+                flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)',
+                background: 'transparent', color: 'var(--muted,#6b7194)', fontSize: '13px', cursor: 'pointer',
+              }}>
+                Cancelar
+              </button>
+              <button onClick={() => generateFlashcards(fcConfig)} style={{
+                flex: 2, padding: '10px', borderRadius: '8px', border: 'none',
+                background: 'var(--accent2,#00d4aa)', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+              }}>
+                Gerar {fcConfig.quantidade} flashcards
               </button>
             </div>
           </div>
