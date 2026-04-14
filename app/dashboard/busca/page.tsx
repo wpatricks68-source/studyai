@@ -39,9 +39,10 @@ const PROVIDER_META: Record<AIProvider, { label: string; color: string; bg: stri
 
 interface Source { title: string; url: string; snippet: string }
 
-interface Flashcard { front: string; back: string }
+interface Flashcard { id?: string; front: string; back: string }
 
 interface Question {
+  id?: string;
   question: string
   tipo: 'cv' | 'mc'
   options?: string[]
@@ -142,6 +143,7 @@ export default function BuscaPage() {
   const [showManualFcModal, setShowManualFcModal] = useState(false)
   const [manualFcFront, setManualFcFront] = useState('')
   const [manualFcBack,  setManualFcBack]  = useState('')
+  const [editingFcId,   setEditingFcId]   = useState<string | null>(null)
 
   const [showManualQModal, setShowManualQModal] = useState(false)
   const [manualQTipo, setManualQTipo] = useState<'cv'|'mc'>('cv')
@@ -151,6 +153,10 @@ export default function BuscaPage() {
   const [manualQGabarito, setManualQGabarito] = useState<'C'|'E'>('C')
   const [manualQExpl, setManualQExpl] = useState('')
   const [isSavingManual, setIsSavingManual] = useState(false)
+
+  // ─── Estados de Gestão de Flashcards ────────────────────────
+  const [isSelectionMode, setIsSelectionMode] = useState(false)
+  const [selectedFcIds, setSelectedFcIds]    = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const loadSession = async () => {
@@ -494,7 +500,7 @@ export default function BuscaPage() {
         throw new Error('Resposta da IA inválida. Tente novamente.')
       }
 
-      setSession(prev => ({ ...prev, flashcards: cards }))
+      setSession(prev => ({ ...prev, flashcards: data.savedCards || cards }))
     } catch (e: unknown) {
       setError((e as Error).message || 'Erro ao gerar flashcards.')
       setView('resumo')
@@ -502,6 +508,66 @@ export default function BuscaPage() {
       setGenTarget(null)
     }
   }
+
+  // ─── GESTÃO DE FLASHCARDS ─────────────────────────────────
+  const handleDeleteFc = useCallback(async (id: string) => {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from('flashcards').delete().eq('id', id)
+      if (error) throw error
+      setSession(prev => ({
+        ...prev,
+        flashcards: prev.flashcards.filter(fc => fc.id !== id)
+      }))
+    } catch (e: unknown) {
+      alert((e as Error).message || 'Erro ao excluir flashcard.')
+    }
+  }, [])
+
+  const handleOpenEditFc = useCallback((fc: Flashcard) => {
+    setEditingFcId(fc.id || null)
+    setManualFcFront(fc.front)
+    setManualFcBack(fc.back)
+    setShowManualFcModal(true)
+  }, [])
+
+  const handleBulkDeleteFcs = useCallback(async () => {
+    if (selectedFcIds.size === 0) return
+    if (!confirm(`Excluir ${selectedFcIds.size} flashcards selecionados?`)) return
+    
+    try {
+      const supabase = createClient()
+      const ids = Array.from(selectedFcIds)
+      const { error } = await supabase.from('flashcards').delete().in('id', ids)
+      if (error) throw error
+      
+      setSession(prev => ({
+        ...prev,
+        flashcards: prev.flashcards.filter(fc => !fc.id || !selectedFcIds.has(fc.id))
+      }))
+      setSelectedFcIds(new Set())
+      setIsSelectionMode(false)
+    } catch (e: unknown) {
+      alert((e as Error).message || 'Erro ao excluir múltiplos flashcards.')
+    }
+  }, [selectedFcIds])
+
+  const toggleFcSelection = useCallback((id: string) => {
+    setSelectedFcIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  const handleSelectAllFcs = useCallback(() => {
+    if (selectedFcIds.size === session.flashcards.length) {
+      setSelectedFcIds(new Set())
+    } else {
+      setSelectedFcIds(new Set(session.flashcards.map(fc => fc.id).filter(Boolean) as string[]))
+    }
+  }, [selectedFcIds, session.flashcards])
 
   // ─── GERAR QUESTÕES — abre modal de configuração ─────────
   function handleQuestions() {
@@ -555,7 +621,7 @@ export default function BuscaPage() {
         throw new Error('Resposta da IA inválida. Tente novamente.')
       }
 
-      setSession(prev => ({ ...prev, questions: qs }))
+      setSession(prev => ({ ...prev, questions: data.savedQuestions || qs }))
     } catch (e: unknown) {
       setError((e as Error).message || 'Erro ao gerar questões.')
       setView('resumo')
@@ -771,22 +837,39 @@ export default function BuscaPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Usuário não autenticado.')
 
-      const { data, error: insertError } = await supabase.from('flashcards').insert({
-        user_id: user.id,
-        session_id: session.sessionId,
-        topic: session.tema,
-        materia: session.disciplina || null,
-        front: manualFcFront,
-        back: manualFcBack
-      }).select('*').single()
-      
-      if (insertError) throw insertError
+      if (editingFcId) {
+        // Modo Edição
+        const { data, error: updateError } = await supabase.from('flashcards').update({
+          front: manualFcFront,
+          back: manualFcBack
+        }).eq('id', editingFcId).select('*').single()
 
-      if (data) setSession(prev => ({ ...prev, flashcards: [...prev.flashcards, data] }))
+        if (updateError) throw updateError
+        if (data) {
+          setSession(prev => ({
+            ...prev,
+            flashcards: prev.flashcards.map(fc => fc.id === editingFcId ? data : fc)
+          }))
+        }
+      } else {
+        // Novo Flashcard
+        const { data, error: insertError } = await supabase.from('flashcards').insert({
+          user_id: user.id,
+          session_id: session.sessionId,
+          topic: session.tema,
+          materia: session.disciplina || null,
+          front: manualFcFront,
+          back: manualFcBack
+        }).select('*').single()
+        
+        if (insertError) throw insertError
+        if (data) setSession(prev => ({ ...prev, flashcards: [...prev.flashcards, data] }))
+      }
       
       setShowManualFcModal(false)
       setManualFcFront('')
       setManualFcBack('')
+      setEditingFcId(null)
     } catch (e: unknown) {
       alert((e as Error).message || 'Erro ao salvar flashcard.')
     } finally {
@@ -1202,7 +1285,20 @@ export default function BuscaPage() {
 
               {/* ── FLASHCARDS ── */}
               <div style={{ display: view === 'flashcards' ? 'block' : 'none', height: '100%' }}>
-                <FlashcardsView cards={session.flashcards} loading={genTarget === 'flashcards'} onOpenManual={() => setShowManualFcModal(true)} onGenerateAI={handleFlashcards} />
+                <FlashcardsView 
+                  cards={session.flashcards} 
+                  loading={genTarget === 'flashcards'} 
+                  onOpenManual={() => setShowManualFcModal(true)} 
+                  onGenerateAI={handleFlashcards}
+                  onDelete={handleDeleteFc}
+                  onEdit={handleOpenEditFc}
+                  isSelectionMode={isSelectionMode}
+                  setIsSelectionMode={setIsSelectionMode}
+                  selectedIds={selectedFcIds}
+                  toggleSelection={toggleFcSelection}
+                  onSelectAll={handleSelectAllFcs}
+                  onDeleteSelected={handleBulkDeleteFcs}
+                />
               </div>
 
               {/* ── QUESTÕES ── */}
@@ -1521,7 +1617,19 @@ function ResumoView({ content, loading }: { content: string; loading: boolean })
 }
 
 // ─── Sub-componente: FLASHCARDS ────────────────────────────
-function FlashcardsView({ cards, loading, onOpenManual, onGenerateAI }: { cards: Flashcard[]; loading: boolean; onOpenManual?: () => void; onGenerateAI?: () => void }) {
+function FlashcardsView({ 
+  cards, loading, onOpenManual, onGenerateAI, 
+  onDelete, onEdit, 
+  isSelectionMode, setIsSelectionMode,
+  selectedIds, toggleSelection,
+  onSelectAll, onDeleteSelected
+}: { 
+  cards: Flashcard[]; loading: boolean; onOpenManual?: () => void; onGenerateAI?: () => void; 
+  onDelete: (id: string) => void; onEdit: (fc: Flashcard) => void;
+  isSelectionMode: boolean; setIsSelectionMode: (v: boolean) => void;
+  selectedIds: Set<string>; toggleSelection: (id: string) => void;
+  onSelectAll: () => void; onDeleteSelected: () => void;
+}) {
   const [flipped, setFlipped] = useState<Record<number, boolean>>({})
   if (loading) return <LoadingDots label="Criando flashcards..." />
 
@@ -1548,52 +1656,139 @@ function FlashcardsView({ cards, loading, onOpenManual, onGenerateAI }: { cards:
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-        <div style={{ fontSize: '12px', color: 'var(--muted,#6b7194)' }}>
-          {cards.length} flashcard{cards.length !== 1 ? 's' : ''} — clique em cada card para ver a resposta
-        </div>
-        {onOpenManual && (
-          <button onClick={onOpenManual} style={{ padding: '6px 14px', borderRadius: '8px', background: 'var(--accent,#6c63ff)', color: '#fff', fontSize: '12px', fontWeight: 600, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            + Novo Flashcard
-          </button>
-        )}
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
-        {cards.map((card, i) => (
-          <div
-            key={i}
-            onClick={() => setFlipped(f => ({ ...f, [i]: !f[i] }))}
-            style={{
-              background: 'var(--surface,#111420)', border: `1px solid ${flipped[i] ? 'var(--accent2,#00d4aa)' : 'var(--border,#1f2640)'}`,
-              borderRadius: '12px', padding: '18px 16px', cursor: 'pointer',
-              minHeight: '120px', display: 'flex', flexDirection: 'column', justifyContent: 'center',
-              transition: 'border-color .2s', userSelect: 'none',
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '12px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--muted,#6b7194)' }}>
+            {cards.length} flashcard{cards.length !== 1 ? 's' : ''}
+          </div>
+          <button 
+            onClick={() => setIsSelectionMode(!isSelectionMode)}
+            style={{ 
+              padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)',
+              background: isSelectionMode ? 'rgba(108,99,255,.15)' : 'transparent',
+              color: isSelectionMode ? 'var(--accent,#6c63ff)' : 'var(--muted,#6b7194)',
+              fontSize: '12px', fontWeight: 600, cursor: 'pointer', transition: 'all .2s'
             }}
           >
-            {!flipped[i] ? (
-              <>
-                <div style={{ fontSize: '10px', color: 'var(--accent,#6c63ff)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>
-                  Pergunta {i + 1}
+            {isSelectionMode ? 'Cancelar Seleção' : 'Selecionar'}
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {isSelectionMode ? (
+            <>
+              <button 
+                onClick={onSelectAll}
+                style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)', background: 'transparent', color: 'var(--text,#e8eaf6)', fontSize: '12px', cursor: 'pointer' }}
+              >
+                {selectedIds.size === cards.length ? 'Desmarcar Tudo' : 'Selecionar Tudo'}
+              </button>
+              <button 
+                onClick={onDeleteSelected}
+                disabled={selectedIds.size === 0}
+                style={{ padding: '6px 12px', borderRadius: '8px', border: 'none', background: '#ef4444', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: selectedIds.size === 0 ? 'default' : 'pointer', opacity: selectedIds.size === 0 ? 0.5 : 1 }}
+              >
+                Excluir ({selectedIds.size})
+              </button>
+            </>
+          ) : (
+            onOpenManual && (
+              <button onClick={onOpenManual} style={{ padding: '6px 14px', borderRadius: '8px', background: 'var(--accent,#6c63ff)', color: '#fff', fontSize: '12px', fontWeight: 600, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                + Novo Flashcard
+              </button>
+            )
+          )}
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+        {cards.map((card, i) => {
+          const isSelected = card.id ? selectedIds.has(card.id) : false
+          
+          return (
+            <div
+              key={card.id || i}
+              onClick={() => {
+                if (isSelectionMode && card.id) {
+                  toggleSelection(card.id)
+                } else {
+                  setFlipped(f => ({ ...f, [i]: !f[i] }))
+                }
+              }}
+              style={{
+                background: 'var(--surface,#111420)', 
+                border: `1px solid ${isSelected ? 'var(--accent,#6c63ff)' : (flipped[i] ? 'var(--accent2,#00d4aa)' : 'var(--border,#1f2640)')}`,
+                borderRadius: '12px', padding: '18px 16px', cursor: 'pointer',
+                minHeight: '130px', display: 'flex', flexDirection: 'column',
+                transition: 'all .2s', userSelect: 'none', position: 'relative',
+                boxShadow: isSelected ? '0 0 0 1px var(--accent,#6c63ff)' : 'none'
+              }}
+            >
+              {/* Checkbox em modo de seleção */}
+              {isSelectionMode && (
+                <div style={{ position: 'absolute', top: '12px', left: '12px', zIndex: 5 }}>
+                  <div style={{ 
+                    width: '18px', height: '18px', borderRadius: '4px', 
+                    border: `2px solid ${isSelected ? 'var(--accent,#6c63ff)' : 'var(--border,#1f2640)'}`,
+                    background: isSelected ? 'var(--accent,#6c63ff)' : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '12px'
+                  }}>
+                    {isSelected && '✓'}
+                  </div>
                 </div>
-                <div style={{ fontSize: '13px', color: 'var(--text,#e8eaf6)', lineHeight: 1.6, fontWeight: 500 }}>
-                  {card.front}
+              )}
+
+              {/* Ações individuais (X e Editar) */}
+              {!isSelectionMode && card.id && (
+                <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '6px', zIndex: 10 }}>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); onEdit(card) }}
+                    title="Editar"
+                    style={{ background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)', borderRadius: '6px', width: '26px', height: '26px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted,#6b7194)', transition: 'all .15s' }}
+                    onMouseOver={e => e.currentTarget.style.color = 'var(--accent,#6c63ff)'}
+                    onMouseOut={e => e.currentTarget.style.color = 'var(--muted,#6b7194)'}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                  </button>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); if(confirm('Excluir este flashcard?')) onDelete(card.id!) }}
+                    title="Excluir"
+                    style={{ background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)', borderRadius: '6px', width: '26px', height: '26px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted,#6b7194)', transition: 'all .15s' }}
+                    onMouseOver={e => e.currentTarget.style.color = '#ef4444'}
+                    onMouseOut={e => e.currentTarget.style.color = 'var(--muted,#6b7194)'}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                  </button>
                 </div>
-                <div style={{ fontSize: '10px', color: 'var(--muted,#6b7194)', marginTop: '12px' }}>
-                  Toque para ver a resposta
-                </div>
-              </>
-            ) : (
-              <>
-                <div style={{ fontSize: '10px', color: 'var(--accent2,#00d4aa)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>
-                  Resposta
-                </div>
-                <div style={{ fontSize: '13px', color: 'var(--text,#e8eaf6)', lineHeight: 1.7 }}>
-                  {card.back}
-                </div>
-              </>
-            )}
-          </div>
-        ))}
+              )}
+
+              {!flipped[i] ? (
+                <>
+                  <div style={{ fontSize: '10px', color: 'var(--accent,#6c63ff)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', marginTop: isSelectionMode ? '10px' : '0' }}>
+                    Pergunta {i + 1}
+                  </div>
+                  <div style={{ fontSize: '13px', color: 'var(--text,#e8eaf6)', lineHeight: 1.6, fontWeight: 500, paddingRight: !isSelectionMode ? '60px' : '0' }}>
+                    {card.front}
+                  </div>
+                  {!isSelectionMode && (
+                    <div style={{ fontSize: '10px', color: 'var(--muted,#6b7194)', marginTop: 'auto', paddingTop: '12px' }}>
+                      Toque para ver a resposta
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div style={{ fontSize: '10px', color: 'var(--accent2,#00d4aa)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>
+                    Resposta
+                  </div>
+                  <div style={{ fontSize: '13px', color: 'var(--text,#e8eaf6)', lineHeight: 1.7 }}>
+                    {card.back}
+                  </div>
+                </>
+              )}
+            </div>
+          )
+        })}
       </div>
     </div>
   )

@@ -366,14 +366,25 @@ export async function POST(req: NextRequest) {
       try {
         const cleaned = result.replace(/```json|```/g, '').trim()
         const cards: Array<{ front: string; back: string }> = JSON.parse(cleaned)
+        let savedCards: any[] = []
         if (Array.isArray(cards) && cards.length > 0) {
-          await supabase.from('flashcards').insert(
+          const { data } = await supabase.from('flashcards').insert(
             cards.map(c => ({
               user_id: user.id, session_id: sessionId,
               front: c.front, back: c.back, topic: topic ?? '',
             }))
-          )
+          ).select('*')
+          savedCards = data ?? []
         }
+        // Return results to frontend so they have IDs
+        return NextResponse.json({ 
+          result, 
+          provider: usedProvider, 
+          model: usedModel, 
+          fallbackUsed, 
+          fallbackMessage,
+          savedCards 
+        })
       } catch (e) {
         console.warn('[generate] Salvar flashcards:', (e as Error).message)
       }
@@ -387,8 +398,9 @@ export async function POST(req: NextRequest) {
           question: string; tipo: string; options?: string[]
           correct?: number; gabarito?: string; explanation?: string; banca?: string
         }> = JSON.parse(cleaned)
+        let savedQuestions: any[] = []
         if (Array.isArray(qs) && qs.length > 0) {
-          await supabase.from('questions').insert(
+          const { data } = await supabase.from('questions').insert(
             qs.map(q => ({
               user_id: user.id, session_id: sessionId,
               question: q.question, tipo: q.tipo,
@@ -396,8 +408,17 @@ export async function POST(req: NextRequest) {
               gabarito: q.gabarito ?? null, explanation: q.explanation ?? null,
               banca: q.banca ?? null, topic: topic ?? '',
             }))
-          )
+          ).select('*')
+          savedQuestions = data ?? []
         }
+        return NextResponse.json({ 
+          result, 
+          provider: usedProvider, 
+          model: usedModel, 
+          fallbackUsed, 
+          fallbackMessage,
+          savedQuestions 
+        })
       } catch (e) {
         console.warn('[generate] Salvar questões:', (e as Error).message)
       }
