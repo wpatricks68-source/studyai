@@ -106,3 +106,21 @@ export interface StudyCycle {
   order_index: number
   created_at: string
 }
+
+export interface DailyStudyLog {
+  id: string
+  user_id: string
+  study_date: string
+  subject: string
+  target_status: 'nao_concluido' | 'parcial' | 'concluido' | string
+  planned_minutes: number
+  effective_minutes: number
+  description: string | null
+  material: string | null
+  start_page: number | null
+  end_page: number | null
+  questions_resolved: number
+  correct_answers: number
+  created_at: string
+  updated_at: string
+}
