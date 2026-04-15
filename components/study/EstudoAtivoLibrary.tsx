@@ -552,23 +552,23 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
       {showFocusMode && topicGroup && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 1000,
-          background: '#050505', display: 'flex', flexDirection: 'column',
-          color: '#e8eaf6'
+          background: 'var(--bg,#0a0c12)', display: 'flex', flexDirection: 'column',
+          color: 'var(--text,#e8eaf6)'
         }}>
           {/* Top Bar */}
           <div style={{
             height: '60px', padding: '0 24px', display: 'flex', alignItems: 'center',
-            justifyContent: 'space-between', borderBottom: '1px solid #1f2640',
-            background: '#0a0c12'
+            justifyContent: 'space-between', borderBottom: '1px solid var(--border,#1f2640)',
+            background: 'var(--surface,#111420)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#fff' }}>{topicGroup.topic}</div>
-              <div style={{ fontSize: '11px', color: '#6b7194', textTransform: 'uppercase', letterSpacing: '1px' }}>{selectedDisc}</div>
+              <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text,#e8eaf6)' }}>{topicGroup.topic}</div>
+              <div style={{ fontSize: '11px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '1px' }}>{selectedDisc}</div>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
               {activeTab === 'flashcards' && (
-                <div style={{ display: 'flex', background: '#111420', borderRadius: '8px', padding: '3px', border: '1px solid #1f2640' }}>
+                <div style={{ display: 'flex', background: 'var(--surface2,#181d2e)', borderRadius: '8px', padding: '3px', border: '1px solid var(--border,#1f2640)' }}>
                   <button
                     onClick={() => setFcLayout('grid')}
                     style={{
@@ -597,12 +597,12 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
               <button
                 onClick={() => setShowFocusMode(false)}
                 style={{
-                  background: '#1f2640', border: 'none', color: '#fff', borderRadius: '8px',
+                  background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)', color: 'var(--text,#e8eaf6)', borderRadius: '8px',
                   width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   cursor: 'pointer', transition: 'all .15s'
                 }}
-                onMouseOver={e => e.currentTarget.style.background = '#2a3152'}
-                onMouseOut={e => e.currentTarget.style.background = '#1f2640'}
+                onMouseOver={e => e.currentTarget.style.background = 'var(--border,#1f2640)'}
+                onMouseOut={e => e.currentTarget.style.background = 'var(--surface2,#181d2e)'}
               >
                 <X size={18} />
               </button>
@@ -629,10 +629,10 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
                           onRate={(id, level) => handleRate(id, level)}
                         />
                       ) : (
-                        <div style={{ padding: '60px', textAlign: 'center', background: '#111420', borderRadius: '16px', border: '1px solid #1f2640' }}>
+                        <div style={{ padding: '60px', textAlign: 'center', background: 'var(--surface,#111420)', borderRadius: '16px', border: '1px solid var(--border,#1f2640)' }}>
                           <div style={{ fontSize: '40px', marginBottom: '16px' }}>🎉</div>
-                          <div style={{ fontSize: '18px', fontWeight: 600, color: '#fff' }}>Parabéns!</div>
-                          <div style={{ fontSize: '14px', color: '#6b7194', marginTop: '8px' }}>
+                          <div style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text,#e8eaf6)' }}>Parabéns!</div>
+                          <div style={{ fontSize: '14px', color: 'var(--muted,#6b7194)', marginTop: '8px' }}>
                             Você revisou todos os cards marcados como fáceis nesta sessão. 
                             {sessionQueue.length > 0 ? ' Os restantes estão em intervalo.' : ''}
                           </div>
@@ -652,15 +652,15 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
                             if (nextId) setActiveCardId(nextId)
                           }}
                           style={{
-                            width: '44px', height: '44px', borderRadius: '50%', border: '1px solid #1f2640',
-                            background: '#111420', color: '#fff', cursor: 'pointer',
+                            width: '44px', height: '44px', borderRadius: '50%', border: '1px solid var(--border,#1f2640)',
+                            background: 'var(--surface,#111420)', color: 'var(--text,#e8eaf6)', cursor: 'pointer',
                             display: 'flex', alignItems: 'center', justifyContent: 'center'
                           }}
                           title="Pular Card"
                         >
                           <RotateCcw size={20} />
                         </button>
-                        <div style={{ fontSize: '14px', fontWeight: 600, color: '#6b7194', minWidth: '120px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--muted,#6b7194)', minWidth: '120px', textAlign: 'center' }}>
                           Restantes: {sessionQueue.length}
                         </div>
                         <button
