@@ -960,27 +960,46 @@ export default function BuscaPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Usuário não autenticado.')
 
-      const payload = {
-        user_id: user.id,
-        session_id: session.sessionId,
-        topic: session.tema,
-        materia: session.disciplina || null,
+      const fields = {
         tipo: manualQTipo,
         question: manualQQuestion,
         explanation: manualQExpl,
-        banca: 'Autoral',
         options: manualQTipo === 'mc' ? manualQOptions : null,
         correct: manualQTipo === 'mc' ? manualQCorrect : null,
         gabarito: manualQTipo === 'cv' ? manualQGabarito : null
       }
 
-      const { data, error: insertError } = await supabase.from('questions').insert(payload).select('*').single()
-      
-      if (insertError) throw insertError
+      if (editingQId) {
+        // MODO EDIÇÃO — atualizar registro existente
+        const { data, error: updateErr } = await supabase
+          .from('questions')
+          .update(fields)
+          .eq('id', editingQId)
+          .select('*')
+          .single()
+        if (updateErr) throw updateErr
+        if (data) {
+          setSession(prev => ({
+            ...prev,
+            questions: prev.questions.map(q => q.id === editingQId ? data : q)
+          }))
+        }
+      } else {
+        // NOVA QUESTÃO — inserir novo registro
+        const { data, error: insertError } = await supabase.from('questions').insert({
+          user_id: user.id,
+          session_id: session.sessionId,
+          topic: session.tema,
+          materia: session.disciplina || null,
+          banca: 'Autoral',
+          ...fields
+        }).select('*').single()
+        if (insertError) throw insertError
+        if (data) setSession(prev => ({ ...prev, questions: [...prev.questions, data] }))
+      }
 
-      if (data) setSession(prev => ({ ...prev, questions: [...prev.questions, data] }))
-      
       setShowManualQModal(false)
+      setEditingQId(null)
       setManualQQuestion('')
       setManualQExpl('')
       setManualQOptions(['', '', '', '', ''])
@@ -992,6 +1011,7 @@ export default function BuscaPage() {
       setIsSavingManual(false)
     }
   }
+
 
   // ─── RENDER ───────────────────────────────────────────────
   const currentMeta = PROVIDER_META[aiProvider]
@@ -1595,7 +1615,9 @@ export default function BuscaPage() {
       {showManualQModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
           <div style={{ background: 'var(--surface,#111420)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border,#1f2640)', width: '500px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text,#e8eaf6)' }}>Nova Questão</div>
+            <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text,#e8eaf6)' }}>
+              {editingQId ? 'Editar Questão' : 'Nova Questão'}
+            </div>
             
             <div style={{ display: 'flex', gap: '10px' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text,#e8eaf6)' }}>
@@ -1639,8 +1661,8 @@ export default function BuscaPage() {
             </div>
 
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }}>
-              <button onClick={() => setShowManualQModal(false)} style={{ padding: '8px 16px', borderRadius: '8px', background: 'transparent', border: '1px solid var(--border,#1f2640)', color: 'var(--muted,#6b7194)', fontSize: '13px', cursor: 'pointer' }}>Cancelar</button>
-              <button onClick={handleSaveManualQ} disabled={isSavingManual || !manualQQuestion.trim()} style={{ padding: '8px 16px', borderRadius: '8px', background: 'var(--accent,#6c63ff)', border: 'none', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: isSavingManual ? 'default' : 'pointer', opacity: (isSavingManual || !manualQQuestion.trim()) ? 0.6 : 1 }}>Salvar Questão</button>
+              <button onClick={() => { setShowManualQModal(false); setEditingQId(null) }} style={{ padding: '8px 16px', borderRadius: '8px', background: 'transparent', border: '1px solid var(--border,#1f2640)', color: 'var(--muted,#6b7194)', fontSize: '13px', cursor: 'pointer' }}>Cancelar</button>
+              <button onClick={handleSaveManualQ} disabled={isSavingManual || !manualQQuestion.trim()} style={{ padding: '8px 16px', borderRadius: '8px', background: 'var(--accent,#6c63ff)', border: 'none', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: isSavingManual ? 'default' : 'pointer', opacity: (isSavingManual || !manualQQuestion.trim()) ? 0.6 : 1 }}>{editingQId ? 'Atualizar' : 'Salvar Questão'}</button>
             </div>
           </div>
         </div>
@@ -2069,7 +2091,7 @@ function QuestoesView({
                   {q.tipo === 'cv' ? 'CERTO / ERRADO' : 'MÚLTIPLA ESCOLHA'}
                 </span>
               </div>
-              {q.banca && (
+              {q.banca && !q.id && (
                 <span style={{ fontSize: '10px', color: 'var(--muted,#6b7194)' }}>{q.banca}</span>
               )}
             </div>
