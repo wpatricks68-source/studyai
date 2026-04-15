@@ -158,6 +158,11 @@ export default function BuscaPage() {
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [selectedFcIds, setSelectedFcIds]    = useState<Set<string>>(new Set())
 
+  // ─── Estados de Gestão de Questões ──────────────────────────
+  const [isQSelectionMode, setIsQSelectionMode] = useState(false)
+  const [selectedQIds, setSelectedQIds]        = useState<Set<string>>(new Set())
+  const [editingQId,   setEditingQId]           = useState<string | null>(null)
+
   useEffect(() => {
     const loadSession = async () => {
       const params = new URLSearchParams(window.location.search)
@@ -568,6 +573,70 @@ export default function BuscaPage() {
       setSelectedFcIds(new Set(session.flashcards.map(fc => fc.id).filter(Boolean) as string[]))
     }
   }, [selectedFcIds, session.flashcards])
+
+  // ─── GESTÃO DE QUESTÕES ──────────────────────────────────
+  const handleDeleteQ = useCallback(async (id: string) => {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from('questions').delete().eq('id', id)
+      if (error) throw error
+      setSession(prev => ({
+        ...prev,
+        questions: prev.questions.filter(q => q.id !== id)
+      }))
+    } catch (e: unknown) {
+      alert((e as Error).message || 'Erro ao excluir questão.')
+    }
+  }, [])
+
+  const handleOpenEditQ = useCallback((q: Question) => {
+    setEditingQId(q.id || null)
+    setManualQTipo(q.tipo)
+    setManualQQuestion(q.question)
+    setManualQOptions(q.options || ['', '', '', '', ''])
+    setManualQCorrect(q.correct || 0)
+    setManualQGabarito((q.gabarito as 'C'|'E') || 'C')
+    setManualQExpl(q.explanation || '')
+    setShowManualQModal(true)
+  }, [])
+
+  const handleBulkDeleteQs = useCallback(async () => {
+    if (selectedQIds.size === 0) return
+    if (!confirm(`Excluir ${selectedQIds.size} questões selecionadas?`)) return
+    
+    try {
+      const supabase = createClient()
+      const ids = Array.from(selectedQIds)
+      const { error } = await supabase.from('questions').delete().in('id', ids)
+      if (error) throw error
+      
+      setSession(prev => ({
+        ...prev,
+        questions: prev.questions.filter(q => !q.id || !selectedQIds.has(q.id))
+      }))
+      setSelectedQIds(new Set())
+      setIsQSelectionMode(false)
+    } catch (e: unknown) {
+      alert((e as Error).message || 'Erro ao excluir múltiplas questões.')
+    }
+  }, [selectedQIds])
+
+  const toggleQSelection = useCallback((id: string) => {
+    setSelectedQIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  const handleSelectAllQs = useCallback(() => {
+    if (selectedQIds.size === session.questions.length) {
+      setSelectedQIds(new Set())
+    } else {
+      setSelectedQIds(new Set(session.questions.map(q => q.id).filter(Boolean) as string[]))
+    }
+  }, [selectedQIds, session.questions])
 
   // ─── GERAR QUESTÕES — abre modal de configuração ─────────
   function handleQuestions() {
@@ -1303,7 +1372,20 @@ export default function BuscaPage() {
 
               {/* ── QUESTÕES ── */}
               <div style={{ display: view === 'questoes' ? 'block' : 'none', height: '100%' }}>
-                <QuestoesView questions={session.questions} loading={genTarget === 'questions'} onOpenManual={() => setShowManualQModal(true)} onGenerateAI={handleQuestions} />
+                <QuestoesView 
+                  questions={session.questions} 
+                  loading={genTarget === 'questions'} 
+                  onOpenManual={() => setShowManualQModal(true)} 
+                  onGenerateAI={handleQuestions}
+                  onDelete={handleDeleteQ}
+                  onEdit={handleOpenEditQ}
+                  isSelectionMode={isQSelectionMode}
+                  setIsSelectionMode={setIsQSelectionMode}
+                  selectedIds={selectedQIds}
+                  toggleSelection={toggleQSelection}
+                  onSelectAll={handleSelectAllQs}
+                  onDeleteSelected={handleBulkDeleteQs}
+                />
               </div>
             </div>
           </div>
@@ -1795,7 +1877,19 @@ function FlashcardsView({
 }
 
 // ─── Sub-componente: QUESTÕES ──────────────────────────────
-function QuestoesView({ questions, loading, onOpenManual, onGenerateAI }: { questions: Question[]; loading: boolean; onOpenManual?: () => void; onGenerateAI?: () => void }) {
+function QuestoesView({ 
+  questions, loading, onOpenManual, onGenerateAI,
+  onDelete, onEdit,
+  isSelectionMode, setIsSelectionMode,
+  selectedIds, toggleSelection,
+  onSelectAll, onDeleteSelected
+}: { 
+  questions: Question[]; loading: boolean; onOpenManual?: () => void; onGenerateAI?: () => void;
+  onDelete: (id: string) => void; onEdit: (q: Question) => void;
+  isSelectionMode: boolean; setIsSelectionMode: (v: boolean) => void;
+  selectedIds: Set<string>; toggleSelection: (id: string) => void;
+  onSelectAll: () => void; onDeleteSelected: () => void;
+}) {
   const [answers,      setAnswers]      = useState<Record<number, string | number>>({})
   const [revealed,     setRevealed]     = useState<Record<number, boolean>>({})
   const [showGabarito, setShowGabarito] = useState(false)
@@ -1835,12 +1929,49 @@ function QuestoesView({ questions, loading, onOpenManual, onGenerateAI }: { ques
   return (
     <div style={{ maxWidth: '760px' }}>
       
-      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start', marginBottom: '20px' }}>
-        {onOpenManual && (
-          <button onClick={onOpenManual} style={{ padding: '6px 14px', borderRadius: '8px', background: 'var(--accent,#6c63ff)', color: '#fff', fontSize: '12px', fontWeight: 600, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            + Nova Questão
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '12px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--muted,#6b7194)' }}>
+            {questions.length} questão{questions.length !== 1 ? 'ões' : ''}
+          </div>
+          <button 
+            onClick={() => setIsSelectionMode(!isSelectionMode)}
+            style={{ 
+              padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)',
+              background: isSelectionMode ? 'rgba(108,99,255,.15)' : 'transparent',
+              color: isSelectionMode ? 'var(--accent,#6c63ff)' : 'var(--muted,#6b7194)',
+              fontSize: '12px', fontWeight: 600, cursor: 'pointer', transition: 'all .2s'
+            }}
+          >
+            {isSelectionMode ? 'Cancelar Seleção' : 'Selecionar'}
           </button>
-        )}
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {isSelectionMode ? (
+            <>
+              <button 
+                onClick={onSelectAll}
+                style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)', background: 'transparent', color: 'var(--text,#e8eaf6)', fontSize: '12px', cursor: 'pointer' }}
+              >
+                {selectedIds.size === questions.length ? 'Desmarcar Tudo' : 'Selecionar Tudo'}
+              </button>
+              <button 
+                onClick={onDeleteSelected}
+                disabled={selectedIds.size === 0}
+                style={{ padding: '6px 12px', borderRadius: '8px', border: 'none', background: '#ef4444', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: selectedIds.size === 0 ? 'default' : 'pointer', opacity: selectedIds.size === 0 ? 0.5 : 1 }}
+              >
+                Excluir ({selectedIds.size})
+              </button>
+            </>
+          ) : (
+            onOpenManual && (
+              <button onClick={onOpenManual} style={{ padding: '6px 14px', borderRadius: '8px', background: 'var(--accent,#6c63ff)', color: '#fff', fontSize: '12px', fontWeight: 600, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                + Nova Questão
+              </button>
+            )
+          )}
+        </div>
       </div>
 
       {/* ── Placar ── */}
