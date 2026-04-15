@@ -3,12 +3,14 @@
 import { useEffect, useState } from 'react'
 import { AlertTriangle, CheckCircle2, Clock3, Pencil, Save, Target, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import type { DailyStudyLog } from '@/types/database'
+import type { DailyStudyLog, PlannerSubject } from '@/types/database'
 
 type FormState = {
   study_date: string
   subject: string
   target_status: 'nao_concluido' | 'parcial' | 'concluido'
+  planned_unit: 'min' | 'h'
+  effective_unit: 'min' | 'h'
   planned_minutes: string
   effective_minutes: string
   description: string
@@ -23,15 +25,19 @@ const emptyForm: FormState = {
   study_date: new Date().toISOString().slice(0, 10),
   subject: '',
   target_status: 'parcial',
+  planned_unit: 'min',
+  effective_unit: 'min',
   planned_minutes: '90',
   effective_minutes: '60',
   description: '',
-  material: '',
+  material: 'PDF',
   start_page: '',
   end_page: '',
   questions_resolved: '0',
   correct_answers: '0',
 }
+
+const MATERIAL_OPTIONS = ['PDF', 'Video aula', 'Outros'] as const
 
 const box: React.CSSProperties = { background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)', borderRadius: 16, padding: 18 }
 const input: React.CSSProperties = { width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)', color: 'var(--text,#e8eaf6)', borderRadius: 12, padding: '11px 12px', fontSize: 14 }
@@ -40,6 +46,11 @@ const td: React.CSSProperties = { padding: '14px 0', borderTop: '1px solid rgba(
 const iconButton: React.CSSProperties = { width: 36, height: 36, borderRadius: 10, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.04)', color: 'var(--text,#e8eaf6)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
 
 const fmtMin = (n: number) => (n < 60 ? `${n}min` : `${Math.floor(n / 60)}h${n % 60 ? ` ${n % 60}min` : ''}`)
+const parseDurationToMinutes = (value: string, unit: 'min' | 'h') => {
+  const parsed = Number(value || 0)
+  if (!Number.isFinite(parsed) || parsed < 0) return 0
+  return unit === 'h' ? Math.round(parsed * 60) : Math.round(parsed)
+}
 const weekStart = (date: string) => { const d = new Date(`${date}T00:00:00`); const day = (d.getDay() + 6) % 7; d.setDate(d.getDate() - day); return d.toISOString().slice(0, 10) }
 const fmtDate = (date: string) => new Intl.DateTimeFormat('pt-BR').format(new Date(`${date}T00:00:00`))
 const pagesRead = (log: Pick<DailyStudyLog, 'start_page' | 'end_page'>) => log.start_page === null || log.end_page === null ? 0 : Math.max(0, log.end_page - log.start_page)
@@ -51,6 +62,7 @@ const pendingTags = (description: string | null) => {
 
 export default function ControleDiarioPage() {
   const [logs, setLogs] = useState<DailyStudyLog[]>([])
+  const [plannerSubjects, setPlannerSubjects] = useState<PlannerSubject[]>([])
   const [form, setForm] = useState<FormState>(emptyForm)
   const [userId, setUserId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -70,9 +82,13 @@ export default function ControleDiarioPage() {
     const { data: auth } = await supabase.auth.getUser()
     if (!auth.user) { setDbError('Usuario nao autenticado.'); setLoading(false); return }
     setUserId(auth.user.id)
-    const { data, error } = await supabase.from('daily_study_logs').select('*').eq('user_id', auth.user.id).order('study_date', { ascending: false }).order('created_at', { ascending: false })
-    if (error) { setDbError(error.message); setLoading(false); return }
-    setLogs((data ?? []) as DailyStudyLog[])
+    const [logsRes, subjectsRes] = await Promise.all([
+      supabase.from('daily_study_logs').select('*').eq('user_id', auth.user.id).order('study_date', { ascending: false }).order('created_at', { ascending: false }),
+      supabase.from('planner_subjects').select('*').eq('user_id', auth.user.id).order('created_at', { ascending: true }),
+    ])
+    if (logsRes.error) { setDbError(logsRes.error.message); setLoading(false); return }
+    if (!subjectsRes.error) setPlannerSubjects((subjectsRes.data ?? []) as PlannerSubject[])
+    setLogs((logsRes.data ?? []) as DailyStudyLog[])
     setLoading(false)
   }
 
@@ -82,6 +98,8 @@ export default function ControleDiarioPage() {
     if (!userId) return
     const q = Number(form.questions_resolved || 0)
     const c = Number(form.correct_answers || 0)
+    const plannedMinutes = parseDurationToMinutes(form.planned_minutes, form.planned_unit)
+    const effectiveMinutes = parseDurationToMinutes(form.effective_minutes, form.effective_unit)
     if (!form.subject.trim()) { setMessage('Informe a disciplina.'); return }
     if (c > q) { setMessage('Acertos nao podem ser maiores que questoes.'); return }
     setSaving(true)
@@ -90,8 +108,8 @@ export default function ControleDiarioPage() {
       study_date: form.study_date,
       subject: form.subject.trim(),
       target_status: form.target_status,
-      planned_minutes: Number(form.planned_minutes || 0),
-      effective_minutes: Number(form.effective_minutes || 0),
+      planned_minutes: plannedMinutes,
+      effective_minutes: effectiveMinutes,
       description: form.description.trim() || null,
       material: form.material.trim() || null,
       start_page: form.start_page ? Number(form.start_page) : null,
@@ -111,7 +129,7 @@ export default function ControleDiarioPage() {
   function editLog(log: DailyStudyLog) {
     setEditingId(log.id)
     setForm({
-      study_date: log.study_date, subject: log.subject, target_status: log.target_status as FormState['target_status'],
+      study_date: log.study_date, subject: log.subject, target_status: log.target_status as FormState['target_status'], planned_unit: 'min', effective_unit: 'min',
       planned_minutes: String(log.planned_minutes ?? 0), effective_minutes: String(log.effective_minutes ?? 0),
       description: log.description ?? '', material: log.material ?? '',
       start_page: log.start_page === null ? '' : String(log.start_page), end_page: log.end_page === null ? '' : String(log.end_page),
@@ -129,6 +147,10 @@ export default function ControleDiarioPage() {
 
   const weeks = Array.from(new Set(logs.map(log => weekStart(log.study_date)))).sort((a, b) => b.localeCompare(a))
   const subjects = Array.from(new Set(logs.map(log => log.subject))).sort((a, b) => a.localeCompare(b))
+  const disciplineOptions = Array.from(new Set(plannerSubjects.map(subject => subject.name).filter(Boolean))).sort((a, b) => a.localeCompare(b))
+  const materialOptions = MATERIAL_OPTIONS.includes(form.material as typeof MATERIAL_OPTIONS[number])
+    ? [...MATERIAL_OPTIONS]
+    : [...MATERIAL_OPTIONS, form.material || 'Outros']
   const filtered = logs.filter(log => (selectedWeek === 'all' || weekStart(log.study_date) === selectedWeek) && (selectedSubject === 'all' || log.subject === selectedSubject) && (selectedStatus === 'all' || log.target_status === selectedStatus))
   const planned = filtered.reduce((sum, log) => sum + (log.planned_minutes ?? 0), 0)
   const effective = filtered.reduce((sum, log) => sum + (log.effective_minutes ?? 0), 0)
@@ -169,11 +191,28 @@ export default function ControleDiarioPage() {
           <div><div style={{ ...labelStyle, color: 'var(--accent,#6c63ff)' }}>{editingId ? 'Editar lancamento' : 'Novo lancamento'}</div><h2 style={{ margin: 0, fontSize: 20 }}>Formulario do estudo diario</h2></div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 12 }}>
             <Field text="Data"><input style={input} type="date" value={form.study_date} onChange={e => setForm(prev => ({ ...prev, study_date: e.target.value }))} /></Field>
-            <Field text="Disciplina"><input style={input} value={form.subject} onChange={e => setForm(prev => ({ ...prev, subject: e.target.value }))} /></Field>
+            <Field text="Disciplina">
+              <>
+                <input style={input} list="planner-subject-options" value={form.subject} onChange={e => setForm(prev => ({ ...prev, subject: e.target.value }))} placeholder={disciplineOptions.length ? 'Escolha ou digite uma disciplina' : 'Cadastre disciplinas no Cronograma'} />
+                <datalist id="planner-subject-options">
+                  {disciplineOptions.map(subject => <option key={subject} value={subject} />)}
+                </datalist>
+              </>
+            </Field>
             <Field text="Meta cumprida"><select style={input} value={form.target_status} onChange={e => setForm(prev => ({ ...prev, target_status: e.target.value as FormState['target_status'] }))}><option value="nao_concluido">Nao concluido</option><option value="parcial">Parcial</option><option value="concluido">Concluido</option></select></Field>
-            <Field text="Material"><input style={input} value={form.material} onChange={e => setForm(prev => ({ ...prev, material: e.target.value }))} /></Field>
-            <Field text="CH planejada"><input style={input} type="number" min="0" value={form.planned_minutes} onChange={e => setForm(prev => ({ ...prev, planned_minutes: e.target.value }))} /></Field>
-            <Field text="CH efetiva"><input style={input} type="number" min="0" value={form.effective_minutes} onChange={e => setForm(prev => ({ ...prev, effective_minutes: e.target.value }))} /></Field>
+            <Field text="Material"><select style={input} value={form.material} onChange={e => setForm(prev => ({ ...prev, material: e.target.value }))}>{materialOptions.map(option => <option key={option} value={option}>{option}</option>)}</select></Field>
+            <Field text="CH planejada">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px', gap: 8 }}>
+                <input style={input} type="number" step={form.planned_unit === 'h' ? '0.25' : '1'} min="0" value={form.planned_minutes} onChange={e => setForm(prev => ({ ...prev, planned_minutes: e.target.value }))} />
+                <select style={input} value={form.planned_unit} onChange={e => setForm(prev => ({ ...prev, planned_unit: e.target.value as FormState['planned_unit'] }))}><option value="min">min</option><option value="h">hr</option></select>
+              </div>
+            </Field>
+            <Field text="CH efetiva">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px', gap: 8 }}>
+                <input style={input} type="number" step={form.effective_unit === 'h' ? '0.25' : '1'} min="0" value={form.effective_minutes} onChange={e => setForm(prev => ({ ...prev, effective_minutes: e.target.value }))} />
+                <select style={input} value={form.effective_unit} onChange={e => setForm(prev => ({ ...prev, effective_unit: e.target.value as FormState['effective_unit'] }))}><option value="min">min</option><option value="h">hr</option></select>
+              </div>
+            </Field>
             <Field text="Onde comecei"><input style={input} type="number" min="0" value={form.start_page} onChange={e => setForm(prev => ({ ...prev, start_page: e.target.value }))} /></Field>
             <Field text="Terminei"><input style={input} type="number" min="0" value={form.end_page} onChange={e => setForm(prev => ({ ...prev, end_page: e.target.value }))} /></Field>
             <Field text="Questoes resolvidas"><input style={input} type="number" min="0" value={form.questions_resolved} onChange={e => setForm(prev => ({ ...prev, questions_resolved: e.target.value }))} /></Field>
