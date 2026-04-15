@@ -25,6 +25,8 @@ const Modal = ({ show, onClose, title, children }: { show: boolean, onClose: () 
   )
 }
 
+const INITIAL_SUBJECT_FORM = { name: '', code: '', description: '', target_sessions: 20, color: '#6c63ff' }
+
 export default function CronogramaPage() {
   const [loading, setLoading] = useState(true)
   const [subjects, setSubjects] = useState<PlannerSubject[]>([])
@@ -37,9 +39,10 @@ export default function CronogramaPage() {
   const [showSubjectModal, setShowSubjectModal] = useState(false)
   const [showScheduleModal, setShowScheduleModal] = useState(false)
   const [showCycleModal, setShowCycleModal] = useState(false)
+  const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null)
   
   // Forms
-  const [subForm, setSubForm] = useState({ name: '', code: '', description: '', target_sessions: 20, color: '#6c63ff' })
+  const [subForm, setSubForm] = useState(INITIAL_SUBJECT_FORM)
   const [schedForm, setSchedForm] = useState({ subject_id: '', day_of_week: 1, start_time: '08:00', end_time: '10:00' })
   const [cycleForm, setCycleForm] = useState({ subject_id: '', duration_minutes: 60 })
 
@@ -90,8 +93,97 @@ export default function CronogramaPage() {
     }
 
     if (data) setSubjects(prev => [...prev, data])
+    closeSubjectModal()
+  }
+
+  function openCreateSubjectModal() {
+    setEditingSubjectId(null)
+    setSubForm(INITIAL_SUBJECT_FORM)
+    setShowSubjectModal(true)
+  }
+
+  function openEditSubjectModal(subject: PlannerSubject) {
+    setEditingSubjectId(subject.id)
+    setSubForm({
+      name: subject.name,
+      code: subject.code ?? '',
+      description: subject.description ?? '',
+      target_sessions: subject.target_sessions ?? 20,
+      color: subject.color
+    })
+    setShowSubjectModal(true)
+  }
+
+  function closeSubjectModal() {
     setShowSubjectModal(false)
-    setSubForm({ name: '', code: '', description: '', target_sessions: 20, color: '#6c63ff' })
+    setEditingSubjectId(null)
+    setSubForm(INITIAL_SUBJECT_FORM)
+  }
+
+  async function handleSaveSubject() {
+    if (editingSubjectId) {
+      await handleUpdateSubject()
+      return
+    }
+
+    await handleAddSubject()
+  }
+
+  async function handleUpdateSubject() {
+    if (!editingSubjectId || !subForm.name) return
+
+    const originalSubject = subjects.find(subject => subject.id === editingSubjectId)
+    if (!originalSubject) return
+
+    const supabase = createClient()
+    const payload = {
+      name: subForm.name,
+      code: subForm.code,
+      description: subForm.description,
+      target_sessions: subForm.target_sessions,
+      color: subForm.color
+    }
+
+    const { data, error } = await supabase
+      .from('planner_subjects')
+      .update(payload)
+      .eq('id', editingSubjectId)
+      .select()
+      .single()
+
+    if (error) {
+      console.error(error)
+      alert("Erro ao atualizar disciplina.")
+      return
+    }
+
+    setSubjects(prev => prev.map(subject => (
+      subject.id === editingSubjectId ? data : subject
+    )))
+
+    const { error: scheduleError } = await supabase
+      .from('schedules')
+      .update({
+        subject: payload.name,
+        materia: payload.code,
+        color: payload.color
+      })
+      .eq('user_id', originalSubject.user_id)
+      .eq('subject', originalSubject.name)
+
+    if (scheduleError) {
+      console.error(scheduleError)
+      alert("A disciplina foi atualizada, mas houve erro ao sincronizar os blocos do cronograma.")
+      return
+    }
+
+    setSchedules(prev => prev.map(schedule => (
+      schedule.subject === originalSubject.name
+        ? { ...schedule, subject: data.name, materia: data.code, color: data.color }
+        : schedule
+    )))
+
+    closeSubjectModal()
   }
 
   async function handleAddSchedule() {
@@ -212,7 +304,7 @@ export default function CronogramaPage() {
         </div>
         
         {/* Table Header */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 50px 80px 40px', gap: '8px', padding: '12px 24px', fontSize: '10px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px', borderBottom: '1px solid var(--border,#1f2640)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 50px 80px 64px', gap: '8px', padding: '12px 24px', fontSize: '10px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px', borderBottom: '1px solid var(--border,#1f2640)' }}>
           <span>Disciplina</span>
           <span style={{ textAlign: 'center' }}>Núm</span>
           <span style={{ textAlign: 'center' }}>Status</span>
@@ -227,7 +319,7 @@ export default function CronogramaPage() {
               <div style={{ fontSize: '13px' }}>Nenhuma disciplina cadastrada</div>
             </div>
           ) : subjects.map(subj => (
-            <div key={subj.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 50px 80px 40px', gap: '8px', padding: '12px 24px', alignItems: 'center', borderBottom: '1px solid rgba(31,38,64,0.5)', fontSize: '13px', transition: 'all .2s' }}>
+            <div key={subj.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 50px 80px 64px', gap: '8px', padding: '12px 24px', alignItems: 'center', borderBottom: '1px solid rgba(31,38,64,0.5)', fontSize: '13px', transition: 'all .2s' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
                 <div style={{ minWidth: '28px', height: '28px', borderRadius: '8px', background: `${subj.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Disc size={14} color={subj.color} />
@@ -243,13 +335,20 @@ export default function CronogramaPage() {
                 </div>
                 <div style={{ fontSize: '9px', color: 'var(--muted)', marginTop: '4px' }}>{subj.target_sessions || 0} sessões</div>
               </div>
-              <button onClick={() => removeSubject(subj.id)} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={14} /></button>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                <button onClick={() => openEditSubjectModal(subj)} title={`Editar ${subj.name}`} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Edit3 size={14} />
+                </button>
+                <button onClick={() => removeSubject(subj.id)} title={`Remover ${subj.name}`} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <X size={14} />
+                </button>
+              </div>
             </div>
           ))}
         </div>
 
         <div style={{ padding: '24px' }}>
-          <button onClick={() => setShowSubjectModal(true)} style={{ width: '100%', padding: '14px', background: 'var(--accent,#6c63ff)', color: 'var(--text,#fff)', borderRadius: '12px', border: 'none', fontWeight: 700, fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', cursor: 'pointer', transition: 'all .2s', boxShadow: '0 8px 20px rgba(108,99,255,0.3)' }}>
+          <button onClick={openCreateSubjectModal} style={{ width: '100%', padding: '14px', background: 'var(--accent,#6c63ff)', color: 'var(--text,#fff)', borderRadius: '12px', border: 'none', fontWeight: 700, fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', cursor: 'pointer', transition: 'all .2s', boxShadow: '0 8px 20px rgba(108,99,255,0.3)' }}>
             Nova Disciplina <Plus size={18} />
           </button>
         </div>
@@ -437,7 +536,7 @@ export default function CronogramaPage() {
       </div>
 
       {/* MODALS COMPONENTS */}
-      <Modal show={showSubjectModal} onClose={() => setShowSubjectModal(false)} title="Nova Disciplina">
+      <Modal show={showSubjectModal} onClose={closeSubjectModal} title={editingSubjectId ? "Editar Disciplina" : "Nova Disciplina"}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
             <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '6px', fontWeight: 700 }}>NOME DA DISCIPLINA</div>
@@ -461,7 +560,9 @@ export default function CronogramaPage() {
               ))}
             </div>
           </div>
-          <button onClick={handleAddSubject} style={{ marginTop: '10px', background: 'var(--accent,#6c63ff)', color: 'var(--text,#fff)', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 700, cursor: 'pointer', boxShadow: '0 8px 20px rgba(108,99,255,0.3)' }}>Criar Disciplina</button>
+          <button onClick={handleSaveSubject} style={{ marginTop: '10px', background: 'var(--accent,#6c63ff)', color: 'var(--text,#fff)', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 700, cursor: 'pointer', boxShadow: '0 8px 20px rgba(108,99,255,0.3)' }}>
+            {editingSubjectId ? 'Salvar alteraÃ§Ãµes' : 'Criar Disciplina'}
+          </button>
         </div>
       </Modal>
 
