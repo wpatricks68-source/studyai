@@ -3,6 +3,7 @@ export interface Profile {
   name: string | null
   avatar_url: string | null
   daily_goal: number
+  plan_tier: 'gratuito' | 'basico' | 'premium' | string | null
   target_exam: string | null
   exam_date: string | null
   created_at: string
@@ -121,6 +122,16 @@ export interface DailyStudyLog {
   end_page: number | null
   questions_resolved: number
   correct_answers: number
+  created_at: string
+  updated_at: string
+}
+
+export interface UsageDaily {
+  id: string
+  user_id: string
+  usage_date: string
+  alto_busca_count: number
+  advanced_busca_count: number
   created_at: string
   updated_at: string
 }

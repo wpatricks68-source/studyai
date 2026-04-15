@@ -1,29 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getSearchLimits, normalizePlanTier, type SearchMode } from '@/lib/search-plans'
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Nao autenticado' }, { status: 401 })
 
-    const { query } = await req.json()
-    if (!query?.trim()) return NextResponse.json({ error: 'query é obrigatório' }, { status: 400 })
+    const { query, searchMode = 'alto' } = await req.json() as { query?: string; searchMode?: SearchMode }
+    if (!query?.trim()) return NextResponse.json({ error: 'query e obrigatorio' }, { status: 400 })
 
-    // Query enriquecida para concursos
-    const enrichedQuery = `${query.trim()} direito concurso público CESPE FGV`
+    const profileRes = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
+    const planTier = normalizePlanTier(profileRes.data?.plan_tier)
+    const limits = getSearchLimits(planTier, searchMode)
+
+    if (searchMode === 'advanced' && !limits.canUseAdvanced) {
+      return NextResponse.json({ error: 'Seu plano atual nao permite Busca Avancada com IA.' }, { status: 403 })
+    }
 
     const response = await fetch('https://api.tavily.com/search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        api_key:             process.env.TAVILY_API_KEY,
-        query:               enrichedQuery,
-        search_depth:        'advanced',        // pesquisa profunda
-        include_answer:      true,              // síntese automática do Tavily
-        include_raw_content: true,              // conteúdo completo das páginas
-        max_results:         7,
-        // Domínios confiáveis para concursos
+        api_key: process.env.TAVILY_API_KEY,
+        query: `${query.trim()} direito concurso publico CESPE FGV`,
+        search_depth: 'advanced',
+        include_answer: true,
+        include_raw_content: true,
+        max_results: Math.max(limits.maxSources, 3),
         include_domains: [
           'planalto.gov.br',
           'stj.jus.br',
@@ -40,37 +45,28 @@ export async function POST(req: NextRequest) {
       }),
     })
 
-    if (!response.ok) {
-      const err = await response.text()
-      console.error('[Search Tavily]', err)
-      throw new Error('Falha na API de busca')
-    }
+    if (!response.ok) throw new Error('Falha na API de busca')
 
     const data = await response.json()
-
-    // Limpa e normaliza os resultados
-    const results = (data.results ?? []).map((r: {
-      title: string
-      url: string
-      content?: string
-      raw_content?: string
-      score?: number
-    }) => ({
-      title:   r.title,
-      url:     r.url,
-      // raw_content tem o texto completo; content é o snippet
-      content: r.raw_content?.slice(0, 3000) ?? r.content ?? '',
-      score:   r.score ?? 0,
-    }))
-
-    // Ordena por score de relevância
-    results.sort((a: { score: number }, b: { score: number }) => b.score - a.score)
+    const results = (data.results ?? [])
+      .map((r: { title: string; url: string; content?: string; raw_content?: string; score?: number }) => ({
+        title: r.title,
+        url: r.url,
+        content: (r.raw_content ?? r.content ?? '').slice(0, limits.maxCharsPerSource),
+        score: r.score ?? 0,
+      }))
+      .sort((a: { score: number }, b: { score: number }) => b.score - a.score)
 
     return NextResponse.json({
-      answer:  data.answer ?? '',
-      results: results.slice(0, 6),
+      answer: data.answer ?? '',
+      results: results.slice(0, limits.maxSources),
+      planTier,
+      searchMode,
+      limits: {
+        maxSources: limits.maxSources,
+        maxCharsPerSource: limits.maxCharsPerSource,
+      },
     })
-
   } catch (error) {
     console.error('[Search]', error)
     return NextResponse.json({ error: 'Erro na busca. Tente novamente.' }, { status: 500 })
