@@ -244,7 +244,7 @@ export default function ControleDiarioPage() {
         {loading ? <div style={{ paddingTop: 16, color: 'var(--muted,#6b7194)' }}>Carregando...</div> : filtered.length === 0 ? <div style={{ paddingTop: 16, color: 'var(--muted,#6b7194)' }}>Nenhum lancamento encontrado.</div> : (
           <div style={{ overflowX: 'auto', marginTop: 16 }}>
             <table style={{ width: '100%', minWidth: 980, borderCollapse: 'collapse' }}>
-              <thead><tr>{['Data','Disciplina','Status','Horas','Paginas','Questoes','Desempenho','Pendencias','Acoes'].map(head => <th key={head} style={{ textAlign: 'left', paddingBottom: 12, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--muted,#6b7194)' }}>{head}</th>)}</tr></thead>
+              <thead><tr>{['Data','Disciplina','Descricao da meta','Status','Horas','Paginas','Questoes','Desempenho','Pendencias','Acoes'].map(head => <th key={head} style={{ textAlign: 'left', paddingBottom: 12, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--muted,#6b7194)' }}>{head}</th>)}</tr></thead>
               <tbody>
                 {filtered.map(log => {
                   const scoreValue = accuracy(log)
@@ -254,6 +254,7 @@ export default function ControleDiarioPage() {
                     <tr key={log.id}>
                       <td style={td}>{fmtDate(log.study_date)}</td>
                       <td style={td}><div style={{ display: 'grid' }}><strong>{log.subject}</strong><span style={{ fontSize: 11, color: 'var(--muted,#6b7194)' }}>{log.material ?? 'Material nao informado'}</span></div></td>
+                      <td style={td}>{log.description ?? 'Sem descricao'}</td>
                       <td style={td}><Pill text={status} color={status === 'Concluido' ? '#10b981' : status === 'Parcial' ? '#f59e0b' : '#ef4444'} /></td>
                       <td style={td}>{fmtMin(log.effective_minutes)} de {fmtMin(log.planned_minutes)}</td>
                       <td style={td}>{pagesRead(log)} pag.</td>
