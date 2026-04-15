@@ -22,6 +22,7 @@ const navItems = [
     items: [
       { href: '/dashboard/cronograma', label: 'Cronograma', icon: IconCalendar },
       { href: '/dashboard/controle-diario', label: 'Controle Diario', icon: IconChecklist },
+      { href: '/dashboard/edital-verticalizado', label: 'Edital Verticalizado', icon: IconLayers },
       { href: '/dashboard/estatisticas', label: 'Estatisticas', icon: IconChart },
     ],
   },
@@ -187,4 +188,7 @@ function IconChart({ active }: { active: boolean }) {
 }
 function IconClock({ active }: { active: boolean }) {
   return <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: active ? 1 : 0.7, flexShrink: 0 }}><circle cx="8" cy="8" r="6" /><path d="M8 4v4l3 2" /></svg>
+}
+function IconLayers({ active }: { active: boolean }) {
+  return <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: active ? 1 : 0.7, flexShrink: 0 }}><path d="M8 2l6 3-6 3-6-3 6-3z" /><path d="M2 8l6 3 6-3" /><path d="M2 11l6 3 6-3" /></svg>
 }
