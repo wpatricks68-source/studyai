@@ -2001,19 +2001,64 @@ function QuestoesView({
       {questions.map((q, qi) => {
         const answered  = answers[qi] !== undefined
         const rev       = revealed[qi]
+        const isSelected = q.id ? selectedIds.has(q.id) : false
         const isCorrect = q.tipo === 'cv'
           ? answers[qi] === q.gabarito
           : answers[qi] === q.correct
 
         return (
-          <div key={qi} style={{
-            background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)',
-            borderRadius: '12px', padding: '18px', marginBottom: '14px',
-          }}>
+          <div key={q.id || qi} 
+            onClick={() => isSelectionMode && q.id && toggleSelection(q.id)}
+            style={{
+              background: 'var(--surface,#111420)', 
+              border: `1px solid ${isSelected ? 'var(--accent,#6c63ff)' : 'var(--border,#1f2640)'}`,
+              borderRadius: '12px', padding: '18px', marginBottom: '14px',
+              position: 'relative', transition: 'all .2s',
+              cursor: isSelectionMode ? 'pointer' : 'default',
+              boxShadow: isSelected ? '0 0 0 1px var(--accent,#6c63ff)' : 'none'
+            }}>
+            
+            {/* Checkbox em modo de seleção */}
+            {isSelectionMode && (
+              <div style={{ position: 'absolute', top: '16px', left: '16px', zIndex: 5 }}>
+                <div style={{ 
+                  width: '18px', height: '18px', borderRadius: '4px', 
+                  border: `2px solid ${isSelected ? 'var(--accent,#6c63ff)' : 'var(--border,#1f2640)'}`,
+                  background: isSelected ? 'var(--accent,#6c63ff)' : 'transparent',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '12px'
+                }}>
+                  {isSelected && '✓'}
+                </div>
+              </div>
+            )}
+
+            {/* Ações individuais (X e Editar) */}
+            {!isSelectionMode && q.id && (
+              <div style={{ position: 'absolute', top: '14px', right: '14px', display: 'flex', gap: '6px', zIndex: 10 }}>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onEdit(q) }}
+                  title="Editar Questão"
+                  style={{ background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)', borderRadius: '6px', width: '28px', height: '28px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted,#6b7194)', transition: 'all .15s' }}
+                  onMouseOver={e => e.currentTarget.style.color = 'var(--accent,#6c63ff)'}
+                  onMouseOut={e => e.currentTarget.style.color = 'var(--muted,#6b7194)'}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                </button>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); if(confirm('Excluir esta questão permanentemente?')) onDelete(q.id!) }}
+                  title="Excluir Questão"
+                  style={{ background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)', borderRadius: '6px', width: '28px', height: '28px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted,#6b7194)', transition: 'all .15s' }}
+                  onMouseOver={e => e.currentTarget.style.color = '#ef4444'}
+                  onMouseOut={e => e.currentTarget.style.color = 'var(--muted,#6b7194)'}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+              </div>
+            )}
             {/* Cabeçalho */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '10px', color: 'var(--accent,#6c63ff)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600 }}>
+                <span style={{ fontSize: '10px', color: 'var(--accent,#6c63ff)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600, paddingLeft: isSelectionMode ? '24px' : '0' }}>
                   Q{qi + 1}
                 </span>
                 <span style={{
@@ -2030,13 +2075,13 @@ function QuestoesView({
             </div>
 
             {/* Enunciado */}
-            <div style={{ fontSize: '14px', color: 'var(--text,#e8eaf6)', lineHeight: 1.75, marginBottom: '16px', fontWeight: 500 }}>
+            <div style={{ fontSize: '14px', color: 'var(--text,#e8eaf6)', lineHeight: 1.75, marginBottom: '16px', fontWeight: 500, paddingRight: '64px', paddingLeft: isSelectionMode ? '24px' : '0' }}>
               {q.question}
             </div>
 
             {/* Opções Certo/Errado */}
             {q.tipo === 'cv' ? (
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '8px', paddingLeft: isSelectionMode ? '24px' : '0' }}>
                 {(['C', 'E'] as const).map(opt => {
                   const selected = answers[qi] === opt
                   const isRight  = opt === q.gabarito
@@ -2063,7 +2108,7 @@ function QuestoesView({
               </div>
             ) : (
               /* Opções múltipla escolha */
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: isSelectionMode ? '24px' : '0' }}>
                 {(q.options ?? []).map((opt, oi) => {
                   const selected = answers[qi] === oi
                   const isRight  = oi === q.correct
