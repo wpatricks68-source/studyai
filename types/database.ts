@@ -135,3 +135,33 @@ export interface UsageDaily {
   created_at: string
   updated_at: string
 }
+
+export interface EditalBoard {
+  id: string
+  user_id: string
+  title: string
+  source_file_name: string | null
+  source_file_type: string | null
+  source_excerpt: string | null
+  ai_provider: string | null
+  ai_model: string | null
+  last_processed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface EditalTopic {
+  id: string
+  board_id: string
+  user_id: string
+  disciplina: string
+  tema: string
+  subtema: string
+  estudo: boolean
+  resumo: boolean
+  revisao: boolean
+  concluido: boolean
+  order_index: number
+  created_at: string
+  updated_at: string
+}
