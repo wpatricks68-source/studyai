@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
 import OpenAI from 'openai'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { getSearchLimits, isProviderAllowed, normalizePlanTier, type SearchMode } from '@/lib/search-plans'
 
 type GenType      = 'summary' | 'flashcards' | 'questions'
 type TipoQuestoes = 'cv' | 'mc' | 'misto'
@@ -44,12 +45,13 @@ function buildPrompt(
   content: string,
   quantidade = 10,
   tipoQuestoes: TipoQuestoes = 'misto',
+  maxContentChars = 8000,
 ): string {
   const base = `Você é um professor especialista em concursos públicos brasileiros com foco em provas CESPE, FGV, FCC e VUNESP.
 Tema do aluno: "${topic}"
 Conteúdo de referência:
 ---
-${content.slice(0, 8000)}
+${content.slice(0, maxContentChars)}
 ---`
 
   if (type === 'summary') return `${base}
@@ -235,6 +237,73 @@ function getDefaultModel(provider: Exclude<Provider, 'auto'>): string {
   return PROVIDER_MODELS[provider]?.[0]?.id ?? ''
 }
 
+function isPaidModel(provider: Exclude<Provider, 'auto'>, model: string) {
+  return PROVIDER_MODELS[provider]?.find(item => item.id === model)?.tier === 'paid'
+}
+
+async function resolvePlanAndUsage(supabase: ReturnType<typeof createClient>, userId: string) {
+  const today = new Date().toISOString().slice(0, 10)
+  const profileRes = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
+  const planTier = normalizePlanTier(profileRes.data?.plan_tier)
+
+  let usage = { alto_busca_count: 0, advanced_busca_count: 0 }
+
+  try {
+    const usageRes = await supabase
+      .from('usage_daily')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('usage_date', today)
+      .maybeSingle()
+
+    if (usageRes.data) {
+      usage = {
+        alto_busca_count: usageRes.data.alto_busca_count ?? 0,
+        advanced_busca_count: usageRes.data.advanced_busca_count ?? 0,
+      }
+    }
+  } catch {}
+
+  return { planTier, usage, today }
+}
+
+async function registerSearchUsage(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  date: string,
+  searchMode: SearchMode,
+) {
+  try {
+    const field = searchMode === 'advanced' ? 'advanced_busca_count' : 'alto_busca_count'
+    const currentRes = await supabase
+      .from('usage_daily')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('usage_date', date)
+      .maybeSingle()
+
+    const current = currentRes.data ?? null
+    const nextPayload = current
+      ? {
+          alto_busca_count: current.alto_busca_count ?? 0,
+          advanced_busca_count: current.advanced_busca_count ?? 0,
+          [field]: (current[field] ?? 0) + 1,
+        }
+      : {
+          user_id: userId,
+          usage_date: date,
+          alto_busca_count: field === 'alto_busca_count' ? 1 : 0,
+          advanced_busca_count: field === 'advanced_busca_count' ? 1 : 0,
+        }
+
+    if (current) {
+      await supabase.from('usage_daily').update(nextPayload).eq('id', current.id)
+    } else {
+      await supabase.from('usage_daily').insert(nextPayload)
+    }
+  } catch {}
+}
+
 function buildFallbackChain(
   preferredProvider: Provider,
   preferredModel?: string,
@@ -317,11 +386,12 @@ export async function POST(req: NextRequest) {
     const {
       content, topic, type, sessionId, quantidade, tipoQuestoes,
       provider = 'gemini',
+      searchMode = 'alto',
       model,
     }: {
       content: string; topic: string; type: GenType; sessionId?: string
       quantidade?: number; tipoQuestoes?: TipoQuestoes
-      provider?: Provider; model?: string
+      provider?: Provider; searchMode?: SearchMode; model?: string
     } = body
 
     if (!content?.trim()) {
@@ -334,16 +404,70 @@ export async function POST(req: NextRequest) {
 
     const qtd: number = typeof quantidade === 'number' ? quantidade : 10
     const tq: TipoQuestoes = ['cv','mc','misto'].includes(tipoQuestoes ?? '') ? tipoQuestoes! : 'misto'
-    const prompt = buildPrompt(type, topic ?? '', content, qtd, tq)
+    const { planTier, usage, today } = await resolvePlanAndUsage(supabase, user.id)
+    const limits = getSearchLimits(planTier, searchMode)
+
+    if (searchMode === 'advanced' && !limits.canUseAdvanced) {
+      return NextResponse.json(
+        { error: 'Seu plano atual nao permite Busca Avancada com IA.' },
+        { status: 403 }
+      )
+    }
+
+    const providerToUse: Provider = searchMode === 'alto' ? 'auto' : provider
+
+    if (searchMode === 'advanced' && providerToUse === 'auto') {
+      return NextResponse.json(
+        { error: 'Selecione uma IA para usar a Busca Avancada com IA.' },
+        { status: 400 }
+      )
+    }
+
+    if (!isProviderAllowed(planTier, searchMode, providerToUse)) {
+      return NextResponse.json(
+        { error: 'A IA selecionada nao esta disponivel para o seu plano atual.' },
+        { status: 403 }
+      )
+    }
+
+    if (
+      providerToUse !== 'auto' &&
+      model &&
+      !limits.allowPaidModels &&
+      isPaidModel(providerToUse, model)
+    ) {
+      return NextResponse.json(
+        { error: 'O modelo selecionado esta disponivel apenas para usuarios premium.' },
+        { status: 403 }
+      )
+    }
+
+    if (type === 'summary') {
+      if (searchMode === 'advanced' && usage.advanced_busca_count >= limits.dailyAdvancedLimit) {
+        return NextResponse.json(
+          { error: 'Voce atingiu o limite diario de Busca Avancada com IA do seu plano.' },
+          { status: 429 }
+        )
+      }
+
+      if (searchMode === 'alto' && usage.alto_busca_count >= limits.dailySearchLimit) {
+        return NextResponse.json(
+          { error: 'Voce atingiu o limite diario de Alto Busca do seu plano.' },
+          { status: 429 }
+        )
+      }
+    }
+
+    const prompt = buildPrompt(type, topic ?? '', content, qtd, tq, limits.maxPromptChars)
 
     let result = ''
-    let usedProvider = provider
+    let usedProvider = providerToUse
     let usedModel    = model ?? ''
     let fallbackUsed = false
     let fallbackMessage = ''
 
     // 3. Chamar provider com retry e fallback inteligente
-    const smartRes = await callWithSmartFallback(provider, model, prompt, type, qtd)
+    const smartRes = await callWithSmartFallback(providerToUse, model, prompt, type, qtd)
     result = smartRes.result
     usedProvider = smartRes.usedProvider
     usedModel = smartRes.usedModel
@@ -359,6 +483,11 @@ export async function POST(req: NextRequest) {
         { error: 'A IA retornou resposta vazia. Tente novamente.' },
         { status: 500 }
       )
+    }
+
+    if (type === 'summary') {
+      result = result.slice(0, limits.maxResponseChars)
+      await registerSearchUsage(supabase, user.id, today, searchMode)
     }
 
     // 4. Salvar flashcards no banco (best-effort)
@@ -383,6 +512,8 @@ export async function POST(req: NextRequest) {
           model: usedModel, 
           fallbackUsed, 
           fallbackMessage,
+          planTier,
+          searchMode,
           savedCards 
         })
       } catch (e) {
@@ -417,6 +548,8 @@ export async function POST(req: NextRequest) {
           model: usedModel, 
           fallbackUsed, 
           fallbackMessage,
+          planTier,
+          searchMode,
           savedQuestions 
         })
       } catch (e) {
@@ -424,7 +557,19 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ result, provider: usedProvider, model: usedModel, fallbackUsed, fallbackMessage })
+    return NextResponse.json({
+      result,
+      provider: usedProvider,
+      model: usedModel,
+      fallbackUsed,
+      fallbackMessage,
+      planTier,
+      searchMode,
+      limits: {
+        maxPromptChars: limits.maxPromptChars,
+        maxResponseChars: limits.maxResponseChars,
+      },
+    })
 
   } catch (error: unknown) {
     const msg  = (error as Error).message ?? 'Erro desconhecido'
@@ -453,5 +598,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Erro: ${msg}` }, { status: 500 })
   }
 }
-
-

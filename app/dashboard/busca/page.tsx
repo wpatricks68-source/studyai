@@ -3,10 +3,12 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { EditableResumo } from '@/components/study/EditableResumo'
+import { getSearchLimits, isProviderAllowed, normalizePlanTier, type PlanTier, type SearchMode } from '@/lib/search-plans'
 
 type GenType   = 'summary' | 'flashcards' | 'questions'
 type ViewMode  = 'resumo' | 'flashcards' | 'questoes'
 type AIProvider = 'auto' | 'gpt' | 'gemini' | 'claude'
+type PaidAIProvider = Exclude<AIProvider, 'auto'>
 
 // ─── Modelos por provider ────────────────────────────────────
 const PROVIDER_MODELS: Record<Exclude<AIProvider,'auto'>, { id: string; label: string; tier: 'paid'|'free' }[]> = {
@@ -31,10 +33,32 @@ const PROVIDER_MODELS: Record<Exclude<AIProvider,'auto'>, { id: string; label: s
 }
 
 const PROVIDER_META: Record<AIProvider, { label: string; color: string; bg: string; icon: string }> = {
-  auto:   { label: 'Auto Gratuito', color: '#10b981', bg: 'rgba(16,185,129,.15)', icon: '✦' },
+  auto:   { label: 'Alto Busca', color: '#10b981', bg: 'rgba(16,185,129,.15)', icon: '✦' },
   gpt:    { label: 'GPT',          color: '#10a37f', bg: 'rgba(16,163,127,.15)', icon: '⬡' },
   gemini: { label: 'Gemini',       color: '#4285f4', bg: 'rgba(66,133,244,.15)', icon: '◈' },
   claude: { label: 'Claude',       color: '#cc785c', bg: 'rgba(204,120,92,.15)', icon: '◆' },
+}
+
+const ADVANCED_PROVIDERS: PaidAIProvider[] = ['gpt', 'gemini', 'claude']
+
+function getPlanLabel(plan: PlanTier) {
+  if (plan === 'premium') return 'Premium'
+  if (plan === 'basico') return 'Basico'
+  return 'Gratuito'
+}
+
+function getTodayKey() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function getProviderModels(provider: PaidAIProvider, planTier: PlanTier) {
+  const models = PROVIDER_MODELS[provider] ?? []
+  return planTier === 'premium' ? models : models.filter(model => model.tier === 'free')
+}
+
+function getDefaultAdvancedProvider(planTier: PlanTier): PaidAIProvider {
+  const allowed = ADVANCED_PROVIDERS.filter(provider => isProviderAllowed(planTier, 'advanced', provider))
+  return allowed[0] ?? 'gemini'
 }
 
 interface Source { title: string; url: string; snippet: string }
@@ -119,24 +143,82 @@ export default function BuscaPage() {
   const abortRef = useRef<AbortController | null>(null)
 
   // ─── Provider & Model ──────────────────────────────────────
-  const [aiProvider, setAiProvider] = useState<AIProvider>('claude')
-  const [aiModel,    setAiModel]    = useState<string>('claude-opus-4-6')
+  const [planTier, setPlanTier] = useState<PlanTier>('gratuito')
+  const [searchMode, setSearchMode] = useState<SearchMode>('alto')
+  const [usageCounts, setUsageCounts] = useState({ alto_busca_count: 0, advanced_busca_count: 0 })
+  const [aiProvider, setAiProvider] = useState<AIProvider>('auto')
+  const [aiModel,    setAiModel]    = useState<string>('')
   const [usedProvider, setUsedProvider] = useState<string>('')
   const [usedModel,    setUsedModel]    = useState<string>('')
   const [aiNotice, setAiNotice] = useState('')
 
-  // Quando muda provider, resetar modelo para o primeiro disponível
-  function handleProviderChange(p: AIProvider) {
-    setAiProvider(p)
-    if (p !== 'auto') {
-      const models = PROVIDER_MODELS[p]
-      const currentModelExists = models.some(m => m.id === aiModel)
-      if (!currentModelExists) {
-        setAiModel(models[0].id)
-      }
-    } else {
+  const loadPlanState = useCallback(async () => {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      setPlanTier('gratuito')
+      setUsageCounts({ alto_busca_count: 0, advanced_busca_count: 0 })
+      setSearchMode('alto')
+      setAiProvider('auto')
+      setAiModel('')
+      return
+    }
+
+    const profileRes = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
+    const nextPlanTier = normalizePlanTier(profileRes.data?.plan_tier)
+    setPlanTier(nextPlanTier)
+
+    try {
+      const usageRes = await supabase
+        .from('usage_daily')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('usage_date', getTodayKey())
+        .maybeSingle()
+
+      setUsageCounts({
+        alto_busca_count: usageRes.data?.alto_busca_count ?? 0,
+        advanced_busca_count: usageRes.data?.advanced_busca_count ?? 0,
+      })
+    } catch {
+      setUsageCounts({ alto_busca_count: 0, advanced_busca_count: 0 })
+    }
+
+    if (nextPlanTier === 'gratuito') {
+      setSearchMode('alto')
+      setAiProvider('auto')
       setAiModel('')
     }
+  }, [])
+
+  // Quando muda provider, resetar modelo para o primeiro disponível
+  function handleProviderChange(p: AIProvider) {
+    if (searchMode === 'alto') {
+      setAiProvider('auto')
+      setAiModel('')
+      return
+    }
+
+    if (p === 'auto') return
+    setAiProvider(p)
+
+    const models = getProviderModels(p, planTier)
+    const currentModelExists = models.some(m => m.id === aiModel)
+    if (!currentModelExists) {
+      setAiModel(models[0]?.id ?? '')
+    }
+  }
+
+  function handleSearchModeChange(mode: SearchMode) {
+    if (mode === 'advanced' && planTier === 'gratuito') {
+      setError('Busca Avancada com IA esta disponivel apenas para usuarios dos planos pagos.')
+      return
+    }
+
+    setError('')
+    setAiNotice('')
+    setSearchMode(mode)
   }
 
   // ─── Estados Manuais ────────────────────────────────────────
@@ -162,6 +244,29 @@ export default function BuscaPage() {
   const [isQSelectionMode, setIsQSelectionMode] = useState(false)
   const [selectedQIds, setSelectedQIds]        = useState<Set<string>>(new Set())
   const [editingQId,   setEditingQId]           = useState<string | null>(null)
+
+  useEffect(() => {
+    loadPlanState()
+  }, [loadPlanState])
+
+  useEffect(() => {
+    if (searchMode === 'alto') {
+      if (aiProvider !== 'auto') setAiProvider('auto')
+      if (aiModel) setAiModel('')
+      return
+    }
+
+    const safeProvider = aiProvider === 'auto' ? getDefaultAdvancedProvider(planTier) : aiProvider
+    if (safeProvider !== aiProvider) {
+      setAiProvider(safeProvider)
+      return
+    }
+
+    const models = getProviderModels(safeProvider, planTier)
+    if (!models.some(model => model.id === aiModel)) {
+      setAiModel(models[0]?.id ?? '')
+    }
+  }, [searchMode, aiProvider, aiModel, planTier])
 
   useEffect(() => {
     const loadSession = async () => {
@@ -267,6 +372,8 @@ export default function BuscaPage() {
   const handleSearch = useCallback(async () => {
     const temaFinal = tema.trim()
     const discFinal = disciplina.trim()
+    const requestProvider = searchMode === 'alto' ? 'auto' : aiProvider
+    const requestModel = searchMode === 'advanced' && requestProvider !== 'auto' ? aiModel : undefined
 
     if (!temaFinal) {
       setError('Insira um tema para pesquisar.')
@@ -291,7 +398,7 @@ export default function BuscaPage() {
       const searchRes = await fetch('/api/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: fullQuery }),
+        body: JSON.stringify({ query: fullQuery, searchMode }),
         signal: ac.signal,
       })
 
@@ -327,8 +434,9 @@ export default function BuscaPage() {
           content: iaContext,
           topic: fullQuery,
           type: 'summary',
-          provider: aiProvider,
-          model: aiProvider !== 'auto' ? aiModel : undefined,
+          searchMode,
+          provider: requestProvider,
+          model: requestModel,
         }),
         signal: ac.signal,
       })
@@ -388,6 +496,7 @@ export default function BuscaPage() {
 
       setPhase('done')
       setGenTarget(null)
+      await loadPlanState()
     } catch (e: unknown) {
       if ((e as Error).name === 'AbortError') return
       setError((e as Error).message || 'Erro inesperado. Tente novamente.')
@@ -395,7 +504,7 @@ export default function BuscaPage() {
     } finally {
       setGenTarget(null)
     }
-  }, [tema, disciplina, phase, aiProvider, aiModel])
+  }, [tema, disciplina, phase, aiProvider, aiModel, searchMode, loadPlanState])
 
   // ─── CRIAR MANUALMENTE ────────────────────────────────────
   const handleManualCreate = useCallback(async () => {
@@ -467,6 +576,8 @@ export default function BuscaPage() {
     setGenTarget('flashcards')
     setError('')
     setAiNotice('')
+    const requestProvider = searchMode === 'alto' ? 'auto' : aiProvider
+    const requestModel = searchMode === 'advanced' && requestProvider !== 'auto' ? aiModel : undefined
 
     try {
       const res = await fetch('/api/ai/generate', {
@@ -478,8 +589,9 @@ export default function BuscaPage() {
           type:       'flashcards',
           sessionId:  session.sessionId,
           quantidade: cfg.quantidade,
-          provider:   aiProvider,
-          model:      aiProvider !== 'auto' ? aiModel : undefined,
+          searchMode,
+          provider:   requestProvider,
+          model:      requestModel,
         }),
       })
       if (!res.ok) {
@@ -651,6 +763,8 @@ export default function BuscaPage() {
     setGenTarget('questions')
     setError('')
     setAiNotice('')
+    const requestProvider = searchMode === 'alto' ? 'auto' : aiProvider
+    const requestModel = searchMode === 'advanced' && requestProvider !== 'auto' ? aiModel : undefined
 
     try {
       const res = await fetch('/api/ai/generate', {
@@ -663,8 +777,9 @@ export default function BuscaPage() {
           sessionId:    session.sessionId,
           quantidade:   cfg.quantidade,
           tipoQuestoes: cfg.tipo,
-          provider:     aiProvider,
-          model:        aiProvider !== 'auto' ? aiModel : undefined,
+          searchMode,
+          provider:     requestProvider,
+          model:        requestModel,
         }),
       })
       if (!res.ok) {
@@ -711,6 +826,8 @@ export default function BuscaPage() {
     fd.append('file', file)
 
     const discFinal = disciplina.trim()
+    const requestProvider = searchMode === 'alto' ? 'auto' : aiProvider
+    const requestModel = searchMode === 'advanced' && requestProvider !== 'auto' ? aiModel : undefined
 
     try {
       const res  = await fetch('/api/upload', { method: 'POST', body: fd })
@@ -731,8 +848,9 @@ export default function BuscaPage() {
           content:  data.content,
           topic:    name,
           type:     'summary',
-          provider: aiProvider,
-          model:    aiProvider !== 'auto' ? aiModel : undefined,
+          searchMode,
+          provider: requestProvider,
+          model:    requestModel,
         }),
       })
       const resumoData = await resumoRes.json()
@@ -775,6 +893,7 @@ export default function BuscaPage() {
       })
       setView('resumo')
       setPhase('done')
+      await loadPlanState()
     } catch (e: unknown) {
       setError((e as Error).message || 'Erro no upload.')
       setPhase('idle')
@@ -1014,7 +1133,17 @@ export default function BuscaPage() {
 
 
   // ─── RENDER ───────────────────────────────────────────────
-  const currentMeta = PROVIDER_META[aiProvider]
+  const selectedProvider =
+    searchMode === 'alto'
+      ? 'auto'
+      : (aiProvider === 'auto' ? getDefaultAdvancedProvider(planTier) : aiProvider)
+  const currentMeta = PROVIDER_META[selectedProvider]
+  const currentLimits = getSearchLimits(planTier, searchMode)
+  const availableProviders = ADVANCED_PROVIDERS.filter(provider => isProviderAllowed(planTier, 'advanced', provider))
+  const availableModels =
+    searchMode === 'advanced' && selectedProvider !== 'auto'
+      ? getProviderModels(selectedProvider, planTier)
+      : []
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: 'var(--bg,#0a0c12)' }}>
@@ -1119,7 +1248,7 @@ export default function BuscaPage() {
                 }}
               >
                 <span style={{ fontSize: '14px' }}>{currentMeta.icon}</span>
-                Buscar com {aiProvider === 'auto' ? 'IA Auto' : currentMeta.label}
+                {searchMode === 'alto' ? 'Alto Busca' : `Busca Avancada com ${currentMeta.label}`}
               </button>
             </>
           )}
@@ -1127,15 +1256,118 @@ export default function BuscaPage() {
 
         {/* ── Seletor de Provider ── */}
         <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '11px', color: 'var(--muted,#6b7194)', marginRight: '2px', whiteSpace: 'nowrap' }}>Modo:</span>
+
+          <button
+            onClick={() => handleSearchModeChange('alto')}
+            disabled={isLoading}
+            style={{
+              padding: '5px 13px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
+              border: `1px solid ${searchMode === 'alto' ? PROVIDER_META.auto.color : 'var(--border,#1f2640)'}`,
+              background: searchMode === 'alto' ? PROVIDER_META.auto.bg : 'transparent',
+              color: searchMode === 'alto' ? PROVIDER_META.auto.color : 'var(--muted,#6b7194)',
+              cursor: isLoading ? 'default' : 'pointer',
+              opacity: isLoading ? .6 : 1,
+            }}
+          >
+            Alto Busca
+          </button>
+
+          <button
+            onClick={() => handleSearchModeChange('advanced')}
+            disabled={isLoading}
+            style={{
+              padding: '5px 13px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
+              border: `1px solid ${searchMode === 'advanced' ? '#f59e0b' : 'var(--border,#1f2640)'}`,
+              background: searchMode === 'advanced' ? 'rgba(245,158,11,.14)' : 'transparent',
+              color: searchMode === 'advanced' ? '#fbbf24' : 'var(--muted,#6b7194)',
+              cursor: isLoading ? 'default' : 'pointer',
+              opacity: isLoading ? .6 : 1,
+            }}
+          >
+            Busca Avancada com IA {planTier === 'gratuito' ? '• Pro' : ''}
+          </button>
+
+          <span style={{
+            fontSize: '10px',
+            color: 'var(--muted,#6b7194)',
+            border: '1px solid var(--border,#1f2640)',
+            borderRadius: '12px',
+            padding: '3px 10px',
+          }}>
+            Plano: <strong style={{ color: 'var(--text,#e8eaf6)' }}>{getPlanLabel(planTier)}</strong>
+          </span>
+
+          <span style={{
+            fontSize: '10px',
+            color: 'var(--muted,#6b7194)',
+            border: '1px solid var(--border,#1f2640)',
+            borderRadius: '12px',
+            padding: '3px 10px',
+          }}>
+            Alto hoje: <strong style={{ color: 'var(--text,#e8eaf6)' }}>{usageCounts.alto_busca_count}/{getSearchLimits(planTier, 'alto').dailySearchLimit}</strong>
+          </span>
+
+          <span style={{
+            fontSize: '10px',
+            color: 'var(--muted,#6b7194)',
+            border: '1px solid var(--border,#1f2640)',
+            borderRadius: '12px',
+            padding: '3px 10px',
+          }}>
+            Avancada hoje: <strong style={{ color: 'var(--text,#e8eaf6)' }}>
+              {planTier === 'gratuito' ? 'bloqueada' : `${usageCounts.advanced_busca_count}/${getSearchLimits(planTier, 'advanced').dailyAdvancedLimit}`}
+            </strong>
+          </span>
+
+          <span style={{
+            fontSize: '10px',
+            color: 'var(--muted,#6b7194)',
+            border: '1px solid var(--border,#1f2640)',
+            borderRadius: '12px',
+            padding: '3px 10px',
+          }}>
+            Resposta: ate {currentLimits.maxResponseChars.toLocaleString('pt-BR')} caracteres
+          </span>
+
+          {usedProvider && phase === 'done' && (
+            <span style={{
+              marginLeft: 'auto', fontSize: '10px', color: 'var(--muted,#6b7194)',
+              display: 'flex', alignItems: 'center', gap: '4px',
+              border: '1px solid var(--border,#1f2640)', borderRadius: '12px',
+              padding: '3px 10px',
+            }}>
+              Gerado por <strong style={{ color: PROVIDER_META[usedProvider as AIProvider]?.color ?? 'var(--text,#e8eaf6)' }}>
+                {PROVIDER_META[usedProvider as AIProvider]?.label ?? usedProvider}
+              </strong>
+              {usedModel && (
+                <span style={{ opacity: .6 }}>· {usedModel.split('-').slice(0,3).join('-')}</span>
+              )}
+            </span>
+          )}
+        </div>
+
+        <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '11px', color: 'var(--muted,#6b7194)', marginRight: '2px', whiteSpace: 'nowrap' }}>IA:</span>
 
-          {(['auto','gpt','gemini','claude'] as AIProvider[]).map(p => {
-            const meta = PROVIDER_META[p]
-            const active = aiProvider === p
+          {searchMode === 'alto' ? (
+            <span style={{
+              fontSize: '11px',
+              color: PROVIDER_META.auto.color,
+              border: `1px solid ${PROVIDER_META.auto.color}`,
+              borderRadius: '999px',
+              padding: '5px 10px',
+              background: PROVIDER_META.auto.bg,
+            }}>
+              Alto Busca escolhe automaticamente a IA mais economica para o seu plano.
+            </span>
+          ) : availableProviders.map(provider => {
+            const meta = PROVIDER_META[provider]
+            const active = selectedProvider === provider
             return (
               <button
-                key={p}
-                onClick={() => handleProviderChange(p)}
+                key={provider}
+                onClick={() => handleProviderChange(provider)}
                 disabled={isLoading}
                 style={{
                   padding: '5px 13px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
@@ -1155,7 +1387,7 @@ export default function BuscaPage() {
           })}
 
           {/* Dropdown de modelo (quando não é Auto) */}
-          {aiProvider !== 'auto' && (
+          {searchMode === 'advanced' && availableModels.length > 0 && (
             <select
               value={aiModel}
               onChange={e => setAiModel(e.target.value)}
@@ -1171,9 +1403,9 @@ export default function BuscaPage() {
                 outline: 'none',
               }}
             >
-              {PROVIDER_MODELS[aiProvider].map(m => (
+              {availableModels.map(m => (
                 <option key={m.id} value={m.id} style={{ background: '#181d2e', color: '#e8eaf6' }}>
-                  {m.label}{m.tier === 'free' ? ' ✓' : ''}
+                  {m.label}{m.tier === 'free' ? ' • Free' : ''}
                 </option>
               ))}
             </select>
@@ -2283,4 +2515,3 @@ function LoadingDots({ label }: { label: string }) {
     </div>
   )
 }
-
