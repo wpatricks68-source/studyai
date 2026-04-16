@@ -495,6 +495,9 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
                   </div>
                   <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text,#e8eaf6)', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     {topicGroup.topic}
+                  </div>
+                </div>
+              </div>
 
                 {/* Session Controller */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
