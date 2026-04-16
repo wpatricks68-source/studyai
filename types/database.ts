@@ -159,7 +159,9 @@ export interface EditalTopic {
   subtema: string
   estudo: boolean
   resumo: boolean
-  revisao: boolean
+  revisao_1: boolean
+  revisao_2: boolean
+  revisao_3: boolean
   concluido: boolean
   order_index: number
   created_at: string
