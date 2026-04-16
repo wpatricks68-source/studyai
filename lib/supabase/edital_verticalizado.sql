@@ -19,22 +19,26 @@ create index if not exists edital_boards_user_updated_idx
 
 alter table public.edital_boards enable row level security;
 
+drop policy if exists "edital_boards_select_own" on public.edital_boards;
 create policy "edital_boards_select_own"
   on public.edital_boards
   for select
   using (auth.uid() = user_id);
 
+drop policy if exists "edital_boards_insert_own" on public.edital_boards;
 create policy "edital_boards_insert_own"
   on public.edital_boards
   for insert
   with check (auth.uid() = user_id);
 
+drop policy if exists "edital_boards_update_own" on public.edital_boards;
 create policy "edital_boards_update_own"
   on public.edital_boards
   for update
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+drop policy if exists "edital_boards_delete_own" on public.edital_boards;
 create policy "edital_boards_delete_own"
   on public.edital_boards
   for delete
@@ -63,6 +67,25 @@ alter table public.edital_topics
   add column if not exists revisao_2 boolean not null default false,
   add column if not exists revisao_3 boolean not null default false;
 
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'edital_topics'
+      and column_name = 'revisao'
+  ) then
+    execute '
+      update public.edital_topics
+      set revisao_1 = true
+      where coalesce(revisao, false) = true
+        and coalesce(revisao_1, false) = false
+    ';
+  end if;
+end
+$$;
+
 create index if not exists edital_topics_board_order_idx
   on public.edital_topics (board_id, disciplina, order_index, created_at);
 
@@ -71,22 +94,26 @@ create index if not exists edital_topics_user_board_idx
 
 alter table public.edital_topics enable row level security;
 
+drop policy if exists "edital_topics_select_own" on public.edital_topics;
 create policy "edital_topics_select_own"
   on public.edital_topics
   for select
   using (auth.uid() = user_id);
 
+drop policy if exists "edital_topics_insert_own" on public.edital_topics;
 create policy "edital_topics_insert_own"
   on public.edital_topics
   for insert
   with check (auth.uid() = user_id);
 
+drop policy if exists "edital_topics_update_own" on public.edital_topics;
 create policy "edital_topics_update_own"
   on public.edital_topics
   for update
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+drop policy if exists "edital_topics_delete_own" on public.edital_topics;
 create policy "edital_topics_delete_own"
   on public.edital_topics
   for delete
