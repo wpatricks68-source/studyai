@@ -1,11 +1,13 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 import type { Profile } from '@/types/database'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { Menu, X } from 'lucide-react'
 
 const navItems = [
   {
@@ -35,6 +37,11 @@ const navItems = [
 export default function Sidebar({ user, profile }: { user: User; profile: Profile | null }) {
   const pathname = usePathname()
   const router = useRouter()
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [pathname])
 
   async function handleLogout() {
     const supabase = createClient()
@@ -51,117 +58,221 @@ export default function Sidebar({ user, profile }: { user: User; profile: Profil
     .slice(0, 2)
 
   return (
-    <aside
-      style={{
-        width: '200px',
-        flexShrink: 0,
-        background: 'var(--surface)',
-        borderRight: '1px solid var(--border)',
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100vh',
-        overflow: 'hidden',
-      }}
-    >
+    <>
+      <style>{`
+        .sidebar-backdrop,
+        .sidebar-mobile-toggle,
+        .sidebar-close-btn {
+          display: none;
+        }
+
+        @media (max-width: 960px) {
+          .sidebar-mobile-toggle {
+            display: inline-flex;
+            position: fixed;
+            top: 14px;
+            left: 14px;
+            z-index: 90;
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,.08);
+            background: rgba(17,20,32,.9);
+            color: var(--text);
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,.28);
+            backdrop-filter: blur(12px);
+          }
+
+          .sidebar-backdrop {
+            display: block;
+            position: fixed;
+            inset: 0;
+            z-index: 70;
+            background: rgba(5,7,12,.58);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .2s ease;
+          }
+
+          .sidebar-backdrop[data-open="true"] {
+            opacity: 1;
+            pointer-events: auto;
+          }
+
+          .sidebar-shell {
+            position: fixed !important;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: min(82vw, 320px) !important;
+            z-index: 80;
+            transform: translateX(-100%);
+            transition: transform .24s ease, box-shadow .24s ease;
+            box-shadow: none;
+          }
+
+          .sidebar-shell[data-open="true"] {
+            transform: translateX(0);
+            box-shadow: 0 22px 60px rgba(0,0,0,.42);
+          }
+
+          .sidebar-close-btn {
+            display: inline-flex;
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,.08);
+            background: rgba(255,255,255,.04);
+            color: var(--text);
+            align-items: center;
+            justify-content: center;
+          }
+        }
+      `}</style>
+
+      <button
+        type="button"
+        className="sidebar-mobile-toggle"
+        aria-label="Abrir menu"
+        onClick={() => setMobileOpen(true)}
+      >
+        <Menu size={18} />
+      </button>
+
       <div
+        className="sidebar-backdrop"
+        data-open={mobileOpen}
+        onClick={() => setMobileOpen(false)}
+      />
+
+      <aside
+        className="sidebar-shell"
+        data-open={mobileOpen}
         style={{
-          padding: '18px 16px 14px',
-          borderBottom: '1px solid var(--border)',
+          width: '200px',
+          flexShrink: 0,
+          background: 'var(--surface)',
+          borderRight: '1px solid var(--border)',
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          flexDirection: 'column',
+          height: '100vh',
+          overflow: 'hidden',
         }}
       >
-        <div>
-          <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '-0.5px' }}>
-            StudyAI
-          </div>
-          <div style={{ fontSize: '10px', color: 'var(--muted)', letterSpacing: '2px', textTransform: 'uppercase', marginTop: '2px' }}>
-            Concursos
-          </div>
-        </div>
-        <ThemeToggle />
-      </div>
-
-      <nav style={{ padding: '10px 8px', flex: 1, overflowY: 'auto' }}>
-        {navItems.map(group => (
-          <div key={group.section}>
-            <div style={{ fontSize: '10px', color: 'var(--muted)', letterSpacing: '1.5px', textTransform: 'uppercase', padding: '10px 10px 5px' }}>
-              {group.section}
-            </div>
-            {group.items.map(item => {
-              const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '9px',
-                    padding: active ? '8px 8px 8px 8px' : '8px 10px',
-                    borderRadius: '8px',
-                    marginBottom: '2px',
-                    fontSize: '13px',
-                    textDecoration: 'none',
-                    color: active ? 'var(--accent)' : 'var(--muted)',
-                    background: active ? 'rgba(108,99,255,.15)' : 'transparent',
-                    borderLeft: active ? '2px solid var(--accent)' : '2px solid transparent',
-                    transition: 'all .12s',
-                  }}
-                >
-                  <item.icon active={active} />
-                  {item.label}
-                </Link>
-              )
-            })}
-          </div>
-        ))}
-      </nav>
-
-      <div style={{ padding: '12px', borderTop: '1px solid var(--border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-          <div
-            style={{
-              width: '28px',
-              height: '28px',
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg,#6c63ff,#00d4aa)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '11px',
-              fontWeight: 600,
-              color: '#fff',
-              flexShrink: 0,
-            }}
-          >
-            {initials}
-          </div>
-          <div>
-            <div style={{ fontSize: '12px', color: 'var(--text)', fontWeight: 500 }}>{profile?.name?.split(' ')[0] ?? 'Usuario'}</div>
-            <div style={{ fontSize: '10px', color: 'var(--muted)' }}>{profile?.target_exam ?? 'Concurso'}</div>
-          </div>
-        </div>
-        <button
-          onClick={handleLogout}
+        <div
           style={{
-            width: '100%',
-            padding: '7px',
-            borderRadius: '7px',
-            background: 'transparent',
-            border: '1px solid var(--border)',
-            color: 'var(--muted)',
-            fontSize: '12px',
-            cursor: 'pointer',
-            transition: 'all .12s',
+            padding: '18px 16px 14px',
+            borderBottom: '1px solid var(--border)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '10px',
           }}
         >
-          Sair
-        </button>
-      </div>
-    </aside>
+          <div>
+            <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '-0.5px' }}>
+              StudyAI
+            </div>
+            <div style={{ fontSize: '10px', color: 'var(--muted)', letterSpacing: '2px', textTransform: 'uppercase', marginTop: '2px' }}>
+              Concursos
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <ThemeToggle />
+            <button
+              type="button"
+              className="sidebar-close-btn"
+              aria-label="Fechar menu"
+              onClick={() => setMobileOpen(false)}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        <nav style={{ padding: '10px 8px', flex: 1, overflowY: 'auto' }}>
+          {navItems.map(group => (
+            <div key={group.section}>
+              <div style={{ fontSize: '10px', color: 'var(--muted)', letterSpacing: '1.5px', textTransform: 'uppercase', padding: '10px 10px 5px' }}>
+                {group.section}
+              </div>
+              {group.items.map(item => {
+                const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMobileOpen(false)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '9px',
+                      padding: active ? '8px 8px 8px 8px' : '8px 10px',
+                      borderRadius: '8px',
+                      marginBottom: '2px',
+                      fontSize: '13px',
+                      textDecoration: 'none',
+                      color: active ? 'var(--accent)' : 'var(--muted)',
+                      background: active ? 'rgba(108,99,255,.15)' : 'transparent',
+                      borderLeft: active ? '2px solid var(--accent)' : '2px solid transparent',
+                      transition: 'all .12s',
+                    }}
+                  >
+                    <item.icon active={active} />
+                    {item.label}
+                  </Link>
+                )
+              })}
+            </div>
+          ))}
+        </nav>
+
+        <div style={{ padding: '12px', borderTop: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+            <div
+              style={{
+                width: '28px',
+                height: '28px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg,#6c63ff,#00d4aa)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '11px',
+                fontWeight: 600,
+                color: '#fff',
+                flexShrink: 0,
+              }}
+            >
+              {initials}
+            </div>
+            <div>
+              <div style={{ fontSize: '12px', color: 'var(--text)', fontWeight: 500 }}>{profile?.name?.split(' ')[0] ?? 'Usuario'}</div>
+              <div style={{ fontSize: '10px', color: 'var(--muted)' }}>{profile?.target_exam ?? 'Concurso'}</div>
+            </div>
+          </div>
+          <button
+            onClick={handleLogout}
+            style={{
+              width: '100%',
+              padding: '7px',
+              borderRadius: '7px',
+              background: 'transparent',
+              border: '1px solid var(--border)',
+              color: 'var(--muted)',
+              fontSize: '12px',
+              cursor: 'pointer',
+              transition: 'all .12s',
+            }}
+          >
+            Sair
+          </button>
+        </div>
+      </aside>
+    </>
   )
 }
 
