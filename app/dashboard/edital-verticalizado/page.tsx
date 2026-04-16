@@ -596,30 +596,59 @@ export default function EditalVerticalizadoPage() {
         .ev-top-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(360px,.95fr);gap:16px;align-items:stretch}
         .ev-stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
         .ev-toolbar{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}
+        .ev-toolbar-left{display:flex;align-items:center;gap:10px;flex:1 1 320px}
+        .ev-toolbar-right{display:flex;gap:8px;flex-wrap:wrap}
         .ev-board-head{display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap}
+        .ev-board-title-wrap{display:flex;align-items:center;gap:10px;min-width:300px}
+        .ev-board-title-row{display:flex;gap:8px}
+        .ev-head-actions,.ev-upload-actions,.ev-meta-row{display:flex;gap:10px;flex-wrap:wrap}
+        .ev-title{margin:0;font-size:32px;font-weight:800;letter-spacing:-.04em}
+        .ev-subtitle{margin:8px 0 0;color:var(--muted,#6b7194);font-size:14px}
         .ev-table-wrap{border:1px solid rgba(255,255,255,.06);border-radius:16px;overflow:auto}
+        .ev-mobile-cards{display:none}
         @media (max-width: 1180px){
           .ev-top-grid{grid-template-columns:1fr}
         }
         @media (max-width: 840px){
           .ev-stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
           .ev-toolbar,.ev-board-head{align-items:stretch}
+          .ev-board-title-wrap{min-width:0;width:100%}
+          .ev-meta-row{width:100%}
+        }
+        @media (max-width: 760px){
+          .ev-toolbar-left{width:100%;flex-direction:column;align-items:stretch}
+          .ev-toolbar-left .ev-select{width:100% !important}
+          .ev-toolbar-right{width:100%}
+          .ev-toolbar-right .ev-btn{flex:1}
+          .ev-board-title-row{flex-direction:column}
+          .ev-board-title-row .ev-btn{width:100%;height:44px}
+          .ev-desktop-table{display:none}
+          .ev-mobile-cards{display:grid;gap:12px}
         }
         @media (max-width: 640px){
+          .ev-page{padding:16px 12px 24px !important;gap:14px !important}
           .ev-stats-grid{grid-template-columns:1fr}
+          .ev-title{font-size:24px}
+          .ev-subtitle{font-size:13px}
+          .ev-head-actions,.ev-upload-actions{width:100%}
+          .ev-head-actions .ev-btn,.ev-upload-actions .ev-btn{flex:1 1 100%}
+          .ev-meta-row > *{max-width:none !important;width:100%}
+        }
+        @media (max-width: 420px){
+          .ev-mobile-status-grid{grid-template-columns:1fr !important}
         }
       `}</style>
 
-      <div style={{ padding: '28px 32px 34px', background: 'var(--bg,#0a0c12)', minHeight: '100%', display: 'grid', gap: 18 }}>
+      <div className="ev-page" style={{ padding: '28px 32px 34px', background: 'var(--bg,#0a0c12)', minHeight: '100%', display: 'grid', gap: 18 }}>
         <header style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: 32, fontWeight: 800, letterSpacing: '-0.04em' }}>Edital Verticalizado</h1>
-            <p style={{ margin: '8px 0 0', color: 'var(--muted,#6b7194)', fontSize: 14 }}>
+            <h1 className="ev-title">Edital Verticalizado</h1>
+            <p className="ev-subtitle">
               Organize o conteudo programatico em disciplina, tema e subtema com apoio de IA.
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <div className="ev-head-actions">
             <button
               className="ev-btn"
               type="button"
@@ -685,7 +714,7 @@ export default function EditalVerticalizadoPage() {
               <Badge color="#1fc16b" label="MD" />
             </div>
 
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <div className="ev-upload-actions">
               <button
                 className="ev-btn"
                 type="button"
@@ -788,7 +817,7 @@ export default function EditalVerticalizadoPage() {
 
         <section style={{ ...box, padding: 20, display: 'grid', gap: 16 }}>
           <div className="ev-toolbar">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: '1 1 320px' }}>
+            <div className="ev-toolbar-left">
               <div style={{ position: 'relative', flex: 1 }}>
                 <Search size={15} style={{ position: 'absolute', left: 12, top: 12, color: 'var(--muted,#6b7194)' }} />
                 <input
@@ -813,7 +842,7 @@ export default function EditalVerticalizadoPage() {
               </select>
             </div>
 
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div className="ev-toolbar-right">
               <button
                 className="ev-btn"
                 type="button"
@@ -834,10 +863,10 @@ export default function EditalVerticalizadoPage() {
           </div>
 
           <div className="ev-board-head">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 300 }}>
+            <div className="ev-board-title-wrap">
               <div style={{ flex: 1 }}>
                 <label style={labelStyle}>Titulo da guia</label>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div className="ev-board-title-row">
                   <input
                     className="ev-input"
                     value={titleDraft}
@@ -866,7 +895,7 @@ export default function EditalVerticalizadoPage() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div className="ev-meta-row">
               <MetaPill label="Arquivo" value={activeBoard?.source_file_name ?? 'Nao enviado'} />
               <MetaPill label="IA" value={activeBoard?.ai_provider ? `${activeBoard.ai_provider} / ${activeBoard.ai_model}` : 'Aguardando arquivo'} />
               <button
@@ -883,114 +912,180 @@ export default function EditalVerticalizadoPage() {
           </div>
 
           <div className="ev-table-wrap">
-            <div style={{ display: 'grid', gridTemplateColumns: '52px minmax(0,1.3fr) minmax(0,1.3fr) repeat(4,94px) 58px', gap: 0, padding: '0 14px', background: 'rgba(255,255,255,.03)', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
-              {['#', 'Tema', 'Subtema', 'Estudo', 'Resumo', 'Revisao', 'Concluido', 'Acoes'].map((label, index) => (
-                <div
-                  key={label}
-                  style={{
-                    padding: '12px 8px',
-                    fontSize: 10,
-                    textTransform: 'uppercase',
-                    letterSpacing: 1.4,
-                    color: 'var(--muted,#6b7194)',
-                    textAlign: index >= 3 ? 'center' : 'left',
-                  }}
-                >
-                  {label}
+            <div className="ev-desktop-table">
+              <div style={{ display: 'grid', gridTemplateColumns: '52px minmax(0,1.3fr) minmax(0,1.3fr) repeat(4,94px) 58px', gap: 0, padding: '0 14px', background: 'rgba(255,255,255,.03)', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
+                {['#', 'Tema', 'Subtema', 'Estudo', 'Resumo', 'Revisao', 'Concluido', 'Acoes'].map((label, index) => (
+                  <div
+                    key={label}
+                    style={{
+                      padding: '12px 8px',
+                      fontSize: 10,
+                      textTransform: 'uppercase',
+                      letterSpacing: 1.4,
+                      color: 'var(--muted,#6b7194)',
+                      textAlign: index >= 3 ? 'center' : 'left',
+                    }}
+                  >
+                    {label}
+                  </div>
+                ))}
+              </div>
+
+              {!Object.keys(groupedTopics).length ? (
+                <div style={{ padding: '56px 18px', textAlign: 'center', display: 'grid', gap: 10, placeItems: 'center' }}>
+                  <div style={{ width: 66, height: 66, borderRadius: 20, background: 'rgba(108,99,255,.12)', display: 'grid', placeItems: 'center', color: '#d8d4ff' }}>
+                    <FileText size={28} />
+                  </div>
+                  <div style={{ fontSize: 22, fontWeight: 800 }}>Nenhum edital carregado</div>
+                  <div style={{ maxWidth: 520, fontSize: 14, color: 'var(--muted,#6b7194)', lineHeight: 1.6 }}>
+                    Envie um arquivo para a IA organizar o conteudo programatico automaticamente ou adicione itens manualmente.
+                  </div>
                 </div>
-              ))}
+              ) : (
+                Object.entries(groupedTopics).map(([disciplina, items]) => {
+                  const isOpen = expandedDisciplines[disciplina] ?? true
+                  const doneCount = items.filter(item => item.concluido).length
+
+                  return (
+                    <div key={disciplina} style={{ borderTop: '1px solid rgba(255,255,255,.05)' }}>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedDisciplines(prev => ({ ...prev, [disciplina]: !isOpen }))}
+                        style={{
+                          width: '100%',
+                          border: 'none',
+                          background: 'rgba(255,255,255,.02)',
+                          color: 'var(--text,#e8eaf6)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 12,
+                          padding: '13px 16px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                          <div style={{ textAlign: 'left' }}>
+                            <div style={{ fontSize: 15, fontWeight: 700 }}>{disciplina}</div>
+                            <div style={{ fontSize: 12, color: 'var(--muted,#6b7194)' }}>{items.length} item(ns) nesta disciplina</div>
+                          </div>
+                        </div>
+                        <div style={{ padding: '4px 10px', borderRadius: 999, background: 'rgba(108,99,255,.12)', color: '#d9d5ff', fontSize: 12 }}>
+                          {doneCount}/{items.length} concluidos
+                        </div>
+                      </button>
+
+                      {isOpen
+                        ? items.map((topic, index) => (
+                            <div key={topic.id} style={{ display: 'grid', gridTemplateColumns: '52px minmax(0,1.3fr) minmax(0,1.3fr) repeat(4,94px) 58px', gap: 0, padding: '0 14px', borderTop: '1px solid rgba(255,255,255,.04)' }}>
+                              <Cell align="center">{String(index + 1).padStart(2, '0')}</Cell>
+                              <Cell>
+                                <div style={{ fontWeight: 700 }}>{topic.tema}</div>
+                              </Cell>
+                              <Cell muted>{topic.subtema}</Cell>
+                              <Cell align="center">
+                                <StatusToggle active={topic.estudo} label={toggleLabel(topic.estudo, 'Sim', 'Nao')} onClick={() => void toggleTopic(topic, 'estudo')} />
+                              </Cell>
+                              <Cell align="center">
+                                <StatusToggle active={topic.resumo} label={toggleLabel(topic.resumo, 'Sim', 'Nao')} onClick={() => void toggleTopic(topic, 'resumo')} />
+                              </Cell>
+                              <Cell align="center">
+                                <StatusToggle active={topic.revisao} label={toggleLabel(topic.revisao, 'Sim', 'Nao')} onClick={() => void toggleTopic(topic, 'revisao')} />
+                              </Cell>
+                              <Cell align="center">
+                                <StatusToggle active={topic.concluido} label={toggleLabel(topic.concluido, 'Ok', 'Pendente')} onClick={() => void toggleTopic(topic, 'concluido')} tone={topic.concluido ? '#1fc16b' : '#ffb224'} />
+                              </Cell>
+                              <Cell align="center">
+                                <button
+                                  className="ev-btn"
+                                  type="button"
+                                  onClick={() => void deleteTopic(topic.id)}
+                                  style={{
+                                    ...buttonBase,
+                                    width: 34,
+                                    height: 34,
+                                    padding: 0,
+                                    background: 'rgba(239,68,68,.1)',
+                                    color: '#ff9a9a',
+                                    borderColor: 'rgba(239,68,68,.2)',
+                                  }}
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </Cell>
+                            </div>
+                          ))
+                        : null}
+                    </div>
+                  )
+                })
+              )}
             </div>
 
-            {!Object.keys(groupedTopics).length ? (
-              <div style={{ padding: '56px 18px', textAlign: 'center', display: 'grid', gap: 10, placeItems: 'center' }}>
-                <div style={{ width: 66, height: 66, borderRadius: 20, background: 'rgba(108,99,255,.12)', display: 'grid', placeItems: 'center', color: '#d8d4ff' }}>
-                  <FileText size={28} />
-                </div>
-                <div style={{ fontSize: 22, fontWeight: 800 }}>Nenhum edital carregado</div>
-                <div style={{ maxWidth: 520, fontSize: 14, color: 'var(--muted,#6b7194)', lineHeight: 1.6 }}>
-                  Envie um arquivo para a IA organizar o conteudo programatico automaticamente ou adicione itens manualmente.
-                </div>
-              </div>
-            ) : (
-              Object.entries(groupedTopics).map(([disciplina, items]) => {
-                const isOpen = expandedDisciplines[disciplina] ?? true
-                const doneCount = items.filter(item => item.concluido).length
-
-                return (
-                  <div key={disciplina} style={{ borderTop: '1px solid rgba(255,255,255,.05)' }}>
-                    <button
-                      type="button"
-                      onClick={() => setExpandedDisciplines(prev => ({ ...prev, [disciplina]: !isOpen }))}
-                      style={{
-                        width: '100%',
-                        border: 'none',
-                        background: 'rgba(255,255,255,.02)',
-                        color: 'var(--text,#e8eaf6)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: 12,
-                        padding: '13px 16px',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                        <div style={{ textAlign: 'left' }}>
-                          <div style={{ fontSize: 15, fontWeight: 700 }}>{disciplina}</div>
-                          <div style={{ fontSize: 12, color: 'var(--muted,#6b7194)' }}>{items.length} item(ns) nesta disciplina</div>
-                        </div>
-                      </div>
-                      <div style={{ padding: '4px 10px', borderRadius: 999, background: 'rgba(108,99,255,.12)', color: '#d9d5ff', fontSize: 12 }}>
-                        {doneCount}/{items.length} concluidos
-                      </div>
-                    </button>
-
-                    {isOpen
-                      ? items.map((topic, index) => (
-                          <div key={topic.id} style={{ display: 'grid', gridTemplateColumns: '52px minmax(0,1.3fr) minmax(0,1.3fr) repeat(4,94px) 58px', gap: 0, padding: '0 14px', borderTop: '1px solid rgba(255,255,255,.04)' }}>
-                            <Cell align="center">{String(index + 1).padStart(2, '0')}</Cell>
-                            <Cell>
-                              <div style={{ fontWeight: 700 }}>{topic.tema}</div>
-                            </Cell>
-                            <Cell muted>{topic.subtema}</Cell>
-                            <Cell align="center">
-                              <StatusToggle active={topic.estudo} label={toggleLabel(topic.estudo, 'Sim', 'Nao')} onClick={() => void toggleTopic(topic, 'estudo')} />
-                            </Cell>
-                            <Cell align="center">
-                              <StatusToggle active={topic.resumo} label={toggleLabel(topic.resumo, 'Sim', 'Nao')} onClick={() => void toggleTopic(topic, 'resumo')} />
-                            </Cell>
-                            <Cell align="center">
-                              <StatusToggle active={topic.revisao} label={toggleLabel(topic.revisao, 'Sim', 'Nao')} onClick={() => void toggleTopic(topic, 'revisao')} />
-                            </Cell>
-                            <Cell align="center">
-                              <StatusToggle active={topic.concluido} label={toggleLabel(topic.concluido, 'Ok', 'Pendente')} onClick={() => void toggleTopic(topic, 'concluido')} tone={topic.concluido ? '#1fc16b' : '#ffb224'} />
-                            </Cell>
-                            <Cell align="center">
-                              <button
-                                className="ev-btn"
-                                type="button"
-                                onClick={() => void deleteTopic(topic.id)}
-                                style={{
-                                  ...buttonBase,
-                                  width: 34,
-                                  height: 34,
-                                  padding: 0,
-                                  background: 'rgba(239,68,68,.1)',
-                                  color: '#ff9a9a',
-                                  borderColor: 'rgba(239,68,68,.2)',
-                                }}
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </Cell>
-                          </div>
-                        ))
-                      : null}
+            <div className="ev-mobile-cards" style={{ padding: '14px' }}>
+              {!Object.keys(groupedTopics).length ? (
+                <div style={{ padding: '26px 8px', textAlign: 'center', display: 'grid', gap: 10, placeItems: 'center' }}>
+                  <div style={{ width: 58, height: 58, borderRadius: 18, background: 'rgba(108,99,255,.12)', display: 'grid', placeItems: 'center', color: '#d8d4ff' }}>
+                    <FileText size={24} />
                   </div>
-                )
-              })
-            )}
+                  <div style={{ fontSize: 18, fontWeight: 800 }}>Nenhum edital carregado</div>
+                  <div style={{ fontSize: 13, color: 'var(--muted,#6b7194)', lineHeight: 1.6 }}>
+                    Envie um arquivo para a IA organizar o conteudo programatico automaticamente ou adicione itens manualmente.
+                  </div>
+                </div>
+              ) : (
+                Object.entries(groupedTopics).map(([disciplina, items]) => {
+                  const isOpen = expandedDisciplines[disciplina] ?? true
+                  const doneCount = items.filter(item => item.concluido).length
+
+                  return (
+                    <div key={`mobile-${disciplina}`} style={{ display: 'grid', gap: 10 }}>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedDisciplines(prev => ({ ...prev, [disciplina]: !isOpen }))}
+                        style={{
+                          width: '100%',
+                          border: '1px solid rgba(255,255,255,.06)',
+                          borderRadius: 16,
+                          background: 'rgba(255,255,255,.02)',
+                          color: 'var(--text,#e8eaf6)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 12,
+                          padding: '13px 14px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                          <div style={{ textAlign: 'left' }}>
+                            <div style={{ fontSize: 14, fontWeight: 800 }}>{disciplina}</div>
+                            <div style={{ fontSize: 12, color: 'var(--muted,#6b7194)' }}>{items.length} item(ns)</div>
+                          </div>
+                        </div>
+                        <div style={{ padding: '4px 9px', borderRadius: 999, background: 'rgba(108,99,255,.12)', color: '#d9d5ff', fontSize: 12 }}>
+                          {doneCount}/{items.length}
+                        </div>
+                      </button>
+
+                      {isOpen
+                        ? items.map((topic, index) => (
+                            <TopicMobileCard
+                              key={`mobile-topic-${topic.id}`}
+                              index={index}
+                              topic={topic}
+                              onDelete={() => void deleteTopic(topic.id)}
+                              onToggle={field => void toggleTopic(topic, field)}
+                            />
+                          ))
+                        : null}
+                    </div>
+                  )
+                })
+              )}
+            </div>
           </div>
         </section>
       </div>
@@ -1203,5 +1298,65 @@ function StatusToggle({
     >
       {label}
     </button>
+  )
+}
+
+function TopicMobileCard({
+  index,
+  topic,
+  onDelete,
+  onToggle,
+}: {
+  index: number
+  topic: EditalTopic
+  onDelete: () => void
+  onToggle: (field: 'estudo' | 'resumo' | 'revisao' | 'concluido') => void
+}) {
+  return (
+    <div
+      style={{
+        background: 'rgba(255,255,255,.03)',
+        border: '1px solid rgba(255,255,255,.06)',
+        borderRadius: 16,
+        padding: 14,
+        display: 'grid',
+        gap: 12,
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
+        <div style={{ display: 'grid', gap: 6, minWidth: 0 }}>
+          <div style={{ fontSize: 11, color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: 1.2 }}>
+            Item {String(index + 1).padStart(2, '0')}
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text,#e8eaf6)' }}>{topic.tema}</div>
+          <div style={{ fontSize: 13, color: 'var(--muted,#6b7194)', lineHeight: 1.5 }}>{topic.subtema}</div>
+        </div>
+
+        <button
+          className="ev-btn"
+          type="button"
+          onClick={onDelete}
+          style={{
+            ...buttonBase,
+            width: 36,
+            height: 36,
+            padding: 0,
+            background: 'rgba(239,68,68,.1)',
+            color: '#ff9a9a',
+            borderColor: 'rgba(239,68,68,.2)',
+            flexShrink: 0,
+          }}
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
+
+      <div className="ev-mobile-status-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+        <StatusToggle active={topic.estudo} label={toggleLabel(topic.estudo, 'Estudo', 'Estudo')} onClick={() => onToggle('estudo')} />
+        <StatusToggle active={topic.resumo} label={toggleLabel(topic.resumo, 'Resumo', 'Resumo')} onClick={() => onToggle('resumo')} />
+        <StatusToggle active={topic.revisao} label={toggleLabel(topic.revisao, 'Revisao', 'Revisao')} onClick={() => onToggle('revisao')} />
+        <StatusToggle active={topic.concluido} label={toggleLabel(topic.concluido, 'Concluido', 'Pendente')} onClick={() => onToggle('concluido')} tone={topic.concluido ? '#1fc16b' : '#ffb224'} />
+      </div>
+    </div>
   )
 }

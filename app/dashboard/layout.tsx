@@ -22,25 +22,36 @@ export default async function DashboardLayout({
     .maybeSingle() // 🔥 CORREÇÃO AQUI
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        height: '100vh',
-        overflow: 'hidden',
-        background: 'var(--bg)',
-      }}
-    >
-      <Sidebar user={user} profile={profile} />
-      <main
+    <>
+      <style>{`
+        @media (max-width: 960px) {
+          .dashboard-main {
+            padding-top: 58px;
+          }
+        }
+      `}</style>
+      <div
         style={{
-          flex: 1,
-          overflow: 'auto',
           display: 'flex',
-          flexDirection: 'column',
+          height: '100vh',
+          overflow: 'hidden',
+          background: 'var(--bg)',
         }}
       >
-        {children}
-      </main>
-    </div>
+        <Sidebar user={user} profile={profile} />
+        <main
+          className="dashboard-main"
+          style={{
+            flex: 1,
+            minWidth: 0,
+            overflow: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          {children}
+        </main>
+      </div>
+    </>
   )
 }
