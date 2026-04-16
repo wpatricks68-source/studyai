@@ -890,18 +890,21 @@ export default function EditalVerticalizadoPage() {
         }
         .ev-icon-btn:hover { transform: translateY(-1px); }
 
+        .ev-desktop-table { display: block; }
+        .ev-mobile-cards { display: none; }
+
         @media (max-width: 1180px){
           .ev-top-grid{grid-template-columns:1fr}
+        }
+        @media (max-width: 1000px){
+          .ev-desktop-table { display: none; }
+          .ev-mobile-cards { display: grid; gap: 12px; }
         }
         @media (max-width: 840px){
           .ev-stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
           .ev-toolbar,.ev-board-head{align-items:stretch}
           .ev-board-title-wrap{min-width:0;width:100%}
           .ev-meta-row{width:100%}
-        }
-        @media (max-width: 1000px){
-          .ev-desktop-table { display: none; }
-          .ev-mobile-cards { display: grid; gap: 12px; }
         }
         @media (max-width: 640px){
           .ev-page{padding:16px 12px 24px !important;gap:14px !important}
@@ -1027,9 +1030,8 @@ export default function EditalVerticalizadoPage() {
               </button>
             </div>
 
-            <div style={{ fontSize: 12, color: 'var(--muted,#6b7194)', lineHeight: 1.5 }}>
-              Guia ativa: <strong style={{ color: 'var(--text,#e8eaf6)' }}>{activeBoard?.title ?? 'Sem guia'}</strong>
-              {' '}| Ultimo processamento: {formatDateTime(activeBoard?.last_processed_at ?? null)}
+            <div style={{ fontSize: 13, color: 'var(--muted,#6b7194)', lineHeight: 1.5, marginTop: 4 }}>
+              Ultimo processamento: {formatDateTime(activeBoard?.last_processed_at ?? null)}
             </div>
 
             <input
@@ -1042,37 +1044,6 @@ export default function EditalVerticalizadoPage() {
           </div>
         </section>
 
-        <section style={{ ...box, padding: '12px 14px', overflowX: 'auto', overflowY: 'visible' }}>
-          <div className="ev-tab" style={{ display: 'flex', gap: 10, overflowX: 'auto', minWidth: 'max-content', paddingBottom: 4 }}>
-            {boards.map(board => {
-              const count = topicsByBoard[board.id]?.length ?? 0
-              const active = board.id === activeBoardId
-
-              return (
-                <button
-                  key={board.id}
-                  type="button"
-                  onClick={() => setActiveBoardId(board.id)}
-                  style={{
-                    ...buttonBase,
-                    padding: '10px 14px',
-                    background: active ? 'rgba(108,99,255,.18)' : 'rgba(255,255,255,.03)',
-                    borderColor: active ? 'rgba(108,99,255,.32)' : 'rgba(255,255,255,.06)',
-                    color: active ? '#e9e7ff' : 'var(--muted,#6b7194)',
-                    whiteSpace: 'nowrap',
-                    flex: '0 0 auto',
-                  }}
-                >
-                  <FileText size={14} />
-                  {board.title}
-                  <span style={{ padding: '2px 7px', borderRadius: 999, background: active ? 'rgba(255,255,255,.14)' : 'rgba(255,255,255,.05)', fontSize: 11 }}>
-                    {count}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </section>
 
         {dbError && (
           <div style={{ ...box, padding: '14px 16px', borderColor: 'rgba(239,68,68,.28)', color: '#ff8f8f', fontSize: 13 }}>
@@ -1091,7 +1062,49 @@ export default function EditalVerticalizadoPage() {
           </div>
         )}
 
-        <section style={{ ...box, padding: 20, display: 'grid', gap: 16 }}>
+        <section style={{ ...box, padding: '20px', display: 'grid', gap: 20 }}>
+          <div className="ev-tab" style={{ display: 'flex', gap: 10, overflowX: 'auto', minWidth: 'max-content', paddingBottom: 10, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            {boards.map(board => {
+              const count = topicsByBoard[board.id]?.length ?? 0
+              const active = board.id === activeBoardId
+
+              return (
+                <button
+                  key={board.id}
+                  type="button"
+                  onClick={() => setActiveBoardId(board.id)}
+                  style={{
+                    ...buttonBase,
+                    position: 'relative',
+                    padding: '10px 16px',
+                    background: active ? 'rgba(108,99,255,0.08)' : 'transparent',
+                    borderColor: 'transparent',
+                    color: active ? '#9b91ff' : 'var(--muted,#6b7194)',
+                    whiteSpace: 'nowrap',
+                    flex: '0 0 auto',
+                    borderRadius: '10px 10px 0 0',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  <FileText size={14} />
+                  {board.title}
+                  <span style={{ padding: '2px 7px', borderRadius: 9, background: active ? 'rgba(108,99,255,0.2)' : 'rgba(255,255,255,.05)', fontSize: 10, fontWeight: 800 }}>
+                    {count}
+                  </span>
+                  {active && (
+                    <div style={{ position: 'absolute', bottom: -11, left: 0, right: 0, height: 2, background: '#7c6cff', borderRadius: '2px 2px 0 0' }} />
+                  )}
+                </button>
+              )
+            })}
+            <button
+              onClick={() => void createBoard(undefined, createDefaultBoardTitle(boards.length), true)}
+              style={{ ...buttonBase, padding: '10px', background: 'rgba(255,255,255,0.03)', color: 'var(--muted,#6b7194)', borderColor: 'transparent' }}
+            >
+              <Plus size={16} />
+            </button>
+          </div>
+
           <div className="ev-toolbar">
             <div className="ev-toolbar-left">
               <div style={{ position: 'relative', flex: 1 }}>
@@ -1134,6 +1147,16 @@ export default function EditalVerticalizadoPage() {
                 style={{ ...buttonBase, padding: '10px 13px', background: 'rgba(255,255,255,.03)', color: 'var(--text,#e8eaf6)' }}
               >
                 Recolher
+              </button>
+              <button
+                className="ev-btn"
+                type="button"
+                onClick={deleteCurrentBoard}
+                disabled={missingTables}
+                style={{ ...buttonBase, padding: '10px 13px', background: 'rgba(239,68,68,.1)', borderColor: 'rgba(239,68,68,.18)', color: '#ffb2b2' }}
+              >
+                <Trash2 size={15} />
+                Excluir Guia
               </button>
             </div>
           </div>
@@ -1232,80 +1255,99 @@ export default function EditalVerticalizadoPage() {
 
                         {isOpen && (
                           <div style={{ display: 'grid' }}>
-                            {groups.map((group, groupIndex) => 
-                              group.topics.map((topic, topicIndex) => (
-                                <div key={topic.id} className="ev-topic-row">
-                                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)' }}>
-                                    {topicIndex === 0 ? groupIndex + 1 : ''}
+                            {groups.map((group, groupIndex) => (
+                              <div key={group.key} style={{ display: 'grid' }}>
+                                {/* Theme header row */}
+                                <div style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 12,
+                                  padding: '12px 20px',
+                                  background: 'rgba(255,255,255,0.02)',
+                                  borderBottom: '1px solid rgba(255,255,255,0.04)',
+                                }}>
+                                  <div style={{ fontSize: 11, fontWeight: 900, color: '#9b91ff', textTransform: 'uppercase', letterSpacing: 1.5, flex: 1 }}>
+                                    TEMA {groupIndex + 1}: {group.tema}
                                   </div>
-                                  <div style={{ fontSize: 13, fontWeight: topicIndex === 0 ? 700 : 400, color: topicIndex === 0 ? '#e8eaf6' : 'rgba(232,234,246,0.6)' }}>
-                                    {topicIndex === 0 ? topic.tema : topic.subtema}
-                                  </div>
-                                  <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                    <button
-                                      className="ev-status-check"
-                                      onClick={() => toggleTopic(topic, 'estudo')}
-                                      style={{ background: topic.estudo ? '#7c6cff' : undefined, borderColor: topic.estudo ? '#7c6cff' : undefined }}
-                                    >
-                                      {topic.estudo && <Check size={14} color="#fff" />}
-                                    </button>
-                                  </div>
-                                  <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                    <button
-                                      className="ev-status-check"
-                                      onClick={() => toggleTopic(topic, 'resumo')}
-                                      style={{ background: topic.resumo ? '#3b82f6' : undefined, borderColor: topic.resumo ? '#3b82f6' : undefined }}
-                                    >
-                                      {topic.resumo && <Check size={14} color="#fff" />}
-                                    </button>
-                                  </div>
-                                  <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                    <div className="ev-rev-group">
-                                      <button
-                                        className="ev-rev-btn"
-                                        onClick={() => toggleTopic(topic, 'revisao_1')}
-                                        style={{ background: topic.revisao_1 ? '#f59e0b' : undefined, color: topic.revisao_1 ? '#fff' : undefined }}
-                                      >1º</button>
-                                      <button
-                                        className="ev-rev-btn"
-                                        onClick={() => toggleTopic(topic, 'revisao_2')}
-                                        style={{ background: topic.revisao_2 ? '#3b82f6' : undefined, color: topic.revisao_2 ? '#fff' : undefined }}
-                                      >2º</button>
-                                      <button
-                                        className="ev-rev-btn"
-                                        onClick={() => toggleTopic(topic, 'revisao_3')}
-                                        style={{ background: topic.revisao_3 ? '#22c55e' : undefined, color: topic.revisao_3 ? '#fff' : undefined }}
-                                      >3º</button>
-                                    </div>
-                                  </div>
-                                  <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                    <button
-                                      className="ev-status-check"
-                                      onClick={() => toggleTopic(topic, 'concluido')}
-                                      style={{ background: topic.concluido ? '#16a34a' : undefined, borderColor: topic.concluido ? '#16a34a' : undefined }}
-                                    >
-                                      {topic.concluido && <Check size={14} color="#fff" />}
-                                    </button>
-                                  </div>
-                                  <div className="ev-action-btns" style={{ justifyContent: 'center' }}>
+                                  <div className="ev-action-btns">
                                     <button
                                       className="ev-icon-btn"
                                       onClick={() => openEditGroup(group)}
-                                      style={{ color: '#f59e0b', background: 'rgba(245,158,11,0.1)' }}
+                                      style={{ color: '#f59e0b', background: 'rgba(245,158,11,0.1)', width: 28, height: 28 }}
                                     >
-                                      <PencilLine size={14} />
-                                    </button>
-                                    <button
-                                      className="ev-icon-btn"
-                                      onClick={() => deleteTopic(topic.id)}
-                                      style={{ color: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.05)' }}
-                                    >
-                                      <Trash2 size={14} />
+                                      <PencilLine size={13} />
                                     </button>
                                   </div>
                                 </div>
-                              ))
-                            )}
+
+                                {/* Subthemes rows */}
+                                {group.topics.map((topic, topicIndex) => (
+                                  <div key={topic.id} className="ev-topic-row">
+                                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)' }}>
+                                      {topicIndex + 1}
+                                    </div>
+                                    <div style={{ fontSize: 13, color: 'rgba(232,234,246,0.9)' }}>
+                                      {topic.subtema}
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                      <button
+                                        className="ev-status-check"
+                                        onClick={() => toggleTopic(topic, 'estudo')}
+                                        style={{ background: topic.estudo ? '#7c6cff' : undefined, borderColor: topic.estudo ? '#7c6cff' : undefined }}
+                                      >
+                                        {topic.estudo && <Check size={14} color="#fff" />}
+                                      </button>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                      <button
+                                        className="ev-status-check"
+                                        onClick={() => toggleTopic(topic, 'resumo')}
+                                        style={{ background: topic.resumo ? '#3b82f6' : undefined, borderColor: topic.resumo ? '#3b82f6' : undefined }}
+                                      >
+                                        {topic.resumo && <Check size={14} color="#fff" />}
+                                      </button>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                      <div className="ev-rev-group">
+                                        <button
+                                          className="ev-rev-btn"
+                                          onClick={() => toggleTopic(topic, 'revisao_1')}
+                                          style={{ background: topic.revisao_1 ? '#f59e0b' : undefined, color: topic.revisao_1 ? '#fff' : undefined }}
+                                        >1º</button>
+                                        <button
+                                          className="ev-rev-btn"
+                                          onClick={() => toggleTopic(topic, 'revisao_2')}
+                                          style={{ background: topic.revisao_2 ? '#3b82f6' : undefined, color: topic.revisao_2 ? '#fff' : undefined }}
+                                        >2º</button>
+                                        <button
+                                          className="ev-rev-btn"
+                                          onClick={() => toggleTopic(topic, 'revisao_3')}
+                                          style={{ background: topic.revisao_3 ? '#22c55e' : undefined, color: topic.revisao_3 ? '#fff' : undefined }}
+                                        >3º</button>
+                                      </div>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                      <button
+                                        className="ev-status-check"
+                                        onClick={() => toggleTopic(topic, 'concluido')}
+                                        style={{ background: topic.concluido ? '#16a34a' : undefined, borderColor: topic.concluido ? '#16a34a' : undefined }}
+                                      >
+                                        {topic.concluido && <Check size={14} color="#fff" />}
+                                      </button>
+                                    </div>
+                                    <div className="ev-action-btns" style={{ justifyContent: 'center' }}>
+                                      <button
+                                        className="ev-icon-btn"
+                                        onClick={() => deleteTopic(topic.id)}
+                                        style={{ color: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.05)' }}
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
