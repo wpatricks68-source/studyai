@@ -59,4 +59,10 @@ body {
   .bg-surface   { background-color: var(--surface); }
   .bg-surface2  { background-color: var(--surface2); }
   .border-custom { border-color: var(--border); }
+  
+  @media (max-width: 768px) {
+    .hide-on-mobile {
+      display: none !important;
+    }
+  }
 }

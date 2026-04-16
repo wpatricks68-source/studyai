@@ -8,6 +8,7 @@ import type { User } from '@supabase/supabase-js'
 import type { Profile } from '@/types/database'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Menu, X } from 'lucide-react'
+import { GlobalTimer } from './GlobalTimer'
 
 const navItems = [
   {
@@ -192,7 +193,11 @@ export default function Sidebar({ user, profile }: { user: User; profile: Profil
           </div>
         </div>
 
-        <nav style={{ padding: '10px 8px', flex: 1, overflowY: 'auto' }}>
+        <div style={{ padding: '4px 12px 0' }}>
+          <GlobalTimer />
+        </div>
+
+        <nav style={{ padding: '0 8px 10px', flex: 1, overflowY: 'auto' }}>
           {navItems.map(group => (
             <div key={group.section}>
               <div style={{ fontSize: '10px', color: 'var(--muted)', letterSpacing: '1.5px', textTransform: 'uppercase', padding: '10px 10px 5px' }}>

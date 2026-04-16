@@ -245,6 +245,14 @@ export default function BuscaPage() {
   const [selectedQIds, setSelectedQIds]        = useState<Set<string>>(new Set())
   const [editingQId,   setEditingQId]           = useState<string | null>(null)
 
+  // ─── Estado do Sidebar Secundário ───
+  const [showSources, setShowSources] = useState(true)
+
+  // Detect mobile and hide sources by default
+  useEffect(() => {
+    if (window.innerWidth < 1024) setShowSources(false)
+  }, [])
+
   useEffect(() => {
     loadPlanState()
   }, [loadPlanState])
@@ -1566,22 +1574,30 @@ export default function BuscaPage() {
                 {genTarget === 'questions' ? 'Gerando...' : `Questões ${session.questions.length > 0 ? `(${session.questions.length}) ✓` : ''}`}
               </button>
 
-              {/* Botão EXPORTAR PDF */}
-              {hasContent && (
-                <button
-                  onClick={handleExportPDF}
-                  title="Exportar todo o conteúdo em PDF"
-                  style={{
-                    padding: '5px 14px', borderRadius: '7px', border: '1px solid #6c63ff',
-                    background: 'rgba(108,99,255,.12)', color: 'var(--accent,#6c63ff)',
-                    fontSize: '12px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
-                    display: 'flex', alignItems: 'center', gap: '5px', marginLeft: '8px'
-                  }}
-                >
                   <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M2 4h8l4 4v6a1 1 0 01-1 1H3a1 1 0 01-1-1V5a1 1 0 011-1z"/><path d="M10 4v4h4"/><path d="M6 10v3M4.5 11.5L6 13l1.5-1.5" strokeLinecap="round"/></svg>
                   Exportar PDF
                 </button>
               )}
+
+              {/* Toggle Sidebar Fontes */}
+              <button
+                onClick={() => setShowSources(!showSources)}
+                title={showSources ? "Esconder Fontes" : "Mostrar Fontes"}
+                style={{
+                  padding: '5px 12px', borderRadius: '7px', border: '1px solid var(--border,#1f2640)',
+                  background: showSources ? 'rgba(108,99,255,.1)' : 'transparent',
+                  color: showSources ? 'var(--accent,#6c63ff)' : 'var(--muted,#6b7194)',
+                  fontSize: '11px', fontWeight: 600, cursor: 'pointer', marginLeft: 'auto',
+                  display: 'flex', alignItems: 'center', gap: '6px'
+                }}
+              >
+                {showSources ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13l-5-5 5-5M11 13l-5-5 5-5"/></svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 13l5-5-5-5M13 13l5-5-5-5"/></svg>
+                )}
+                <span className="hide-on-mobile">Fontes</span>
+              </button>
 
               {/* Status salvo */}
               {session.savedAt && (
@@ -1643,8 +1659,19 @@ export default function BuscaPage() {
           </div>
 
           {/* Painel lateral — fontes */}
-          <div style={{ width: '210px', background: 'var(--surface,#111420)', borderLeft: '1px solid var(--border,#1f2640)', display: 'flex', flexDirection: 'column', flexShrink: 0, overflow: 'hidden' }}>
-            <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border,#1f2640)', fontSize: '10px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+          <div style={{ 
+            width: showSources ? '210px' : '0px', 
+            opacity: showSources ? 1 : 0,
+            pointerEvents: showSources ? 'auto' : 'none',
+            background: 'var(--surface,#111420)', 
+            borderLeft: showSources ? '1px solid var(--border,#1f2640)' : 'none', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            flexShrink: 0, 
+            overflow: 'hidden',
+            transition: 'width 0.24s ease, opacity 0.2s ease'
+          }}>
+            <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border,#1f2640)', fontSize: '10px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '1px', whiteSpace: 'nowrap' }}>
               Fontes consultadas
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '8px 14px' }}>
