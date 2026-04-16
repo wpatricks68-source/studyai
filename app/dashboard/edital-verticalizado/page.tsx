@@ -9,6 +9,7 @@ import {
   Loader2,
   PencilLine,
   Plus,
+  Save,
   Search,
   Sparkles,
   Trash2,
@@ -175,6 +176,7 @@ export default function EditalVerticalizadoPage() {
   const [savingManual, setSavingManual] = useState(false)
   const [expandedDisciplines, setExpandedDisciplines] = useState<Record<string, boolean>>({})
   const [titleDraft, setTitleDraft] = useState('')
+  const [editingBoardId, setEditingBoardId] = useState<string | null>(null)
 
   const activeBoard = boards.find(board => board.id === activeBoardId) ?? null
   const activeTopics = activeBoard ? topicsByBoard[activeBoard.id] ?? [] : []
@@ -800,6 +802,7 @@ export default function EditalVerticalizadoPage() {
         @keyframes spin{to{transform:rotate(360deg)}}
         .ev-top-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(360px,.95fr);gap:16px;align-items:stretch}
         .ev-stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+        .ev-panel-header{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;border-bottom:1px solid var(--border,#1f2640);padding-bottom:10px}
         .ev-toolbar{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}
         .ev-toolbar-left{display:flex;align-items:center;gap:10px;flex:1 1 320px}
         .ev-toolbar-right{display:flex;gap:8px;flex-wrap:wrap}
@@ -832,8 +835,9 @@ export default function EditalVerticalizadoPage() {
           background: rgba(108,99,255,0.05);
           padding: 12px 20px;
           cursor: pointer;
-          border-left: 3px solid #7c6cff;
+          border-left: 3px solid var(--accent);
           transition: background 0.2s;
+          color: var(--text);
         }
         .ev-discipline-row:hover { background: rgba(108,99,255,0.08); }
         .ev-topic-row {
@@ -841,17 +845,30 @@ export default function EditalVerticalizadoPage() {
           grid-template-columns: 50px 1fr 100px 100px 160px 120px 110px;
           padding: 12px 20px;
           align-items: center;
-          border-bottom: 1px solid rgba(255,255,255,0.03);
+          border-bottom: 1px solid var(--border);
           transition: background 0.2s;
+          color: var(--text);
         }
         .ev-topic-row:hover { background: rgba(255,255,255,0.015); }
+        .light .ev-topic-row:hover { background: rgba(0,0,0,0.015); }
         
+        .ev-theme-row {
+          display: grid;
+          grid-template-columns: 50px 1fr 100px 100px 160px 120px 110px;
+          padding: 12px 20px;
+          align-items: center;
+          border-bottom: 1px solid var(--border);
+          background: var(--surface2);
+          font-weight: 700;
+          color: var(--text);
+        }
+
         .ev-status-check {
           width: 24px;
           height: 24px;
           border-radius: 6px;
-          border: 1px solid rgba(255,255,255,0.1);
-          background: rgba(255,255,255,0.04);
+          border: 1px solid var(--border);
+          background: var(--surface2);
           cursor: pointer;
           display: flex;
           align-items: center;
@@ -924,42 +941,6 @@ export default function EditalVerticalizadoPage() {
             <p className="ev-subtitle">
               Organize o conteudo programatico em disciplina, tema e subtema com apoio de IA.
             </p>
-          </div>
-
-          <div className="ev-head-actions">
-            <button
-              className="ev-btn"
-              type="button"
-              onClick={() => openCreateEditor()}
-              disabled={missingTables}
-              style={{
-                ...buttonBase,
-                padding: '11px 16px',
-                background: 'transparent',
-                color: 'var(--text,#e8eaf6)',
-                opacity: missingTables ? 0.5 : 1,
-              }}
-            >
-              <Plus size={16} />
-              Adicionar Manual
-            </button>
-            <button
-              className="ev-btn"
-              type="button"
-              onClick={() => void createBoard(undefined, createDefaultBoardTitle(boards.length), true)}
-              disabled={missingTables || savingBoard}
-              style={{
-                ...buttonBase,
-                padding: '11px 16px',
-                background: 'rgba(108,99,255,.12)',
-                color: '#cfcafc',
-                borderColor: 'rgba(108,99,255,.22)',
-                opacity: missingTables ? 0.5 : 1,
-              }}
-            >
-              <Plus size={16} />
-              Novo Edital
-            </button>
           </div>
         </header>
 
@@ -1063,46 +1044,143 @@ export default function EditalVerticalizadoPage() {
         )}
 
         <section style={{ ...box, padding: '20px', display: 'grid', gap: 20 }}>
-          <div className="ev-tab" style={{ display: 'flex', gap: 10, overflowX: 'auto', minWidth: 'max-content', paddingBottom: 10, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            {boards.map(board => {
-              const count = topicsByBoard[board.id]?.length ?? 0
-              const active = board.id === activeBoardId
+          <div className="ev-panel-header">
+            <div className="ev-tab" style={{ display: 'flex', gap: 10, overflowX: 'auto', minWidth: 'max-content', paddingBottom: 4 }}>
+              {boards.map((board, bIdx) => {
+                const count = topicsByBoard[board.id]?.length ?? 0
+                const active = board.id === activeBoardId
+                const isEditing = editingBoardId === board.id
+                
+                // Varied colors based on index
+                const colors = ['#7c6cff', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#ec4899', '#8b5cf6']
+                const tabColor = colors[bIdx % colors.length]
 
-              return (
-                <button
-                  key={board.id}
-                  type="button"
-                  onClick={() => setActiveBoardId(board.id)}
-                  style={{
-                    ...buttonBase,
-                    position: 'relative',
-                    padding: '10px 16px',
-                    background: active ? 'rgba(108,99,255,0.08)' : 'transparent',
-                    borderColor: 'transparent',
-                    color: active ? '#9b91ff' : 'var(--muted,#6b7194)',
-                    whiteSpace: 'nowrap',
-                    flex: '0 0 auto',
-                    borderRadius: '10px 10px 0 0',
-                    transition: 'all 0.2s',
-                  }}
-                >
-                  <FileText size={14} />
-                  {board.title}
-                  <span style={{ padding: '2px 7px', borderRadius: 9, background: active ? 'rgba(108,99,255,0.2)' : 'rgba(255,255,255,.05)', fontSize: 10, fontWeight: 800 }}>
-                    {count}
-                  </span>
-                  {active && (
-                    <div style={{ position: 'absolute', bottom: -11, left: 0, right: 0, height: 2, background: '#7c6cff', borderRadius: '2px 2px 0 0' }} />
-                  )}
-                </button>
-              )
-            })}
-            <button
-              onClick={() => void createBoard(undefined, createDefaultBoardTitle(boards.length), true)}
-              style={{ ...buttonBase, padding: '10px', background: 'rgba(255,255,255,0.03)', color: 'var(--muted,#6b7194)', borderColor: 'transparent' }}
-            >
-              <Plus size={16} />
-            </button>
+                return (
+                  <div key={board.id} style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={() => setActiveBoardId(board.id)}
+                      className="group"
+                      style={{
+                        ...buttonBase,
+                        position: 'relative',
+                        padding: '10px 16px',
+                        background: active ? `${tabColor}15` : 'transparent',
+                        borderColor: 'transparent',
+                        color: active ? tabColor : 'var(--muted,#6b7194)',
+                        whiteSpace: 'nowrap',
+                        flex: '0 0 auto',
+                        borderRadius: '10px 10px 0 0',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                      }}
+                    >
+                      <FileText size={14} />
+                      
+                      {isEditing ? (
+                        <input
+                          autoFocus
+                          value={titleDraft}
+                          onChange={e => setTitleDraft(e.target.value)}
+                          onBlur={() => {
+                            void saveBoardTitle()
+                            setEditingBoardId(null)
+                          }}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              void saveBoardTitle()
+                              setEditingBoardId(null)
+                            }
+                          }}
+                          style={{
+                            background: 'rgba(0,0,0,0.1)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 4,
+                            padding: '2px 6px',
+                            color: 'inherit',
+                            fontSize: 'inherit',
+                            fontWeight: 'inherit',
+                            width: 120,
+                          }}
+                          onClick={e => e.stopPropagation()}
+                        />
+                      ) : (
+                        <span>{board.title}</span>
+                      )}
+
+                      <span style={{ padding: '2px 7px', borderRadius: 9, background: active ? `${tabColor}33` : 'rgba(255,255,255,.05)', fontSize: 10, fontWeight: 800 }}>
+                        {count}
+                      </span>
+
+                      {active && (
+                        <div style={{ position: 'absolute', bottom: -11, left: 0, right: 0, height: 2, background: tabColor, borderRadius: '2px 2px 0 0' }} />
+                      )}
+
+                      {active && !isEditing && (
+                        <PencilLine 
+                          size={12} 
+                          className="opacity-0 group-hover:opacity-100 transition-opacity" 
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setEditingBoardId(board.id)
+                          }}
+                        />
+                      )}
+                    </button>
+                    {!active && (
+                      <div style={{ width: 1, height: 20, background: 'var(--border)', opacity: 0.3, margin: '0 4px' }} />
+                    )}
+                  </div>
+                )
+              })}
+              <button
+                onClick={() => void createBoard(undefined, createDefaultBoardTitle(boards.length), true)}
+                className="hover:scale-110 transition-transform"
+                style={{ ...buttonBase, padding: '10px', background: 'transparent', color: 'var(--muted,#6b7194)', borderColor: 'transparent' }}
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                className="ev-btn"
+                type="button"
+                onClick={() => openCreateEditor()}
+                disabled={missingTables}
+                style={{
+                  ...buttonBase,
+                  padding: '9px 14px',
+                  background: 'var(--surface2)',
+                  color: 'var(--text)',
+                  fontSize: 12,
+                  opacity: missingTables ? 0.5 : 1,
+                }}
+              >
+                <Plus size={14} />
+                Adicionar Manual
+              </button>
+              <button
+                className="ev-btn"
+                type="button"
+                onClick={() => void createBoard(undefined, createDefaultBoardTitle(boards.length), true)}
+                disabled={missingTables || savingBoard}
+                style={{
+                  ...buttonBase,
+                  padding: '9px 14px',
+                  background: 'rgba(108,99,255,0.1)',
+                  color: 'var(--accent)',
+                  borderColor: 'rgba(108,99,255,0.2)',
+                  fontSize: 12,
+                  opacity: missingTables ? 0.5 : 1,
+                }}
+              >
+                <Sparkles size={14} />
+                Novo Edital
+              </button>
+            </div>
           </div>
 
           <div className="ev-toolbar">
@@ -1161,54 +1239,6 @@ export default function EditalVerticalizadoPage() {
             </div>
           </div>
 
-          <div className="ev-board-head">
-            <div className="ev-board-title-wrap">
-              <div style={{ flex: 1 }}>
-                <label style={labelStyle}>Titulo da guia</label>
-                <div className="ev-board-title-row">
-                  <input
-                    className="ev-input"
-                    value={titleDraft}
-                    onChange={event => setTitleDraft(event.target.value)}
-                    onBlur={() => void saveBoardTitle()}
-                    style={inputBase}
-                    placeholder="Nome do edital"
-                    disabled={!activeBoard || missingTables}
-                  />
-                  <button
-                    className="ev-btn"
-                    type="button"
-                    onClick={() => void saveBoardTitle()}
-                    disabled={!activeBoard || savingBoard || missingTables}
-                    style={{
-                      ...buttonBase,
-                      width: 46,
-                      background: 'rgba(108,99,255,.14)',
-                      color: '#d6d2ff',
-                      borderColor: 'rgba(108,99,255,.22)',
-                    }}
-                  >
-                    {savingBoard ? <Loader2 size={16} className="spin" /> : <PencilLine size={16} />}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="ev-meta-row">
-              <MetaPill label="Arquivo" value={activeBoard?.source_file_name ?? 'Nao enviado'} />
-              <MetaPill label="IA" value={activeBoard?.ai_provider ? `${activeBoard.ai_provider} / ${activeBoard.ai_model}` : 'Aguardando arquivo'} />
-              <button
-                className="ev-btn"
-                type="button"
-                onClick={deleteCurrentBoard}
-                disabled={missingTables}
-                style={{ ...buttonBase, padding: '10px 13px', background: 'rgba(239,68,68,.12)', borderColor: 'rgba(239,68,68,.24)', color: '#ffb2b2' }}
-              >
-                <Trash2 size={15} />
-                Excluir Guia
-              </button>
-            </div>
-          </div>
 
           {!Object.keys(groupedTopics).length ? (
             <div style={{ padding: '56px 18px', textAlign: 'center', display: 'grid', gap: 10, placeItems: 'center' }}>
@@ -1257,23 +1287,22 @@ export default function EditalVerticalizadoPage() {
                           <div style={{ display: 'grid' }}>
                             {groups.map((group, groupIndex) => (
                               <div key={group.key} style={{ display: 'grid' }}>
-                                {/* Theme header row */}
-                                <div style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 12,
-                                  padding: '12px 20px',
-                                  background: 'rgba(255,255,255,0.02)',
-                                  borderBottom: '1px solid rgba(255,255,255,0.04)',
-                                }}>
-                                  <div style={{ fontSize: 11, fontWeight: 900, color: '#9b91ff', textTransform: 'uppercase', letterSpacing: 1.5, flex: 1 }}>
-                                    TEMA {groupIndex + 1}: {group.tema}
+                                {/* Theme row - now formatted like subthemes */}
+                                <div className="ev-theme-row">
+                                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                                    {groupIndex + 1}
+                                  </div>
+                                  <div style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: 1 }}>
+                                    {group.tema}
+                                  </div>
+                                  <div style={{ display: 'grid', placeItems: 'center', gridColumn: 'span 4' }}>
+                                    <div style={{ width: '100%', height: 1, background: 'var(--border)', opacity: 0.5 }} />
                                   </div>
                                   <div className="ev-action-btns">
                                     <button
                                       className="ev-icon-btn"
                                       onClick={() => openEditGroup(group)}
-                                      style={{ color: '#f59e0b', background: 'rgba(245,158,11,0.1)', width: 28, height: 28 }}
+                                      style={{ color: 'var(--amber)', background: 'var(--surface2)', width: 28, height: 28 }}
                                     >
                                       <PencilLine size={13} />
                                     </button>
@@ -1283,17 +1312,17 @@ export default function EditalVerticalizadoPage() {
                                 {/* Subthemes rows */}
                                 {group.topics.map((topic, topicIndex) => (
                                   <div key={topic.id} className="ev-topic-row">
-                                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)' }}>
-                                      {topicIndex + 1}
+                                    <div style={{ fontSize: 11, color: 'var(--muted)', opacity: 0.7 }}>
+                                      {groupIndex + 1}.{topicIndex + 1}
                                     </div>
-                                    <div style={{ fontSize: 13, color: 'rgba(232,234,246,0.9)' }}>
+                                    <div style={{ fontSize: 13, fontStyle: 'italic', color: 'var(--text)' }}>
                                       {topic.subtema}
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'center' }}>
                                       <button
                                         className="ev-status-check"
                                         onClick={() => toggleTopic(topic, 'estudo')}
-                                        style={{ background: topic.estudo ? '#7c6cff' : undefined, borderColor: topic.estudo ? '#7c6cff' : undefined }}
+                                        style={{ background: topic.estudo ? 'var(--accent)' : undefined, borderColor: topic.estudo ? 'var(--accent)' : undefined }}
                                       >
                                         {topic.estudo && <Check size={14} color="#fff" />}
                                       </button>
@@ -1302,7 +1331,7 @@ export default function EditalVerticalizadoPage() {
                                       <button
                                         className="ev-status-check"
                                         onClick={() => toggleTopic(topic, 'resumo')}
-                                        style={{ background: topic.resumo ? '#3b82f6' : undefined, borderColor: topic.resumo ? '#3b82f6' : undefined }}
+                                        style={{ background: topic.resumo ? 'var(--accent2)' : undefined, borderColor: topic.resumo ? 'var(--accent2)' : undefined }}
                                       >
                                         {topic.resumo && <Check size={14} color="#fff" />}
                                       </button>
@@ -1312,7 +1341,7 @@ export default function EditalVerticalizadoPage() {
                                         <button
                                           className="ev-rev-btn"
                                           onClick={() => toggleTopic(topic, 'revisao_1')}
-                                          style={{ background: topic.revisao_1 ? '#f59e0b' : undefined, color: topic.revisao_1 ? '#fff' : undefined }}
+                                          style={{ background: topic.revisao_1 ? 'var(--amber)' : undefined, color: topic.revisao_1 ? '#fff' : undefined }}
                                         >1º</button>
                                         <button
                                           className="ev-rev-btn"
@@ -1322,7 +1351,7 @@ export default function EditalVerticalizadoPage() {
                                         <button
                                           className="ev-rev-btn"
                                           onClick={() => toggleTopic(topic, 'revisao_3')}
-                                          style={{ background: topic.revisao_3 ? '#22c55e' : undefined, color: topic.revisao_3 ? '#fff' : undefined }}
+                                          style={{ background: topic.revisao_3 ? 'var(--green)' : undefined, color: topic.revisao_3 ? '#fff' : undefined }}
                                         >3º</button>
                                       </div>
                                     </div>
@@ -1330,7 +1359,7 @@ export default function EditalVerticalizadoPage() {
                                       <button
                                         className="ev-status-check"
                                         onClick={() => toggleTopic(topic, 'concluido')}
-                                        style={{ background: topic.concluido ? '#16a34a' : undefined, borderColor: topic.concluido ? '#16a34a' : undefined }}
+                                        style={{ background: topic.concluido ? 'var(--green)' : undefined, borderColor: topic.concluido ? 'var(--green)' : undefined }}
                                       >
                                         {topic.concluido && <Check size={14} color="#fff" />}
                                       </button>
@@ -1339,7 +1368,7 @@ export default function EditalVerticalizadoPage() {
                                       <button
                                         className="ev-icon-btn"
                                         onClick={() => deleteTopic(topic.id)}
-                                        style={{ color: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.05)' }}
+                                        style={{ color: 'var(--muted)', background: 'var(--surface2)', opacity: 0.5 }}
                                       >
                                         <Trash2 size={14} />
                                       </button>
@@ -1512,7 +1541,7 @@ export default function EditalVerticalizadoPage() {
 
 function StatCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.05)', borderRadius: 14, padding: '10px 12px', textAlign: 'center' }}>
+    <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 14, padding: '10px 12px', textAlign: 'center' }}>
       <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: 1.4, color: 'var(--muted,#6b7194)', marginBottom: 8 }}>
         {label}
       </div>
@@ -1544,7 +1573,7 @@ function Badge({ color, label }: { color: string; label: string }) {
 
 function MetaPill({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ padding: '9px 12px', borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)', maxWidth: 280 }}>
+    <div style={{ padding: '9px 12px', borderRadius: 12, background: 'var(--surface2)', border: '1px solid var(--border)', maxWidth: 280 }}>
       <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: 'var(--muted,#6b7194)', marginBottom: 4 }}>
         {label}
       </div>
