@@ -188,7 +188,7 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
           <button
             onClick={() => setIsSidebarOpen(true)}
             style={{
-              position: 'absolute', top: '15px', left: '15px', zSelf: 10,
+              position: 'absolute', top: '15px', left: '15px', zIndex: 10,
               width: '32px', height: '32px', borderRadius: '8px', border: '1px solid var(--border)',
               background: 'var(--surface)', color: 'var(--accent)', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
