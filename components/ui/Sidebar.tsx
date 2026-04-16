@@ -15,6 +15,7 @@ const navItems = [
     section: 'Principal',
     items: [
       { href: '/dashboard', label: 'Dashboard', icon: IconGrid },
+      { href: '/dashboard/aluno', label: 'Area do Aluno', icon: IconUser },
       { href: '/dashboard/busca', label: 'Busca + IA', icon: IconSearch },
       { href: '/dashboard/resumos', label: 'Resumos', icon: IconBook },
       { href: '/dashboard/flashcards', label: 'Estudo Ativo', icon: IconCards },
@@ -307,4 +308,7 @@ function IconClock({ active }: { active: boolean }) {
 }
 function IconLayers({ active }: { active: boolean }) {
   return <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: active ? 1 : 0.7, flexShrink: 0 }}><path d="M8 2l6 3-6 3-6-3 6-3z" /><path d="M2 8l6 3 6-3" /><path d="M2 11l6 3 6-3" /></svg>
+}
+function IconUser({ active }: { active: boolean }) {
+  return <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: active ? 1 : 0.7, flexShrink: 0 }}><circle cx="8" cy="5" r="2.5" /><path d="M3 13c.8-2 2.6-3 5-3s4.2 1 5 3" /></svg>
 }
