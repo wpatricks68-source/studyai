@@ -49,12 +49,19 @@ create table if not exists public.edital_topics (
   subtema text not null,
   estudo boolean not null default false,
   resumo boolean not null default false,
-  revisao boolean not null default false,
+  revisao_1 boolean not null default false,
+  revisao_2 boolean not null default false,
+  revisao_3 boolean not null default false,
   concluido boolean not null default false,
   order_index integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.edital_topics
+  add column if not exists revisao_1 boolean not null default false,
+  add column if not exists revisao_2 boolean not null default false,
+  add column if not exists revisao_3 boolean not null default false;
 
 create index if not exists edital_topics_board_order_idx
   on public.edital_topics (board_id, disciplina, order_index, created_at);

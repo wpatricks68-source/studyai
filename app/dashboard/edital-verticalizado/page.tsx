@@ -22,7 +22,14 @@ type StatusFilter = 'all' | 'pending' | 'in-progress' | 'done'
 type ManualForm = {
   disciplina: string
   tema: string
-  subtema: string
+  subtemas: string
+}
+
+type ThemeGroup = {
+  key: string
+  disciplina: string
+  tema: string
+  topics: EditalTopic[]
 }
 
 type ParsedResponse = {
@@ -76,7 +83,7 @@ const labelStyle: React.CSSProperties = {
 const emptyForm: ManualForm = {
   disciplina: '',
   tema: '',
-  subtema: '',
+  subtemas: '',
 }
 
 function formatDateTime(value: string | null) {
@@ -95,6 +102,58 @@ function toggleLabel(value: boolean, activeLabel: string, inactiveLabel: string)
   return value ? activeLabel : inactiveLabel
 }
 
+function normalizeKey(value: string) {
+  return value.trim().toLowerCase()
+}
+
+function parseSubtemaLines(value: string) {
+  return value
+    .split('\n')
+    .map(line => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+}
+
+function buildThemeGroups(topics: EditalTopic[]) {
+  const groups = new Map<string, ThemeGroup>()
+
+  for (const topic of topics) {
+    const key = `${normalizeKey(topic.disciplina)}|||${normalizeKey(topic.tema)}`
+    const existing = groups.get(key)
+
+    if (existing) {
+      existing.topics.push(topic)
+      continue
+    }
+
+    groups.set(key, {
+      key,
+      disciplina: topic.disciplina,
+      tema: topic.tema,
+      topics: [topic],
+    })
+  }
+
+  return Array.from(groups.values())
+    .map(group => ({
+      ...group,
+      topics: [...group.topics].sort((a, b) => {
+        const orderDiff = (a.order_index ?? 0) - (b.order_index ?? 0)
+        if (orderDiff !== 0) return orderDiff
+        return a.created_at.localeCompare(b.created_at)
+      }),
+    }))
+    .sort((a, b) => {
+      const disciplinaDiff = a.disciplina.localeCompare(b.disciplina)
+      if (disciplinaDiff !== 0) return disciplinaDiff
+
+      const orderA = Math.min(...a.topics.map(topic => topic.order_index ?? 0))
+      const orderB = Math.min(...b.topics.map(topic => topic.order_index ?? 0))
+      if (orderA !== orderB) return orderA - orderB
+
+      return a.tema.localeCompare(b.tema)
+    })
+}
+
 export default function EditalVerticalizadoPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [boards, setBoards] = useState<EditalBoard[]>([])
@@ -108,7 +167,9 @@ export default function EditalVerticalizadoPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [dbError, setDbError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const [manualOpen, setManualOpen] = useState(false)
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [editorMode, setEditorMode] = useState<'create' | 'edit'>('create')
+  const [editingGroupKey, setEditingGroupKey] = useState<string | null>(null)
   const [manualForm, setManualForm] = useState<ManualForm>(emptyForm)
   const [savingManual, setSavingManual] = useState(false)
   const [expandedDisciplines, setExpandedDisciplines] = useState<Record<string, boolean>>({})
@@ -347,7 +408,7 @@ export default function EditalVerticalizadoPage() {
     }))
   }
 
-  async function toggleTopic(topic: EditalTopic, field: 'estudo' | 'resumo' | 'revisao' | 'concluido') {
+  async function toggleTopic(topic: EditalTopic, field: 'estudo' | 'resumo' | 'revisao_1' | 'revisao_2' | 'revisao_3' | 'concluido') {
     const supabase = createClient()
     const nextValue = !topic[field]
 
@@ -378,48 +439,189 @@ export default function EditalVerticalizadoPage() {
     }))
   }
 
+  function openCreateEditor(prefill?: Partial<ManualForm>) {
+    setEditorMode('create')
+    setEditingGroupKey(null)
+    setManualForm({
+      disciplina: prefill?.disciplina ?? '',
+      tema: prefill?.tema ?? '',
+      subtemas: prefill?.subtemas ?? '',
+    })
+    setEditorOpen(true)
+  }
+
+  function openEditGroup(group: ThemeGroup) {
+    setEditorMode('edit')
+    setEditingGroupKey(group.key)
+    setManualForm({
+      disciplina: group.disciplina,
+      tema: group.tema,
+      subtemas: group.topics.map(topic => topic.subtema).join('\n'),
+    })
+    setEditorOpen(true)
+  }
+
+  function closeEditor() {
+    setEditorOpen(false)
+    setEditorMode('create')
+    setEditingGroupKey(null)
+    setManualForm(emptyForm)
+  }
+
   async function handleManualSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
     if (!activeBoard || !userId) return
-    if (!manualForm.disciplina.trim() || !manualForm.tema.trim() || !manualForm.subtema.trim()) {
-      setNotice('Preencha disciplina, tema e subtema para adicionar manualmente.')
+    const disciplina = manualForm.disciplina.trim()
+    const tema = manualForm.tema.trim()
+    const subtemas = parseSubtemaLines(manualForm.subtemas)
+
+    if (!disciplina || !tema || !subtemas.length) {
+      setNotice('Preencha disciplina, tema e pelo menos um subtema.')
       return
     }
 
     setSavingManual(true)
     const supabase = createClient()
-    const nextOrder = activeTopics.length
+    const boardTopics = topicsByBoard[activeBoard.id] ?? []
 
-    const { data, error } = await supabase
-      .from('edital_topics')
-      .insert({
+    if (editorMode === 'create') {
+      const baseOrder = boardTopics.length
+      const payload = subtemas.map((subtema, index) => ({
         board_id: activeBoard.id,
         user_id: userId,
-        disciplina: manualForm.disciplina.trim(),
-        tema: manualForm.tema.trim(),
-        subtema: manualForm.subtema.trim(),
-        order_index: nextOrder,
-      })
-      .select('*')
-      .single()
+        disciplina,
+        tema,
+        subtema,
+        order_index: baseOrder + index,
+      }))
 
-    setSavingManual(false)
+      const { data, error } = await supabase
+        .from('edital_topics')
+        .insert(payload)
+        .select('*')
 
-    if (error) {
-      setDbError(error.message)
+      setSavingManual(false)
+
+      if (error) {
+        setDbError(error.message)
+        return
+      }
+
+      const savedTopics = (data ?? []) as EditalTopic[]
+      setTopicsByBoard(prev => ({
+        ...prev,
+        [activeBoard.id]: [...(prev[activeBoard.id] ?? []), ...savedTopics],
+      }))
+      setExpandedDisciplines(prev => ({ ...prev, [disciplina]: true }))
+      closeEditor()
+      setNotice(
+        savedTopics.length > 1
+          ? `${savedTopics.length} subtemas adicionados ao tema "${tema}".`
+          : 'Item adicionado manualmente.'
+      )
       return
     }
 
-    const saved = data as EditalTopic
-    setTopicsByBoard(prev => ({
-      ...prev,
-      [activeBoard.id]: [...(prev[activeBoard.id] ?? []), saved],
-    }))
-    setExpandedDisciplines(prev => ({ ...prev, [saved.disciplina]: true }))
-    setManualForm(emptyForm)
-    setManualOpen(false)
-    setNotice('Item adicionado manualmente.')
+    const groupToEdit = buildThemeGroups(boardTopics).find(group => group.key === editingGroupKey)
+
+    if (!groupToEdit) {
+      setSavingManual(false)
+      setDbError('Nao foi possivel localizar o tema para edicao.')
+      return
+    }
+
+    const existingTopics = [...groupToEdit.topics]
+    const minOrder = Math.min(...existingTopics.map(topic => topic.order_index ?? 0))
+    const statusBySubtema = new Map(
+      existingTopics.map(topic => [
+        normalizeKey(topic.subtema),
+        {
+          estudo: topic.estudo,
+          resumo: topic.resumo,
+          revisao_1: topic.revisao_1,
+          revisao_2: topic.revisao_2,
+          revisao_3: topic.revisao_3,
+          concluido: topic.concluido,
+        },
+      ])
+    )
+
+    const topicsToUpdate = existingTopics.slice(0, subtemas.length)
+    const topicsToDelete = existingTopics.slice(subtemas.length)
+    const extraSubtemas = subtemas.slice(existingTopics.length)
+
+    for (let index = 0; index < topicsToUpdate.length; index += 1) {
+      const current = topicsToUpdate[index]
+      const nextSubtema = subtemas[index]
+      const preserved = statusBySubtema.get(normalizeKey(nextSubtema))
+
+      const { error } = await supabase
+        .from('edital_topics')
+        .update({
+          disciplina,
+          tema,
+          subtema: nextSubtema,
+          order_index: minOrder + index,
+          ...(preserved ?? {}),
+        })
+        .eq('id', current.id)
+
+      if (error) {
+        setSavingManual(false)
+        setDbError(error.message)
+        return
+      }
+    }
+
+    if (topicsToDelete.length) {
+      const { error } = await supabase
+        .from('edital_topics')
+        .delete()
+        .in('id', topicsToDelete.map(topic => topic.id))
+
+      if (error) {
+        setSavingManual(false)
+        setDbError(error.message)
+        return
+      }
+    }
+
+    if (extraSubtemas.length) {
+      const payload = extraSubtemas.map((subtema, index) => {
+        const preserved = statusBySubtema.get(normalizeKey(subtema))
+
+        return {
+          board_id: activeBoard.id,
+          user_id: userId,
+          disciplina,
+          tema,
+          subtema,
+          order_index: minOrder + topicsToUpdate.length + index,
+          estudo: preserved?.estudo ?? false,
+          resumo: preserved?.resumo ?? false,
+          revisao_1: preserved?.revisao_1 ?? false,
+          revisao_2: preserved?.revisao_2 ?? false,
+          revisao_3: preserved?.revisao_3 ?? false,
+          concluido: preserved?.concluido ?? false,
+        }
+      })
+
+      const { error } = await supabase
+        .from('edital_topics')
+        .insert(payload)
+
+      if (error) {
+        setSavingManual(false)
+        setDbError(error.message)
+        return
+      }
+    }
+
+    setSavingManual(false)
+    closeEditor()
+    setNotice(`Tema "${tema}" atualizado.`)
+    await loadBoards()
   }
 
   async function handleUploadChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -533,7 +735,7 @@ export default function EditalVerticalizadoPage() {
       !search.trim() ||
       `${topic.disciplina} ${topic.tema} ${topic.subtema}`.toLowerCase().includes(search.toLowerCase())
 
-    const isInProgress = topic.estudo || topic.resumo || topic.revisao
+    const isInProgress = topic.estudo || topic.resumo || topic.revisao_1 || topic.revisao_2 || topic.revisao_3
     const matchesStatus =
       statusFilter === 'all' ||
       (statusFilter === 'pending' && !isInProgress && !topic.concluido) ||
@@ -543,14 +745,16 @@ export default function EditalVerticalizadoPage() {
     return matchesSearch && matchesStatus
   })
 
-  const groupedTopics = filteredTopics.reduce<Record<string, EditalTopic[]>>((acc, topic) => {
-    acc[topic.disciplina] = [...(acc[topic.disciplina] ?? []), topic]
+  const filteredThemeGroups = buildThemeGroups(filteredTopics)
+  const groupedTopics = filteredThemeGroups.reduce<Record<string, ThemeGroup[]>>((acc, group) => {
+    acc[group.disciplina] = [...(acc[group.disciplina] ?? []), group]
     return acc
   }, {})
 
-  const disciplinas = Array.from(new Set(activeTopics.map(topic => topic.disciplina)))
-  const totalTemas = activeTopics.length
-  const totalConcluidos = activeTopics.filter(topic => topic.concluido).length
+  const summaryGroups = buildThemeGroups(activeTopics)
+  const disciplinas = Array.from(new Set(summaryGroups.map(group => group.disciplina)))
+  const totalTemas = summaryGroups.length
+  const totalConcluidos = summaryGroups.filter(group => group.topics.every(topic => topic.concluido)).length
   const progresso = totalTemas ? Math.round((totalConcluidos / totalTemas) * 100) : 0
 
   function expandAll() {
@@ -652,7 +856,7 @@ export default function EditalVerticalizadoPage() {
             <button
               className="ev-btn"
               type="button"
-              onClick={() => setManualOpen(true)}
+              onClick={() => openCreateEditor()}
               disabled={missingTables}
               style={{
                 ...buttonBase,
@@ -767,8 +971,8 @@ export default function EditalVerticalizadoPage() {
           </div>
         </section>
 
-        <section style={{ ...box, padding: '12px 14px', overflow: 'hidden' }}>
-          <div className="ev-tab" style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 }}>
+        <section style={{ ...box, padding: '12px 14px', overflowX: 'auto', overflowY: 'visible' }}>
+          <div className="ev-tab" style={{ display: 'flex', gap: 10, overflowX: 'auto', minWidth: 'max-content', paddingBottom: 4 }}>
             {boards.map(board => {
               const count = topicsByBoard[board.id]?.length ?? 0
               const active = board.id === activeBoardId
@@ -785,6 +989,7 @@ export default function EditalVerticalizadoPage() {
                     borderColor: active ? 'rgba(108,99,255,.32)' : 'rgba(255,255,255,.06)',
                     color: active ? '#e9e7ff' : 'var(--muted,#6b7194)',
                     whiteSpace: 'nowrap',
+                    flex: '0 0 auto',
                   }}
                 >
                   <FileText size={14} />
@@ -911,188 +1116,77 @@ export default function EditalVerticalizadoPage() {
             </div>
           </div>
 
-          <div className="ev-table-wrap">
-            <div className="ev-desktop-table">
-              <div style={{ display: 'grid', gridTemplateColumns: '52px minmax(0,1.3fr) minmax(0,1.3fr) repeat(4,94px) 58px', gap: 0, padding: '0 14px', background: 'rgba(255,255,255,.03)', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
-                {['#', 'Tema', 'Subtema', 'Estudo', 'Resumo', 'Revisao', 'Concluido', 'Acoes'].map((label, index) => (
-                  <div
-                    key={label}
-                    style={{
-                      padding: '12px 8px',
-                      fontSize: 10,
-                      textTransform: 'uppercase',
-                      letterSpacing: 1.4,
-                      color: 'var(--muted,#6b7194)',
-                      textAlign: index >= 3 ? 'center' : 'left',
-                    }}
-                  >
-                    {label}
-                  </div>
-                ))}
+          {!Object.keys(groupedTopics).length ? (
+            <div style={{ padding: '56px 18px', textAlign: 'center', display: 'grid', gap: 10, placeItems: 'center' }}>
+              <div style={{ width: 66, height: 66, borderRadius: 20, background: 'rgba(108,99,255,.12)', display: 'grid', placeItems: 'center', color: '#d8d4ff' }}>
+                <FileText size={28} />
               </div>
-
-              {!Object.keys(groupedTopics).length ? (
-                <div style={{ padding: '56px 18px', textAlign: 'center', display: 'grid', gap: 10, placeItems: 'center' }}>
-                  <div style={{ width: 66, height: 66, borderRadius: 20, background: 'rgba(108,99,255,.12)', display: 'grid', placeItems: 'center', color: '#d8d4ff' }}>
-                    <FileText size={28} />
-                  </div>
-                  <div style={{ fontSize: 22, fontWeight: 800 }}>Nenhum edital carregado</div>
-                  <div style={{ maxWidth: 520, fontSize: 14, color: 'var(--muted,#6b7194)', lineHeight: 1.6 }}>
-                    Envie um arquivo para a IA organizar o conteudo programatico automaticamente ou adicione itens manualmente.
-                  </div>
-                </div>
-              ) : (
-                Object.entries(groupedTopics).map(([disciplina, items]) => {
-                  const isOpen = expandedDisciplines[disciplina] ?? true
-                  const doneCount = items.filter(item => item.concluido).length
-
-                  return (
-                    <div key={disciplina} style={{ borderTop: '1px solid rgba(255,255,255,.05)' }}>
-                      <button
-                        type="button"
-                        onClick={() => setExpandedDisciplines(prev => ({ ...prev, [disciplina]: !isOpen }))}
-                        style={{
-                          width: '100%',
-                          border: 'none',
-                          background: 'rgba(255,255,255,.02)',
-                          color: 'var(--text,#e8eaf6)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 12,
-                          padding: '13px 16px',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                          <div style={{ textAlign: 'left' }}>
-                            <div style={{ fontSize: 15, fontWeight: 700 }}>{disciplina}</div>
-                            <div style={{ fontSize: 12, color: 'var(--muted,#6b7194)' }}>{items.length} item(ns) nesta disciplina</div>
-                          </div>
-                        </div>
-                        <div style={{ padding: '4px 10px', borderRadius: 999, background: 'rgba(108,99,255,.12)', color: '#d9d5ff', fontSize: 12 }}>
-                          {doneCount}/{items.length} concluidos
-                        </div>
-                      </button>
-
-                      {isOpen
-                        ? items.map((topic, index) => (
-                            <div key={topic.id} style={{ display: 'grid', gridTemplateColumns: '52px minmax(0,1.3fr) minmax(0,1.3fr) repeat(4,94px) 58px', gap: 0, padding: '0 14px', borderTop: '1px solid rgba(255,255,255,.04)' }}>
-                              <Cell align="center">{String(index + 1).padStart(2, '0')}</Cell>
-                              <Cell>
-                                <div style={{ fontWeight: 700 }}>{topic.tema}</div>
-                              </Cell>
-                              <Cell muted>{topic.subtema}</Cell>
-                              <Cell align="center">
-                                <StatusToggle active={topic.estudo} label={toggleLabel(topic.estudo, 'Sim', 'Nao')} onClick={() => void toggleTopic(topic, 'estudo')} />
-                              </Cell>
-                              <Cell align="center">
-                                <StatusToggle active={topic.resumo} label={toggleLabel(topic.resumo, 'Sim', 'Nao')} onClick={() => void toggleTopic(topic, 'resumo')} />
-                              </Cell>
-                              <Cell align="center">
-                                <StatusToggle active={topic.revisao} label={toggleLabel(topic.revisao, 'Sim', 'Nao')} onClick={() => void toggleTopic(topic, 'revisao')} />
-                              </Cell>
-                              <Cell align="center">
-                                <StatusToggle active={topic.concluido} label={toggleLabel(topic.concluido, 'Ok', 'Pendente')} onClick={() => void toggleTopic(topic, 'concluido')} tone={topic.concluido ? '#1fc16b' : '#ffb224'} />
-                              </Cell>
-                              <Cell align="center">
-                                <button
-                                  className="ev-btn"
-                                  type="button"
-                                  onClick={() => void deleteTopic(topic.id)}
-                                  style={{
-                                    ...buttonBase,
-                                    width: 34,
-                                    height: 34,
-                                    padding: 0,
-                                    background: 'rgba(239,68,68,.1)',
-                                    color: '#ff9a9a',
-                                    borderColor: 'rgba(239,68,68,.2)',
-                                  }}
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              </Cell>
-                            </div>
-                          ))
-                        : null}
-                    </div>
-                  )
-                })
-              )}
+              <div style={{ fontSize: 22, fontWeight: 800 }}>Nenhum edital carregado</div>
+              <div style={{ maxWidth: 520, fontSize: 14, color: 'var(--muted,#6b7194)', lineHeight: 1.6 }}>
+                Envie um arquivo para a IA organizar o conteudo programatico automaticamente ou adicione itens manualmente.
+              </div>
             </div>
+          ) : (
+            <div style={{ display: 'grid', gap: 14 }}>
+              {Object.entries(groupedTopics).map(([disciplina, groups]) => {
+                const isOpen = expandedDisciplines[disciplina] ?? true
+                const doneCount = groups.filter(group => group.topics.every(topic => topic.concluido)).length
 
-            <div className="ev-mobile-cards" style={{ padding: '14px' }}>
-              {!Object.keys(groupedTopics).length ? (
-                <div style={{ padding: '26px 8px', textAlign: 'center', display: 'grid', gap: 10, placeItems: 'center' }}>
-                  <div style={{ width: 58, height: 58, borderRadius: 18, background: 'rgba(108,99,255,.12)', display: 'grid', placeItems: 'center', color: '#d8d4ff' }}>
-                    <FileText size={24} />
-                  </div>
-                  <div style={{ fontSize: 18, fontWeight: 800 }}>Nenhum edital carregado</div>
-                  <div style={{ fontSize: 13, color: 'var(--muted,#6b7194)', lineHeight: 1.6 }}>
-                    Envie um arquivo para a IA organizar o conteudo programatico automaticamente ou adicione itens manualmente.
-                  </div>
-                </div>
-              ) : (
-                Object.entries(groupedTopics).map(([disciplina, items]) => {
-                  const isOpen = expandedDisciplines[disciplina] ?? true
-                  const doneCount = items.filter(item => item.concluido).length
-
-                  return (
-                    <div key={`mobile-${disciplina}`} style={{ display: 'grid', gap: 10 }}>
-                      <button
-                        type="button"
-                        onClick={() => setExpandedDisciplines(prev => ({ ...prev, [disciplina]: !isOpen }))}
-                        style={{
-                          width: '100%',
-                          border: '1px solid rgba(255,255,255,.06)',
-                          borderRadius: 16,
-                          background: 'rgba(255,255,255,.02)',
-                          color: 'var(--text,#e8eaf6)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 12,
-                          padding: '13px 14px',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                          <div style={{ textAlign: 'left' }}>
-                            <div style={{ fontSize: 14, fontWeight: 800 }}>{disciplina}</div>
-                            <div style={{ fontSize: 12, color: 'var(--muted,#6b7194)' }}>{items.length} item(ns)</div>
-                          </div>
+                return (
+                  <div key={disciplina} style={{ border: '1px solid rgba(255,255,255,.06)', borderRadius: 18, overflow: 'hidden' }}>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedDisciplines(prev => ({ ...prev, [disciplina]: !isOpen }))}
+                      style={{
+                        width: '100%',
+                        border: 'none',
+                        background: 'rgba(255,255,255,.02)',
+                        color: 'var(--text,#e8eaf6)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                        padding: '14px 16px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                        <div style={{ textAlign: 'left' }}>
+                          <div style={{ fontSize: 15, fontWeight: 800 }}>{disciplina}</div>
+                          <div style={{ fontSize: 12, color: 'var(--muted,#6b7194)' }}>{groups.length} tema(s) nesta disciplina</div>
                         </div>
-                        <div style={{ padding: '4px 9px', borderRadius: 999, background: 'rgba(108,99,255,.12)', color: '#d9d5ff', fontSize: 12 }}>
-                          {doneCount}/{items.length}
-                        </div>
-                      </button>
+                      </div>
+                      <div style={{ padding: '4px 10px', borderRadius: 999, background: 'rgba(34,197,94,.14)', color: '#8af0b3', fontSize: 12 }}>
+                        {doneCount}/{groups.length} concluidos
+                      </div>
+                    </button>
 
-                      {isOpen
-                        ? items.map((topic, index) => (
-                            <TopicMobileCard
-                              key={`mobile-topic-${topic.id}`}
-                              index={index}
-                              topic={topic}
-                              onDelete={() => void deleteTopic(topic.id)}
-                              onToggle={field => void toggleTopic(topic, field)}
-                            />
-                          ))
-                        : null}
-                    </div>
-                  )
-                })
-              )}
+                    {isOpen ? (
+                      <div style={{ display: 'grid', gap: 12, padding: 14 }}>
+                        {groups.map(group => (
+                          <ThemeGroupPanel
+                            key={group.key}
+                            disciplina={disciplina}
+                            group={group}
+                            onEdit={() => openEditGroup(group)}
+                            onDeleteTopic={topicId => void deleteTopic(topicId)}
+                            onToggle={(topic, field) => void toggleTopic(topic, field)}
+                          />
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                )
+              })}
             </div>
-          </div>
+          )}
         </section>
       </div>
 
-      {manualOpen ? (
+      {editorOpen ? (
         <div
-          onClick={() => setManualOpen(false)}
+          onClick={closeEditor}
           style={{
             position: 'fixed',
             inset: 0,
@@ -1111,20 +1205,24 @@ export default function EditalVerticalizadoPage() {
               padding: 22,
               borderColor: 'rgba(108,99,255,.2)',
               boxShadow: '0 24px 80px rgba(0,0,0,.45)',
+              maxHeight: 'min(88vh, 760px)',
+              overflowY: 'auto',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 18 }}>
               <div>
-                <div style={{ fontSize: 24, fontWeight: 800 }}>Adicionar item manual</div>
+                <div style={{ fontSize: 24, fontWeight: 800 }}>
+                  {editorMode === 'edit' ? 'Editar tema' : 'Adicionar itens manualmente'}
+                </div>
                 <div style={{ marginTop: 6, color: 'var(--muted,#6b7194)', fontSize: 14 }}>
-                  Use esta opcao para complementar o edital com itens que a IA nao capturou.
+                  Defina a disciplina, o tema e liste um subtema por linha para manter o conteudo verticalizado.
                 </div>
               </div>
 
               <button
                 className="ev-btn"
                 type="button"
-                onClick={() => setManualOpen(false)}
+                onClick={closeEditor}
                 style={{ ...buttonBase, width: 36, height: 36, background: 'rgba(255,255,255,.04)', color: 'var(--text,#e8eaf6)' }}
               >
                 <X size={16} />
@@ -1155,21 +1253,24 @@ export default function EditalVerticalizadoPage() {
               </div>
 
               <div>
-                <label style={labelStyle}>Subtema</label>
+                <label style={labelStyle}>Subtemas</label>
                 <textarea
                   className="ev-textarea"
-                  value={manualForm.subtema}
-                  onChange={event => setManualForm(prev => ({ ...prev, subtema: event.target.value }))}
-                  style={{ ...inputBase, minHeight: 110, resize: 'vertical' }}
-                  placeholder="Ex.: ADI, ADC, ADO e ADPF"
+                  value={manualForm.subtemas}
+                  onChange={event => setManualForm(prev => ({ ...prev, subtemas: event.target.value }))}
+                  style={{ ...inputBase, minHeight: 150, resize: 'vertical' }}
+                  placeholder={`Ex.: ADI\nADC\nADO\nADPF`}
                 />
+                <div style={{ marginTop: 8, fontSize: 12, color: 'var(--muted,#6b7194)', lineHeight: 1.5 }}>
+                  Cada linha vira um subtema separado dentro do mesmo tema.
+                </div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 6 }}>
                 <button
                   className="ev-btn"
                   type="button"
-                  onClick={() => setManualOpen(false)}
+                  onClick={closeEditor}
                   style={{ ...buttonBase, padding: '11px 16px', background: 'transparent', color: 'var(--text,#e8eaf6)' }}
                 >
                   Cancelar
@@ -1187,7 +1288,7 @@ export default function EditalVerticalizadoPage() {
                   }}
                 >
                   {savingManual ? <Loader2 size={16} className="spin" /> : <Plus size={16} />}
-                  Salvar item
+                  {editorMode === 'edit' ? 'Salvar alteracoes' : 'Salvar itens'}
                 </button>
               </div>
             </form>
@@ -1200,11 +1301,11 @@ export default function EditalVerticalizadoPage() {
 
 function StatCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.05)', borderRadius: 16, padding: '14px 16px' }}>
-      <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.4, color: 'var(--muted,#6b7194)', marginBottom: 10 }}>
+    <div style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.05)', borderRadius: 14, padding: '10px 12px', textAlign: 'center' }}>
+      <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: 1.4, color: 'var(--muted,#6b7194)', marginBottom: 8 }}>
         {label}
       </div>
-      <div style={{ fontSize: 30, fontWeight: 800, color }}>{value}</div>
+      <div style={{ fontSize: 24, lineHeight: 1, fontWeight: 800, color, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 30 }}>{value}</div>
     </div>
   )
 }
@@ -1237,32 +1338,6 @@ function MetaPill({ label, value }: { label: string; value: string }) {
         {label}
       </div>
       <div style={{ fontSize: 12, color: 'var(--text,#e8eaf6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
-    </div>
-  )
-}
-
-function Cell({
-  children,
-  align = 'left',
-  muted = false,
-}: {
-  children: React.ReactNode
-  align?: 'left' | 'center'
-  muted?: boolean
-}) {
-  return (
-    <div
-      style={{
-        padding: '12px 8px',
-        fontSize: 13,
-        color: muted ? 'var(--muted,#6b7194)' : 'var(--text,#e8eaf6)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: align === 'center' ? 'center' : 'flex-start',
-        minHeight: 54,
-      }}
-    >
-      {children}
     </div>
   )
 }
@@ -1301,7 +1376,96 @@ function StatusToggle({
   )
 }
 
-function TopicMobileCard({
+function ThemeGroupPanel({
+  disciplina,
+  group,
+  onEdit,
+  onDeleteTopic,
+  onToggle,
+}: {
+  disciplina: string
+  group: ThemeGroup
+  onEdit: () => void
+  onDeleteTopic: (topicId: string) => void
+  onToggle: (
+    topic: EditalTopic,
+    field: 'estudo' | 'resumo' | 'revisao_1' | 'revisao_2' | 'revisao_3' | 'concluido'
+  ) => void
+}) {
+  const doneCount = group.topics.filter(topic => topic.concluido).length
+
+  return (
+    <div
+      style={{
+        background: 'rgba(255,255,255,.025)',
+        border: '1px solid rgba(255,255,255,.06)',
+        borderRadius: 16,
+        padding: 14,
+        display: 'grid',
+        gap: 12,
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div style={{ display: 'grid', gap: 6, minWidth: 0 }}>
+          <div style={{ fontSize: 10, color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: 1.2 }}>
+            Tema
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text,#e8eaf6)' }}>{group.tema}</div>
+          <div style={{ fontSize: 12, color: 'var(--muted,#6b7194)' }}>
+            {disciplina} | {group.topics.length} subtema(s) | {doneCount}/{group.topics.length} concluidos
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            className="ev-btn"
+            type="button"
+            onClick={onEdit}
+            style={{
+              ...buttonBase,
+              padding: '9px 12px',
+              background: 'rgba(79,140,255,.12)',
+              color: '#a6c4ff',
+              borderColor: 'rgba(79,140,255,.22)',
+            }}
+          >
+            <PencilLine size={14} />
+            Editar
+          </button>
+          <button
+            className="ev-btn"
+            type="button"
+            onClick={onEdit}
+            style={{
+              ...buttonBase,
+              padding: '9px 12px',
+              background: 'rgba(34,197,94,.12)',
+              color: '#8af0b3',
+              borderColor: 'rgba(34,197,94,.22)',
+            }}
+          >
+            <Plus size={14} />
+            Subtemas
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gap: 10 }}>
+        {group.topics.map((topic, index) => (
+          <SubtopicLine
+            key={topic.id}
+            index={index}
+            topic={topic}
+            onDelete={() => onDeleteTopic(topic.id)}
+            onToggle={field => onToggle(topic, field)}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function SubtopicLine({
   index,
   topic,
   onDelete,
@@ -1310,26 +1474,18 @@ function TopicMobileCard({
   index: number
   topic: EditalTopic
   onDelete: () => void
-  onToggle: (field: 'estudo' | 'resumo' | 'revisao' | 'concluido') => void
+  onToggle: (
+    field: 'estudo' | 'resumo' | 'revisao_1' | 'revisao_2' | 'revisao_3' | 'concluido'
+  ) => void
 }) {
   return (
-    <div
-      style={{
-        background: 'rgba(255,255,255,.03)',
-        border: '1px solid rgba(255,255,255,.06)',
-        borderRadius: 16,
-        padding: 14,
-        display: 'grid',
-        gap: 12,
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
-        <div style={{ display: 'grid', gap: 6, minWidth: 0 }}>
-          <div style={{ fontSize: 11, color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: 1.2 }}>
-            Item {String(index + 1).padStart(2, '0')}
+    <div style={{ border: '1px solid rgba(255,255,255,.05)', borderRadius: 14, padding: 12, display: 'grid', gap: 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 10, color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 6 }}>
+            Subtema {String(index + 1).padStart(2, '0')}
           </div>
-          <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text,#e8eaf6)' }}>{topic.tema}</div>
-          <div style={{ fontSize: 13, color: 'var(--muted,#6b7194)', lineHeight: 1.5 }}>{topic.subtema}</div>
+          <div style={{ fontSize: 14, color: 'var(--text,#e8eaf6)', lineHeight: 1.55 }}>{topic.subtema}</div>
         </div>
 
         <button
@@ -1338,8 +1494,8 @@ function TopicMobileCard({
           onClick={onDelete}
           style={{
             ...buttonBase,
-            width: 36,
-            height: 36,
+            width: 34,
+            height: 34,
             padding: 0,
             background: 'rgba(239,68,68,.1)',
             color: '#ff9a9a',
@@ -1351,11 +1507,13 @@ function TopicMobileCard({
         </button>
       </div>
 
-      <div className="ev-mobile-status-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
-        <StatusToggle active={topic.estudo} label={toggleLabel(topic.estudo, 'Estudo', 'Estudo')} onClick={() => onToggle('estudo')} />
-        <StatusToggle active={topic.resumo} label={toggleLabel(topic.resumo, 'Resumo', 'Resumo')} onClick={() => onToggle('resumo')} />
-        <StatusToggle active={topic.revisao} label={toggleLabel(topic.revisao, 'Revisao', 'Revisao')} onClick={() => onToggle('revisao')} />
-        <StatusToggle active={topic.concluido} label={toggleLabel(topic.concluido, 'Concluido', 'Pendente')} onClick={() => onToggle('concluido')} tone={topic.concluido ? '#1fc16b' : '#ffb224'} />
+      <div className="ev-mobile-status-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+        <StatusToggle active={topic.estudo} label={toggleLabel(topic.estudo, 'Estudo', 'Estudo')} onClick={() => onToggle('estudo')} tone={topic.estudo ? '#22c55e' : undefined} />
+        <StatusToggle active={topic.resumo} label={toggleLabel(topic.resumo, 'Resumo', 'Resumo')} onClick={() => onToggle('resumo')} tone={topic.resumo ? '#22c55e' : undefined} />
+        <StatusToggle active={topic.revisao_1} label="1a Rev" onClick={() => onToggle('revisao_1')} tone={topic.revisao_1 ? '#3b82f6' : undefined} />
+        <StatusToggle active={topic.revisao_2} label="2a Rev" onClick={() => onToggle('revisao_2')} tone={topic.revisao_2 ? '#f59e0b' : undefined} />
+        <StatusToggle active={topic.revisao_3} label="3a Rev" onClick={() => onToggle('revisao_3')} tone={topic.revisao_3 ? '#ec4899' : undefined} />
+        <StatusToggle active={topic.concluido} label={toggleLabel(topic.concluido, 'Concluido', 'Pendente')} onClick={() => onToggle('concluido')} tone={topic.concluido ? '#16a34a' : '#ffb224'} />
       </div>
     </div>
   )
