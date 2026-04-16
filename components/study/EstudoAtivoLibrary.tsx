@@ -99,7 +99,13 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
   const [timerMode,    setTimerMode]     = useState<'chrono' | 'timer'>('chrono')
   const [seconds,      setSeconds]       = useState(0)
   const [timerInput,   setTimerInput]    = useState(20) // Default 20 mins
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   
+  // Auto-hide on mobile
+  useEffect(() => {
+    if (window.innerWidth < 1024) setIsSidebarOpen(false)
+  }, [])
+
   // Focus Mode States
   const [showFocusMode, setShowFocusMode] = useState(false)
   const [fcLayout, setFcLayout] = useState<'grid' | 'single'>('single')
@@ -339,9 +345,16 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
 
       {/* ── Painel esquerdo: disciplinas e temas ── */}
       <div style={{
-        width: '240px', flexShrink: 0,
-        background: 'var(--surface,#111420)', borderRight: '1px solid var(--border,#1f2640)',
-        display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        width: isSidebarOpen ? '240px' : '0px', 
+        opacity: isSidebarOpen ? 1 : 0,
+        flexShrink: 0,
+        background: 'var(--surface,#111420)', 
+        borderRight: isSidebarOpen ? '1px solid var(--border,#1f2640)' : 'none',
+        display: 'flex', 
+        flexDirection: 'column', 
+        overflow: 'hidden',
+        transition: 'width 0.25s ease, opacity 0.2s ease',
+        position: 'relative'
       }}>
         <div style={{ padding: '14px 14px 10px', borderBottom: '1px solid var(--border,#1f2640)' }}>
           <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1.4px', color: 'var(--muted,#6b7194)', fontWeight: 600 }}>
@@ -435,7 +448,24 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
       </div>
 
       {/* ── Painel direito: conteúdo do tema ── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+        
+        {/* Toggle Button (when sidebar is closed) */}
+        {!isSidebarOpen && (
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            style={{
+              position: 'absolute', top: '15px', left: '15px', zIndex: 10,
+              width: '32px', height: '32px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)',
+              background: 'var(--surface,#111420)', color: 'var(--accent,#6c63ff)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+            }}
+            title="Abrir Menu"
+          >
+            <ChevronRight size={18} />
+          </button>
+        )}
+
         {!topicGroup ? (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '10px', color: 'var(--muted,#6b7194)' }}>
             <div style={{ fontSize: '32px', opacity: .25 }}>📚</div>
@@ -445,11 +475,26 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
           <>
             {/* Header do tema */}
             <div style={{ padding: '14px 20px 0', borderBottom: '1px solid var(--border,#1f2640)', background: 'var(--surface,#111420)', flexShrink: 0 }}>
-              <div style={{ fontSize: '11px', color: 'var(--accent,#6c63ff)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>
-                {selectedDisc}
-              </div>
-              <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text,#e8eaf6)', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                {topicGroup.topic}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {isSidebarOpen && (
+                  <button
+                    onClick={() => setIsSidebarOpen(false)}
+                    style={{
+                      width: '28px', height: '28px', borderRadius: '6px', border: '1px solid var(--border,#1f2640)',
+                      background: 'transparent', color: 'var(--muted,#6b7194)', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}
+                    title="Recolher Menu"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                )}
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '11px', color: 'var(--accent,#6c63ff)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '2px' }}>
+                    {selectedDisc}
+                  </div>
+                  <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text,#e8eaf6)', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    {topicGroup.topic}
 
                 {/* Session Controller */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

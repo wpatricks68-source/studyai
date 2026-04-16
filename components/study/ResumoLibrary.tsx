@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { StudySession } from '@/types/database'
 import { formatDate } from '@/lib/utils'
+import { useEffect } from 'react'
 
 export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }) {
   const [list, setList]             = useState(sessions)
@@ -13,6 +14,12 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
   const [activeTab, setActiveTab]   = useState<'resumo' | 'notas' | 'progresso'>('resumo')
   const [notas, setNotas]           = useState('')
   const [savingNota, setSavingNota] = useState(false)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+
+  // Auto-hide on mobile
+  useEffect(() => {
+    if (window.innerWidth < 1024) setIsSidebarOpen(false)
+  }, [])
 
   const materias = Array.from(new Set(sessions.map(s => s.materia).filter(Boolean))) as string[]
 
@@ -70,7 +77,18 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
 
       {/* Library sidebar */}
-      <div style={{ width: '300px', background: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+      <div style={{ 
+        width: isSidebarOpen ? '300px' : '0px', 
+        opacity: isSidebarOpen ? 1 : 0,
+        background: 'var(--surface)', 
+        borderRight: isSidebarOpen ? '1px solid var(--border)' : 'none', 
+        display: 'flex', 
+        flexDirection: 'column', 
+        flexShrink: 0,
+        overflow: 'hidden',
+        transition: 'width 0.25s ease, opacity 0.2s ease',
+        position: 'relative'
+      }}>
         <div style={{ padding: '16px 14px 12px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ fontSize: '15px', fontWeight: 500, color: 'var(--text)', marginBottom: '10px' }}>
             Minhas sessões
@@ -163,9 +181,26 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
       </div>
 
       {/* Viewer */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+        
+        {/* Toggle Button (when sidebar is closed) */}
+        {!isSidebarOpen && (
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            style={{
+              position: 'absolute', top: '15px', left: '15px', zSelf: 10,
+              width: '32px', height: '32px', borderRadius: '8px', border: '1px solid var(--border)',
+              background: 'var(--surface)', color: 'var(--accent)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+            }}
+            title="Abrir Biblioteca"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        )}
+
         {!selected ? (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px', color: 'var(--muted)' }}>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px', color: 'var(--muted)', padding: '20px' }}>
             <div style={{ fontSize: '36px', opacity: .3 }}>📖</div>
             <div style={{ fontSize: '15px', color: 'var(--text)', fontWeight: 500 }}>Selecione uma sessão</div>
             <div style={{ fontSize: '13px' }}>Escolha um resumo na lista ao lado para revisar</div>
@@ -175,9 +210,24 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
             {/* Header */}
             <div style={{ padding: '14px 20px 12px', borderBottom: '1px solid var(--border)', background: 'var(--surface)', flexShrink: 0 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '8px' }}>
-                <h2 style={{ fontSize: '16px', fontWeight: 500, color: 'var(--text)', flex: 1, margin: 0 }}>
-                  {selected.title}
-                </h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  {isSidebarOpen && (
+                    <button
+                      onClick={() => setIsSidebarOpen(false)}
+                      style={{
+                        width: '28px', height: '28px', borderRadius: '6px', border: '1px solid var(--border)',
+                        background: 'transparent', color: 'var(--muted)', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}
+                      title="Recolher Biblioteca"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
+                    </button>
+                  )}
+                  <h2 style={{ fontSize: '16px', fontWeight: 500, color: 'var(--text)', flex: 1, margin: 0, paddingLeft: !isSidebarOpen ? '32px' : '0' }}>
+                    {selected.title}
+                  </h2>
+                </div>
                 <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
                   <button
                     onClick={registerRevisao}
