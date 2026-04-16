@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import {
+  Check,
   ChevronDown,
   ChevronRight,
   FileText,
@@ -809,7 +810,86 @@ export default function EditalVerticalizadoPage() {
         .ev-title{margin:0;font-size:32px;font-weight:800;letter-spacing:-.04em}
         .ev-subtitle{margin:8px 0 0;color:var(--muted,#6b7194);font-size:14px}
         .ev-table-wrap{border:1px solid rgba(255,255,255,.06);border-radius:16px;overflow:auto}
-        .ev-mobile-cards{display:none}
+        
+        /* New Table Styles */
+        .ev-table-container { min-width: 900px; display: grid; gap: 4px; }
+        .ev-table-header {
+          display: grid;
+          grid-template-columns: 50px 1fr 100px 100px 160px 120px 110px;
+          padding: 16px 20px;
+          background: rgba(255,255,255,0.02);
+          border-radius: 12px 12px 0 0;
+          font-size: 11px;
+          font-weight: 700;
+          color: #6b7194;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          align-items: center;
+        }
+        .ev-discipline-row {
+          display: flex;
+          align-items: center;
+          background: rgba(108,99,255,0.05);
+          padding: 12px 20px;
+          cursor: pointer;
+          border-left: 3px solid #7c6cff;
+          transition: background 0.2s;
+        }
+        .ev-discipline-row:hover { background: rgba(108,99,255,0.08); }
+        .ev-topic-row {
+          display: grid;
+          grid-template-columns: 50px 1fr 100px 100px 160px 120px 110px;
+          padding: 12px 20px;
+          align-items: center;
+          border-bottom: 1px solid rgba(255,255,255,0.03);
+          transition: background 0.2s;
+        }
+        .ev-topic-row:hover { background: rgba(255,255,255,0.015); }
+        
+        .ev-status-check {
+          width: 24px;
+          height: 24px;
+          border-radius: 6px;
+          border: 1px solid rgba(255,255,255,0.1);
+          background: rgba(255,255,255,0.04);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s;
+        }
+        .ev-rev-group { display: flex; gap: 6px; }
+        .ev-rev-btn {
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          border: 1px solid rgba(255,255,255,0.1);
+          background: rgba(255,255,255,0.04);
+          font-size: 10px;
+          font-weight: 700;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s;
+          color: #6b7194;
+        }
+        
+        .ev-action-btns { display: flex; gap: 8px; }
+        .ev-icon-btn {
+          width: 34px;
+          height: 34px;
+          border-radius: 8px;
+          border: 1px solid rgba(255,255,255,0.1);
+          background: rgba(255,255,255,0.04);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .ev-icon-btn:hover { transform: translateY(-1px); }
+
         @media (max-width: 1180px){
           .ev-top-grid{grid-template-columns:1fr}
         }
@@ -819,15 +899,9 @@ export default function EditalVerticalizadoPage() {
           .ev-board-title-wrap{min-width:0;width:100%}
           .ev-meta-row{width:100%}
         }
-        @media (max-width: 760px){
-          .ev-toolbar-left{width:100%;flex-direction:column;align-items:stretch}
-          .ev-toolbar-left .ev-select{width:100% !important}
-          .ev-toolbar-right{width:100%}
-          .ev-toolbar-right .ev-btn{flex:1}
-          .ev-board-title-row{flex-direction:column}
-          .ev-board-title-row .ev-btn{width:100%;height:44px}
-          .ev-desktop-table{display:none}
-          .ev-mobile-cards{display:grid;gap:12px}
+        @media (max-width: 1000px){
+          .ev-desktop-table { display: none; }
+          .ev-mobile-cards { display: grid; gap: 12px; }
         }
         @media (max-width: 640px){
           .ev-page{padding:16px 12px 24px !important;gap:14px !important}
@@ -837,9 +911,6 @@ export default function EditalVerticalizadoPage() {
           .ev-head-actions,.ev-upload-actions{width:100%}
           .ev-head-actions .ev-btn,.ev-upload-actions .ev-btn{flex:1 1 100%}
           .ev-meta-row > *{max-width:none !important;width:100%}
-        }
-        @media (max-width: 420px){
-          .ev-mobile-status-grid{grid-template-columns:1fr !important}
         }
       `}</style>
 
@@ -1127,58 +1198,156 @@ export default function EditalVerticalizadoPage() {
               </div>
             </div>
           ) : (
-            <div style={{ display: 'grid', gap: 14 }}>
-              {Object.entries(groupedTopics).map(([disciplina, groups]) => {
-                const isOpen = expandedDisciplines[disciplina] ?? true
-                const doneCount = groups.filter(group => group.topics.every(topic => topic.concluido)).length
-
-                return (
-                  <div key={disciplina} style={{ border: '1px solid rgba(255,255,255,.06)', borderRadius: 18, overflow: 'hidden' }}>
-                    <button
-                      type="button"
-                      onClick={() => setExpandedDisciplines(prev => ({ ...prev, [disciplina]: !isOpen }))}
-                      style={{
-                        width: '100%',
-                        border: 'none',
-                        background: 'rgba(255,255,255,.02)',
-                        color: 'var(--text,#e8eaf6)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: 12,
-                        padding: '14px 16px',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                        <div style={{ textAlign: 'left' }}>
-                          <div style={{ fontSize: 15, fontWeight: 800 }}>{disciplina}</div>
-                          <div style={{ fontSize: 12, color: 'var(--muted,#6b7194)' }}>{groups.length} tema(s) nesta disciplina</div>
-                        </div>
-                      </div>
-                      <div style={{ padding: '4px 10px', borderRadius: 999, background: 'rgba(34,197,94,.14)', color: '#8af0b3', fontSize: 12 }}>
-                        {doneCount}/{groups.length} concluidos
-                      </div>
-                    </button>
-
-                    {isOpen ? (
-                      <div style={{ display: 'grid', gap: 12, padding: 14 }}>
-                        {groups.map(group => (
-                          <ThemeGroupPanel
-                            key={group.key}
-                            disciplina={disciplina}
-                            group={group}
-                            onEdit={() => openEditGroup(group)}
-                            onDeleteTopic={topicId => void deleteTopic(topicId)}
-                            onToggle={(topic, field) => void toggleTopic(topic, field)}
-                          />
-                        ))}
-                      </div>
-                    ) : null}
+            <div className="ev-table-wrap">
+              <div className="ev-desktop-table">
+                <div className="ev-table-container">
+                  <div className="ev-table-header">
+                    <div>#</div>
+                    <div>Disciplina / Tema</div>
+                    <div style={{ textAlign: 'center' }}>Estudo</div>
+                    <div style={{ textAlign: 'center' }}>Resumo</div>
+                    <div style={{ textAlign: 'center' }}>Revisão</div>
+                    <div style={{ textAlign: 'center' }}>Concluído</div>
+                    <div style={{ textAlign: 'center' }}>Ações</div>
                   </div>
-                )
-              })}
+
+                  {Object.entries(groupedTopics).map(([disciplina, groups]) => {
+                    const isOpen = expandedDisciplines[disciplina] ?? true
+                    const doneCount = groups.filter(group => group.topics.every(topic => topic.concluido)).length
+
+                    return (
+                      <div key={disciplina} style={{ display: 'grid' }}>
+                        <div
+                          className="ev-discipline-row"
+                          onClick={() => setExpandedDisciplines(prev => ({ ...prev, [disciplina]: !isOpen }))}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
+                            {isOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                            <div style={{ fontSize: 13, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>{disciplina}</div>
+                          </div>
+                          <div style={{ fontSize: 11, color: '#8af0b3', background: 'rgba(34,197,94,0.1)', padding: '4px 10px', borderRadius: 20 }}>
+                            {doneCount}/{groups.length} CONCLUÍDOS
+                          </div>
+                        </div>
+
+                        {isOpen && (
+                          <div style={{ display: 'grid' }}>
+                            {groups.map((group, groupIndex) => 
+                              group.topics.map((topic, topicIndex) => (
+                                <div key={topic.id} className="ev-topic-row">
+                                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)' }}>
+                                    {topicIndex === 0 ? groupIndex + 1 : ''}
+                                  </div>
+                                  <div style={{ fontSize: 13, fontWeight: topicIndex === 0 ? 700 : 400, color: topicIndex === 0 ? '#e8eaf6' : 'rgba(232,234,246,0.6)' }}>
+                                    {topicIndex === 0 ? topic.tema : topic.subtema}
+                                  </div>
+                                  <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                    <button
+                                      className="ev-status-check"
+                                      onClick={() => toggleTopic(topic, 'estudo')}
+                                      style={{ background: topic.estudo ? '#7c6cff' : undefined, borderColor: topic.estudo ? '#7c6cff' : undefined }}
+                                    >
+                                      {topic.estudo && <Check size={14} color="#fff" />}
+                                    </button>
+                                  </div>
+                                  <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                    <button
+                                      className="ev-status-check"
+                                      onClick={() => toggleTopic(topic, 'resumo')}
+                                      style={{ background: topic.resumo ? '#3b82f6' : undefined, borderColor: topic.resumo ? '#3b82f6' : undefined }}
+                                    >
+                                      {topic.resumo && <Check size={14} color="#fff" />}
+                                    </button>
+                                  </div>
+                                  <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                    <div className="ev-rev-group">
+                                      <button
+                                        className="ev-rev-btn"
+                                        onClick={() => toggleTopic(topic, 'revisao_1')}
+                                        style={{ background: topic.revisao_1 ? '#f59e0b' : undefined, color: topic.revisao_1 ? '#fff' : undefined }}
+                                      >1º</button>
+                                      <button
+                                        className="ev-rev-btn"
+                                        onClick={() => toggleTopic(topic, 'revisao_2')}
+                                        style={{ background: topic.revisao_2 ? '#3b82f6' : undefined, color: topic.revisao_2 ? '#fff' : undefined }}
+                                      >2º</button>
+                                      <button
+                                        className="ev-rev-btn"
+                                        onClick={() => toggleTopic(topic, 'revisao_3')}
+                                        style={{ background: topic.revisao_3 ? '#22c55e' : undefined, color: topic.revisao_3 ? '#fff' : undefined }}
+                                      >3º</button>
+                                    </div>
+                                  </div>
+                                  <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                    <button
+                                      className="ev-status-check"
+                                      onClick={() => toggleTopic(topic, 'concluido')}
+                                      style={{ background: topic.concluido ? '#16a34a' : undefined, borderColor: topic.concluido ? '#16a34a' : undefined }}
+                                    >
+                                      {topic.concluido && <Check size={14} color="#fff" />}
+                                    </button>
+                                  </div>
+                                  <div className="ev-action-btns" style={{ justifyContent: 'center' }}>
+                                    <button
+                                      className="ev-icon-btn"
+                                      onClick={() => openEditGroup(group)}
+                                      style={{ color: '#f59e0b', background: 'rgba(245,158,11,0.1)' }}
+                                    >
+                                      <PencilLine size={14} />
+                                    </button>
+                                    <button
+                                      className="ev-icon-btn"
+                                      onClick={() => deleteTopic(topic.id)}
+                                      style={{ color: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.05)' }}
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="ev-mobile-cards">
+                {Object.entries(groupedTopics).map(([disciplina, groups]) => {
+                  const isOpen = expandedDisciplines[disciplina] ?? true
+                  return (
+                    <div key={disciplina} style={{ border: '1px solid rgba(255,255,255,.06)', borderRadius: 18, overflow: 'hidden' }}>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedDisciplines(prev => ({ ...prev, [disciplina]: !isOpen }))}
+                        style={{ width: '100%', border: 'none', background: 'rgba(255,255,255,.02)', color: '#e8eaf6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', cursor: 'pointer' }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                          <span style={{ fontSize: 14, fontWeight: 800 }}>{disciplina}</span>
+                        </div>
+                      </button>
+
+                      {isOpen && (
+                        <div style={{ padding: 12, display: 'grid', gap: 12 }}>
+                          {groups.map(group => (
+                            <ThemeGroupPanel
+                              key={group.key}
+                              disciplina={disciplina}
+                              group={group}
+                              onEdit={() => openEditGroup(group)}
+                              onDeleteTopic={topicId => void deleteTopic(topicId)}
+                              onToggle={(topic, field) => void toggleTopic(topic, field)}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )}
         </section>
@@ -1397,60 +1566,35 @@ function ThemeGroupPanel({
   return (
     <div
       style={{
-        background: 'rgba(255,255,255,.025)',
-        border: '1px solid rgba(255,255,255,.06)',
+        background: 'rgba(255,255,255,.015)',
+        border: '1px solid rgba(255,255,255,.05)',
         borderRadius: 16,
         padding: 14,
         display: 'grid',
         gap: 12,
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        <div style={{ display: 'grid', gap: 6, minWidth: 0 }}>
-          <div style={{ fontSize: 10, color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: 1.2 }}>
-            Tema
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+        <div style={{ display: 'grid', gap: 4, minWidth: 0 }}>
+          <div style={{ fontSize: 10, color: '#6b7194', textTransform: 'uppercase', letterSpacing: 1 }}>
+            TEMA
           </div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text,#e8eaf6)' }}>{group.tema}</div>
-          <div style={{ fontSize: 12, color: 'var(--muted,#6b7194)' }}>
-            {disciplina} | {group.topics.length} subtema(s) | {doneCount}/{group.topics.length} concluidos
+          <div style={{ fontSize: 15, fontWeight: 800, color: '#e8eaf6' }}>{group.tema}</div>
+          <div style={{ fontSize: 11, color: '#6b7194' }}>
+            {group.topics.length} subtema(s) | {doneCount}/{group.topics.length} concluídos
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button
-            className="ev-btn"
-            type="button"
-            onClick={onEdit}
-            style={{
-              ...buttonBase,
-              padding: '9px 12px',
-              background: 'rgba(79,140,255,.12)',
-              color: '#a6c4ff',
-              borderColor: 'rgba(79,140,255,.22)',
-            }}
-          >
-            <PencilLine size={14} />
-            Editar
-          </button>
-          <button
-            className="ev-btn"
-            type="button"
-            onClick={onEdit}
-            style={{
-              ...buttonBase,
-              padding: '9px 12px',
-              background: 'rgba(34,197,94,.12)',
-              color: '#8af0b3',
-              borderColor: 'rgba(34,197,94,.22)',
-            }}
-          >
-            <Plus size={14} />
-            Subtemas
-          </button>
-        </div>
+        <button
+          className="ev-icon-btn"
+          onClick={onEdit}
+          style={{ color: '#f59e0b', background: 'rgba(245,158,11,0.1)', flexShrink: 0 }}
+        >
+          <PencilLine size={14} />
+        </button>
       </div>
 
-      <div style={{ display: 'grid', gap: 10 }}>
+      <div style={{ display: 'grid', gap: 8 }}>
         {group.topics.map((topic, index) => (
           <SubtopicLine
             key={topic.id}
@@ -1479,41 +1623,78 @@ function SubtopicLine({
   ) => void
 }) {
   return (
-    <div style={{ border: '1px solid rgba(255,255,255,.05)', borderRadius: 14, padding: 12, display: 'grid', gap: 10 }}>
+    <div style={{ border: '1px solid rgba(255,255,255,.04)', borderRadius: 12, padding: 10, display: 'grid', gap: 10, background: 'rgba(255,255,255,0.01)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 10, color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 6 }}>
-            Subtema {String(index + 1).padStart(2, '0')}
+          <div style={{ fontSize: 13, color: 'rgba(232,234,246,0.8)', lineHeight: 1.4 }}>
+            {topic.subtema}
           </div>
-          <div style={{ fontSize: 14, color: 'var(--text,#e8eaf6)', lineHeight: 1.55 }}>{topic.subtema}</div>
         </div>
 
         <button
-          className="ev-btn"
-          type="button"
+          className="ev-icon-btn"
           onClick={onDelete}
-          style={{
-            ...buttonBase,
-            width: 34,
-            height: 34,
-            padding: 0,
-            background: 'rgba(239,68,68,.1)',
-            color: '#ff9a9a',
-            borderColor: 'rgba(239,68,68,.2)',
-            flexShrink: 0,
-          }}
+          style={{ width: 28, height: 28, color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.03)', flexShrink: 0 }}
         >
-          <Trash2 size={14} />
+          <Trash2 size={12} />
         </button>
       </div>
 
-      <div className="ev-mobile-status-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
-        <StatusToggle active={topic.estudo} label={toggleLabel(topic.estudo, 'Estudo', 'Estudo')} onClick={() => onToggle('estudo')} tone={topic.estudo ? '#22c55e' : undefined} />
-        <StatusToggle active={topic.resumo} label={toggleLabel(topic.resumo, 'Resumo', 'Resumo')} onClick={() => onToggle('resumo')} tone={topic.resumo ? '#22c55e' : undefined} />
-        <StatusToggle active={topic.revisao_1} label="1a Rev" onClick={() => onToggle('revisao_1')} tone={topic.revisao_1 ? '#3b82f6' : undefined} />
-        <StatusToggle active={topic.revisao_2} label="2a Rev" onClick={() => onToggle('revisao_2')} tone={topic.revisao_2 ? '#f59e0b' : undefined} />
-        <StatusToggle active={topic.revisao_3} label="3a Rev" onClick={() => onToggle('revisao_3')} tone={topic.revisao_3 ? '#ec4899' : undefined} />
-        <StatusToggle active={topic.concluido} label={toggleLabel(topic.concluido, 'Concluido', 'Pendente')} onClick={() => onToggle('concluido')} tone={topic.concluido ? '#16a34a' : '#ffb224'} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+        <button
+          className="ev-btn"
+          onClick={() => onToggle('estudo')}
+          style={{
+            ...buttonBase,
+            fontSize: 10,
+            padding: '6px',
+            background: topic.estudo ? '#7c6cff' : 'rgba(255,255,255,0.03)',
+            color: topic.estudo ? '#fff' : '#6b7194',
+            borderColor: 'transparent'
+          }}
+        >Estudo</button>
+        <button
+          className="ev-btn"
+          onClick={() => onToggle('resumo')}
+          style={{
+            ...buttonBase,
+            fontSize: 10,
+            padding: '6px',
+            background: topic.resumo ? '#3b82f6' : 'rgba(255,255,255,0.03)',
+            color: topic.resumo ? '#fff' : '#6b7194',
+            borderColor: 'transparent'
+          }}
+        >Resumo</button>
+        <button
+          className="ev-btn"
+          onClick={() => onToggle('concluido')}
+          style={{
+            ...buttonBase,
+            fontSize: 10,
+            padding: '6px',
+            background: topic.concluido ? '#16a34a' : 'rgba(255,255,255,0.03)',
+            color: topic.concluido ? '#fff' : '#6b7194',
+            borderColor: 'transparent'
+          }}
+        >Concluído</button>
+      </div>
+      
+      <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+        <button
+          className="ev-rev-btn"
+          onClick={() => onToggle('revisao_1')}
+          style={{ width: 28, height: 28, background: topic.revisao_1 ? '#f59e0b' : undefined, color: topic.revisao_1 ? '#fff' : undefined }}
+        >1º</button>
+        <button
+          className="ev-rev-btn"
+          onClick={() => onToggle('revisao_2')}
+          style={{ width: 28, height: 28, background: topic.revisao_2 ? '#3b82f6' : undefined, color: topic.revisao_2 ? '#fff' : undefined }}
+        >2º</button>
+        <button
+          className="ev-rev-btn"
+          onClick={() => onToggle('revisao_3')}
+          style={{ width: 28, height: 28, background: topic.revisao_3 ? '#22c55e' : undefined, color: topic.revisao_3 ? '#fff' : undefined }}
+        >3º</button>
       </div>
     </div>
   )
