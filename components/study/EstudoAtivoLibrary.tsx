@@ -475,29 +475,30 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
           <>
             {/* Header do tema */}
             <div style={{ padding: '14px 20px 0', borderBottom: '1px solid var(--border,#1f2640)', background: 'var(--surface,#111420)', flexShrink: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                {isSidebarOpen && (
-                  <button
-                    onClick={() => setIsSidebarOpen(false)}
-                    style={{
-                      width: '28px', height: '28px', borderRadius: '6px', border: '1px solid var(--border,#1f2640)',
-                      background: 'transparent', color: 'var(--muted,#6b7194)', cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center'
-                    }}
-                    title="Recolher Menu"
-                  >
-                    <ChevronLeft size={16} />
-                  </button>
-                )}
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '11px', color: 'var(--accent,#6c63ff)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '2px' }}>
-                    {selectedDisc}
-                  </div>
-                  <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text,#e8eaf6)', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    {topicGroup.topic}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                  {isSidebarOpen && (
+                    <button
+                      onClick={() => setIsSidebarOpen(false)}
+                      style={{
+                        width: '28px', height: '28px', borderRadius: '6px', border: '1px solid var(--border,#1f2640)',
+                        background: 'transparent', color: 'var(--muted,#6b7194)', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}
+                      title="Recolher Menu"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                  )}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '11px', color: 'var(--accent,#6c63ff)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '2px' }}>
+                      {selectedDisc}
+                    </div>
+                    <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text,#e8eaf6)', lineHeight: 1.3 }}>
+                      {topicGroup.topic}
+                    </div>
                   </div>
                 </div>
-              </div>
 
                 {/* Session Controller */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
