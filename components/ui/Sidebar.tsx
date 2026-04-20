@@ -68,6 +68,36 @@ export default function Sidebar({ user, profile }: { user: User; profile: Profil
           display: none;
         }
 
+        .sb-nav-link {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 9px 11px;
+          border-radius: 10px;
+          margin-bottom: 2px;
+          font-size: 13px;
+          font-weight: 500;
+          text-decoration: none;
+          color: var(--muted);
+          transition: all .18s cubic-bezier(.4,0,.2,1);
+          position: relative;
+          letter-spacing: -0.1px;
+        }
+        .sb-nav-link:hover {
+          color: var(--text);
+          background: rgba(255,255,255,0.04);
+        }
+        .sb-nav-link.active {
+          color: #fff;
+          background: linear-gradient(135deg, rgba(116,97,255,0.85) 0%, rgba(91,200,255,0.7) 100%);
+          box-shadow: 0 4px 20px rgba(116,97,255,0.3);
+          font-weight: 600;
+        }
+        .light .sb-nav-link.active {
+          background: linear-gradient(135deg, rgba(91,79,255,0.9) 0%, rgba(0,140,255,0.7) 100%);
+          box-shadow: 0 4px 20px rgba(91,79,255,0.25);
+        }
+
         @media (max-width: 960px) {
           .sidebar-mobile-toggle {
             display: inline-flex;
@@ -79,12 +109,12 @@ export default function Sidebar({ user, profile }: { user: User; profile: Profil
             height: 42px;
             border-radius: 12px;
             border: 1px solid rgba(255,255,255,.08);
-            background: rgba(17,20,32,.9);
+            background: rgba(13,16,32,.92);
             color: var(--text);
             align-items: center;
             justify-content: center;
-            box-shadow: 0 10px 30px rgba(0,0,0,.28);
-            backdrop-filter: blur(12px);
+            box-shadow: 0 10px 30px rgba(0,0,0,.38);
+            backdrop-filter: blur(16px);
           }
 
           .sidebar-backdrop {
@@ -92,7 +122,7 @@ export default function Sidebar({ user, profile }: { user: User; profile: Profil
             position: fixed;
             inset: 0;
             z-index: 70;
-            background: rgba(5,7,12,.58);
+            background: rgba(4,5,10,.65);
             opacity: 0;
             pointer-events: none;
             transition: opacity .2s ease;
@@ -108,16 +138,16 @@ export default function Sidebar({ user, profile }: { user: User; profile: Profil
             top: 0;
             left: 0;
             bottom: 0;
-            width: min(82vw, 320px) !important;
+            width: min(82vw, 300px) !important;
             z-index: 80;
             transform: translateX(-100%);
-            transition: transform .24s ease, box-shadow .24s ease;
+            transition: transform .24s cubic-bezier(.4,0,.2,1), box-shadow .24s ease;
             box-shadow: none;
           }
 
           .sidebar-shell[data-open="true"] {
             transform: translateX(0);
-            box-shadow: 0 22px 60px rgba(0,0,0,.42);
+            box-shadow: 0 0 80px rgba(0,0,0,.6);
           }
 
           .sidebar-close-btn {
@@ -153,35 +183,55 @@ export default function Sidebar({ user, profile }: { user: User; profile: Profil
         className="sidebar-shell"
         data-open={mobileOpen}
         style={{
-          width: '200px',
+          width: '215px',
           flexShrink: 0,
-          background: 'var(--surface)',
-          borderRight: '1px solid var(--border)',
+          background: 'linear-gradient(180deg, #0e1124 0%, #080a14 100%)',
+          borderRight: '1px solid rgba(255,255,255,0.055)',
           display: 'flex',
           flexDirection: 'column',
           height: '100vh',
           overflow: 'hidden',
+          position: 'relative',
         }}
       >
-        <div
-          style={{
-            padding: '18px 16px 14px',
-            borderBottom: '1px solid var(--border)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: '10px',
-          }}
-        >
+        {/* Glowing orb background decoration */}
+        <div style={{
+          position: 'absolute',
+          top: '-40px',
+          left: '-40px',
+          width: '200px',
+          height: '200px',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(116,97,255,0.12) 0%, transparent 70%)',
+          pointerEvents: 'none',
+        }} />
+
+        {/* Logo header */}
+        <div style={{
+          padding: '20px 16px 16px',
+          borderBottom: '1px solid rgba(255,255,255,0.05)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '10px',
+        }}>
           <div>
-            <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '-0.5px' }}>
+            <div style={{
+              fontSize: '19px',
+              fontWeight: 800,
+              letterSpacing: '-0.7px',
+              background: 'linear-gradient(135deg, #7461ff, #00e5b0)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+            }}>
               StudyAI
             </div>
-            <div style={{ fontSize: '10px', color: 'var(--muted)', letterSpacing: '2px', textTransform: 'uppercase', marginTop: '2px' }}>
+            <div style={{ fontSize: '9px', color: 'var(--muted)', letterSpacing: '2.5px', textTransform: 'uppercase', marginTop: '3px' }}>
               Concursos
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <ThemeToggle />
             <button
               type="button"
@@ -194,38 +244,33 @@ export default function Sidebar({ user, profile }: { user: User; profile: Profil
           </div>
         </div>
 
+        {/* Timer */}
         <div style={{ padding: '4px 12px 0' }}>
           <GlobalTimer />
         </div>
 
-        <nav style={{ padding: '0 8px 10px', flex: 1, overflowY: 'auto' }}>
+        {/* Navigation */}
+        <nav style={{ padding: '8px 10px 10px', flex: 1, overflowY: 'auto' }}>
           {navItems.map(group => (
-            <div key={group.section}>
-              <div style={{ fontSize: '10px', color: 'var(--muted)', letterSpacing: '1.5px', textTransform: 'uppercase', padding: '10px 10px 5px' }}>
+            <div key={group.section} style={{ marginBottom: '10px' }}>
+              <div style={{
+                fontSize: '9px',
+                color: 'rgba(93,100,144,0.7)',
+                letterSpacing: '2px',
+                textTransform: 'uppercase',
+                padding: '8px 11px 5px',
+                fontWeight: 600,
+              }}>
                 {group.section}
               </div>
               {group.items.map(item => {
                 const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
-
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
                     onClick={() => setMobileOpen(false)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '9px',
-                      padding: active ? '8px 8px 8px 8px' : '8px 10px',
-                      borderRadius: '8px',
-                      marginBottom: '2px',
-                      fontSize: '13px',
-                      textDecoration: 'none',
-                      color: active ? 'var(--accent)' : 'var(--muted)',
-                      background: active ? 'rgba(108,99,255,.15)' : 'transparent',
-                      borderLeft: active ? '2px solid var(--accent)' : '2px solid transparent',
-                      transition: 'all .12s',
-                    }}
+                    className={`sb-nav-link${active ? ' active' : ''}`}
                   >
                     <item.icon active={active} />
                     {item.label}
@@ -236,45 +281,65 @@ export default function Sidebar({ user, profile }: { user: User; profile: Profil
           ))}
         </nav>
 
-        <div style={{ padding: '12px', borderTop: '1px solid var(--border)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-            <div
-              style={{
-                width: '28px',
-                height: '28px',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg,#6c63ff,#00d4aa)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '11px',
-                fontWeight: 600,
-                color: '#fff',
-                flexShrink: 0,
-              }}
-            >
+        {/* User footer */}
+        <div style={{
+          padding: '12px 12px 16px',
+          borderTop: '1px solid rgba(255,255,255,0.05)',
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            marginBottom: '10px',
+            padding: '10px',
+            borderRadius: '12px',
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid rgba(255,255,255,0.05)',
+          }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #7461ff, #00e5b0)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '12px',
+              fontWeight: 700,
+              color: '#fff',
+              flexShrink: 0,
+              boxShadow: '0 4px 12px rgba(116,97,255,0.35)',
+            }}>
               {initials}
             </div>
-            <div>
-              <div style={{ fontSize: '12px', color: 'var(--text)', fontWeight: 500 }}>{profile?.name?.split(' ')[0] ?? 'Usuario'}</div>
-              <div style={{ fontSize: '10px', color: 'var(--muted)' }}>{profile?.target_exam ?? 'Concurso'}</div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: '12px', color: 'var(--text)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {profile?.name?.split(' ')[0] ?? 'Usuário'}
+              </div>
+              <div style={{ fontSize: '10px', color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {profile?.target_exam ?? 'Concurso'}
+              </div>
             </div>
           </div>
           <button
             onClick={handleLogout}
             style={{
               width: '100%',
-              padding: '7px',
-              borderRadius: '7px',
-              background: 'transparent',
-              border: '1px solid var(--border)',
-              color: 'var(--muted)',
+              padding: '8px',
+              borderRadius: '9px',
+              background: 'rgba(239,68,68,0.07)',
+              border: '1px solid rgba(239,68,68,0.15)',
+              color: 'rgba(255,130,130,0.8)',
               fontSize: '12px',
+              fontWeight: 500,
               cursor: 'pointer',
-              transition: 'all .12s',
+              transition: 'all .16s ease',
+              letterSpacing: '0.1px',
             }}
+            onMouseEnter={e => { (e.target as HTMLElement).style.background = 'rgba(239,68,68,0.14)' }}
+            onMouseLeave={e => { (e.target as HTMLElement).style.background = 'rgba(239,68,68,0.07)' }}
           >
-            Sair
+            Sair da conta
           </button>
         </div>
       </aside>

@@ -1,33 +1,39 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --bg:       #0a0c12;
-  --surface:  #111420;
-  --surface2: #181d2e;
-  --border:   #1f2640;
-  --text:     #e8eaf6;
-  --muted:    #6b7194;
-  --accent:   #6c63ff;
-  --accent2:  #00d4aa;
-  --amber:    #f59e0b;
-  --red:      #ef4444;
-  --green:    #10b981;
+  --bg:        #080a10;
+  --surface:   #0d1020;
+  --surface2:  #141828;
+  --border:    #1e2540;
+  --text:      #eaecf5;
+  --muted:     #5d6490;
+  --accent:    #7461ff;
+  --accent2:   #00e5b0;
+  --amber:     #f59e0b;
+  --red:       #ef4444;
+  --green:     #10d494;
+  --accent-glow: rgba(116,97,255,0.35);
+  --card-border: rgba(116,97,255,0.15);
 }
 
 .light {
-  --bg:       #f9fafb;
-  --surface:  #ffffff;
-  --surface2: #f3f4f6;
-  --border:   #e5e7eb;
-  --text:     #111827;
-  --muted:    #6b7280;
-  --accent:   #4f46e5;
-  --accent2:  #0d9488;
-  --amber:    #d97706;
-  --red:      #dc2626;
-  --green:    #059669;
+  --bg:        #f4f5f9;
+  --surface:   #ffffff;
+  --surface2:  #f0f1f7;
+  --border:    #e2e4ef;
+  --text:      #111827;
+  --muted:     #6b7280;
+  --accent:    #5b4fff;
+  --accent2:   #0d9488;
+  --amber:     #d97706;
+  --red:       #dc2626;
+  --green:     #059669;
+  --accent-glow: rgba(91,79,255,0.2);
+  --card-border: rgba(91,79,255,0.15);
 }
 
 * {
@@ -38,7 +44,7 @@ html,
 body {
   background-color: var(--bg);
   color: var(--text);
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -49,8 +55,8 @@ body {
 ::-webkit-scrollbar-thumb  { background: var(--border); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
 
-/* Seleção de texto */
-::selection { background: rgba(108, 99, 255, 0.3); }
+/* Text selection */
+::selection { background: rgba(116, 97, 255, 0.35); }
 
 @layer utilities {
   .text-accent  { color: var(--accent); }
