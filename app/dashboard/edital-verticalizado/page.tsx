@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import EvolucaoEstudosChart from '@/components/stats/EvolucaoEstudosChart'
 import {
   Check,
   ChevronDown,
@@ -177,10 +178,30 @@ export default function EditalVerticalizadoPage() {
   const [expandedDisciplines, setExpandedDisciplines] = useState<Record<string, boolean>>({})
   const [titleDraft, setTitleDraft] = useState('')
   const [editingBoardId, setEditingBoardId] = useState<string | null>(null)
-
+  
   const activeBoard = boards.find(board => board.id === activeBoardId) ?? null
   const activeTopics = activeBoard ? topicsByBoard[activeBoard.id] ?? [] : []
   const missingTables = !!dbError && /edital_boards|edital_topics/i.test(dbError)
+
+  const chartData = useMemo(() => {
+    const dataMap = new Map<string, { pendente: number; andamento: number; concluido: number }>()
+
+    activeTopics.forEach(topic => {
+      const disc = topic.disciplina || 'Outros'
+      const current = dataMap.get(disc) || { pendente: 0, andamento: 0, concluido: 0 }
+
+      if (topic.status === 'done') current.concluido++
+      else if (topic.status === 'in-progress') current.andamento++
+      else current.pendente++
+
+      dataMap.set(disc, current)
+    })
+
+    return Array.from(dataMap.entries()).map(([disciplina, counts]) => ({
+      disciplina,
+      ...counts
+    }))
+  }, [activeTopics])
 
   useEffect(() => {
     void loadBoards()
@@ -1311,7 +1332,17 @@ export default function EditalVerticalizadoPage() {
               </div>
             </div>
           ) : (
-            <div className="ev-table-wrap">
+            <div style={{ display: 'grid', gap: 20 }}>
+              {/* Seção do Gráfico */}
+              <div style={{ ...box, padding: 20, background: 'rgba(255,255,255,0.01)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+                  <div style={{ width: 4, height: 18, background: 'var(--accent)', borderRadius: 2 }} />
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Evolução por Disciplina</h3>
+                </div>
+                <EvolucaoEstudosChart data={chartData} />
+              </div>
+
+              <div className="ev-table-wrap">
               <div className="ev-desktop-table">
                 <div className="ev-table-container">
                   <div className="ev-table-header">
