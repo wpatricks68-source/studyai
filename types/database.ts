@@ -163,6 +163,7 @@ export interface EditalTopic {
   revisao_2: boolean
   revisao_3: boolean
   concluido: boolean
+  status: 'pending' | 'in-progress' | 'done'
   order_index: number
   created_at: string
   updated_at: string
