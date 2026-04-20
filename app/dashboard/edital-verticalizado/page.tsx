@@ -442,6 +442,66 @@ export default function EditalVerticalizadoPage() {
     }))
   }
 
+  async function cycleStatus(topic: EditalTopic) {
+    const supabase = createClient()
+    const statuses: EditalTopic['status'][] = ['pending', 'in-progress', 'done']
+    const currentIndex = statuses.indexOf(topic.status || 'pending')
+    const nextStatus = statuses[(currentIndex + 1) % statuses.length]
+
+    let updatePayload: Partial<EditalTopic> = { status: nextStatus }
+
+    // Lógica pedida: Concluído marca tudo como feito (sim do usuário)
+    if (nextStatus === 'in-progress') {
+      updatePayload = { ...updatePayload, estudo: true, concluido: false }
+    } else if (nextStatus === 'done') {
+      updatePayload = { 
+        ...updatePayload, 
+        estudo: true, 
+        resumo: true, 
+        revisao_1: true, 
+        revisao_2: true, 
+        revisao_3: true,
+        concluido: true 
+      }
+    } else if (nextStatus === 'pending') {
+      updatePayload = { 
+        ...updatePayload, 
+        estudo: false, 
+        resumo: false, 
+        revisao_1: false, 
+        revisao_2: false, 
+        revisao_3: false,
+        concluido: false 
+      }
+    }
+
+    setTopicsByBoard(prev => ({
+      ...prev,
+      [topic.board_id]: (prev[topic.board_id] ?? []).map(item =>
+        item.id === topic.id ? { ...item, ...updatePayload } : item
+      ),
+    }))
+
+    const { data, error } = await supabase
+      .from('edital_topics')
+      .update(updatePayload)
+      .eq('id', topic.id)
+      .select('*')
+      .single()
+
+    if (error) {
+      setDbError(error.message)
+      await loadBoards()
+      return
+    }
+
+    const saved = data as EditalTopic
+    setTopicsByBoard(prev => ({
+      ...prev,
+      [saved.board_id]: (prev[saved.board_id] ?? []).map(item => (item.id === saved.id ? saved : item)),
+    }))
+  }
+
   function openCreateEditor(prefill?: Partial<ManualForm>) {
     setEditorMode('create')
     setEditingGroupKey(null)
@@ -1260,7 +1320,7 @@ export default function EditalVerticalizadoPage() {
                     <div style={{ textAlign: 'center' }}>Estudo</div>
                     <div style={{ textAlign: 'center' }}>Resumo</div>
                     <div style={{ textAlign: 'center' }}>Revisão</div>
-                    <div style={{ textAlign: 'center' }}>Concluído</div>
+                    <div style={{ textAlign: 'center' }}>STATUS</div>
                     <div style={{ textAlign: 'center' }}>Ações</div>
                   </div>
 
@@ -1358,10 +1418,21 @@ export default function EditalVerticalizadoPage() {
                                     <div style={{ display: 'flex', justifyContent: 'center' }}>
                                       <button
                                         className="ev-status-check"
-                                        onClick={() => toggleTopic(topic, 'concluido')}
-                                        style={{ background: topic.concluido ? 'var(--green)' : undefined, borderColor: topic.concluido ? 'var(--green)' : undefined }}
+                                        onClick={() => cycleStatus(topic)}
+                                        style={{ 
+                                          width: '100px',
+                                          height: '32px',
+                                          borderRadius: '8px',
+                                          fontSize: '11px',
+                                          fontWeight: 800,
+                                          textTransform: 'uppercase',
+                                          background: topic.status === 'done' ? 'var(--green)' : topic.status === 'in-progress' ? 'var(--amber)' : 'rgba(255,255,255,0.05)',
+                                          borderColor: 'transparent',
+                                          color: topic.status === 'pending' || !topic.status ? 'var(--muted)' : '#fff',
+                                          cursor: 'pointer'
+                                        }}
                                       >
-                                        {topic.concluido && <Check size={14} color="#fff" />}
+                                        {topic.status === 'done' ? 'Concluído' : topic.status === 'in-progress' ? 'Em Andamento' : 'Pendente'}
                                       </button>
                                     </div>
                                     <div className="ev-action-btns" style={{ justifyContent: 'center' }}>
@@ -1738,16 +1809,18 @@ function SubtopicLine({
         >Resumo</button>
         <button
           className="ev-btn"
-          onClick={() => onToggle('concluido')}
+          onClick={() => cycleStatus(topic)}
           style={{
             ...buttonBase,
+            gridColumn: 'span 3',
             fontSize: 10,
-            padding: '6px',
-            background: topic.concluido ? '#16a34a' : 'rgba(255,255,255,0.03)',
-            color: topic.concluido ? '#fff' : '#6b7194',
-            borderColor: 'transparent'
+            padding: '8px',
+            background: topic.status === 'done' ? 'var(--green)' : topic.status === 'in-progress' ? 'var(--amber)' : 'rgba(255,255,255,0.03)',
+            color: topic.status === 'pending' || !topic.status ? 'var(--muted)' : '#fff',
+            borderColor: 'transparent',
+            fontWeight: 800
           }}
-        >Concluído</button>
+        >STATUS: {topic.status === 'done' ? 'CONCLUÍDO' : topic.status === 'in-progress' ? 'EM ANDAMENTO' : 'PENDENTE'}</button>
       </div>
       
       <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
