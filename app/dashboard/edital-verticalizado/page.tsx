@@ -1523,7 +1523,8 @@ export default function EditalVerticalizadoPage() {
                 })}
               </div>
             </div>
-          )}
+          </div>
+        )}
         </section>
       </div>
 
