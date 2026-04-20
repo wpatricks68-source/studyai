@@ -1,14 +1,37 @@
 import { createClient } from '@/lib/supabase/server'
+import EvolucaoEstudosChart from '@/components/stats/EvolucaoEstudosChart'
 
 export default async function EstatisticasPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const [{ data: sessions }, { data: answers }, { data: flashcards }] = await Promise.all([
+  const [{ data: sessions }, { data: answers }, { data: flashcards }, { data: editalTopics }] = await Promise.all([
     supabase.from('study_sessions').select('materia, duration_min, created_at').eq('user_id', user!.id),
     supabase.from('question_answers').select('is_correct, answered_at').eq('user_id', user!.id),
     supabase.from('flashcards').select('difficulty, next_review').eq('user_id', user!.id),
+    supabase.from('edital_topics').select('disciplina, status').eq('user_id', user!.id),
   ])
+
+  // Processamento do gráfico de evolução do edital
+  const evolutionData = (() => {
+    const dataMap = new Map<string, { pendente: number; andamento: number; concluido: number }>()
+
+    ;(editalTopics ?? []).forEach(topic => {
+      const disc = topic.disciplina || 'Outros'
+      const current = dataMap.get(disc) || { pendente: 0, andamento: 0, concluido: 0 }
+
+      if (topic.status === 'done') current.concluido++
+      else if (topic.status === 'in-progress') current.andamento++
+      else current.pendente++
+
+      dataMap.set(disc, current)
+    })
+
+    return Array.from(dataMap.entries()).map(([disciplina, counts]) => ({
+      disciplina,
+      ...counts
+    }))
+  })()
 
   const totalMin      = (sessions ?? []).reduce((s, r) => s + (r.duration_min ?? 0), 0)
   const totalHoras    = Math.round(totalMin / 60 * 10) / 10
@@ -39,7 +62,6 @@ export default async function EstatisticasPage() {
       <h1 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text)', marginBottom: '6px' }}>Estatísticas</h1>
       <p style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: '28px' }}>Acompanhe sua evolução</p>
 
-      {/* Stat cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: '12px', marginBottom: '28px' }}>
         {statCards.map(c => (
           <div key={c.label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '16px' }}>
@@ -47,6 +69,15 @@ export default async function EstatisticasPage() {
             <div style={{ fontSize: '28px', fontWeight: 700, color: c.color }}>{c.value}</div>
           </div>
         ))}
+      </div>
+
+      {/* Evolução do Edital Verticalizado */}
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '28px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+          <div style={{ width: 4, height: 18, background: 'var(--accent)', borderRadius: 2 }} />
+          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>Progresso do Edital Verticalizado</div>
+        </div>
+        <EvolucaoEstudosChart data={evolutionData} />
       </div>
 
       {/* Horas por matéria */}
