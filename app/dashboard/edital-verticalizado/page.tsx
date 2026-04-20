@@ -176,6 +176,8 @@ export default function EditalVerticalizadoPage() {
   const [savingManual, setSavingManual] = useState(false)
   const [expandedDisciplines, setExpandedDisciplines] = useState<Record<string, boolean>>({})
   const [titleDraft, setTitleDraft] = useState('')
+  const [editingBoardId, setEditingBoardId] = useState<string | null>(null)
+
   const activeBoard = boards.find(board => board.id === activeBoardId) ?? null
   const activeTopics = activeBoard ? topicsByBoard[activeBoard.id] ?? [] : []
   const missingTables = !!dbError && /edital_boards|edital_topics/i.test(dbError)
