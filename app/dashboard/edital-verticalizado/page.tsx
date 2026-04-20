@@ -1694,6 +1694,7 @@ function ThemeGroupPanel({
   onEdit,
   onDeleteTopic,
   onToggle,
+  onCycleStatus,
 }: {
   disciplina: string
   group: ThemeGroup
@@ -1746,7 +1747,7 @@ function ThemeGroupPanel({
             topic={topic}
             onDelete={() => onDeleteTopic(topic.id)}
             onToggle={field => onToggle(topic, field)}
-            onCycleStatus={onCycleStatus}
+            onCycleStatus={() => onCycleStatus(topic)}
           />
         ))}
       </div>
@@ -1759,6 +1760,7 @@ function SubtopicLine({
   topic,
   onDelete,
   onToggle,
+  onCycleStatus,
 }: {
   index: number
   topic: EditalTopic
