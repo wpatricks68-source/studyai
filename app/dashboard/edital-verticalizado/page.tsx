@@ -1482,6 +1482,7 @@ export default function EditalVerticalizadoPage() {
                               onEdit={() => openEditGroup(group)}
                               onDeleteTopic={topicId => void deleteTopic(topicId)}
                               onToggle={(topic, field) => void toggleTopic(topic, field)}
+                              onCycleStatus={topic => void cycleStatus(topic)}
                             />
                           ))}
                         </div>
@@ -1702,6 +1703,7 @@ function ThemeGroupPanel({
     topic: EditalTopic,
     field: 'estudo' | 'resumo' | 'revisao_1' | 'revisao_2' | 'revisao_3' | 'concluido'
   ) => void
+  onCycleStatus: (topic: EditalTopic) => void
 }) {
   const doneCount = group.topics.filter(topic => topic.concluido).length
 
@@ -1744,6 +1746,7 @@ function ThemeGroupPanel({
             topic={topic}
             onDelete={() => onDeleteTopic(topic.id)}
             onToggle={field => onToggle(topic, field)}
+            onCycleStatus={onCycleStatus}
           />
         ))}
       </div>
@@ -1763,6 +1766,7 @@ function SubtopicLine({
   onToggle: (
     field: 'estudo' | 'resumo' | 'revisao_1' | 'revisao_2' | 'revisao_3' | 'concluido'
   ) => void
+  onCycleStatus: () => void
 }) {
   return (
     <div style={{ border: '1px solid rgba(255,255,255,.04)', borderRadius: 12, padding: 10, display: 'grid', gap: 10, background: 'rgba(255,255,255,0.01)' }}>
@@ -1809,7 +1813,7 @@ function SubtopicLine({
         >Resumo</button>
         <button
           className="ev-btn"
-          onClick={() => cycleStatus(topic)}
+          onClick={onCycleStatus}
           style={{
             ...buttonBase,
             gridColumn: 'span 3',
