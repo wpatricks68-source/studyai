@@ -1247,6 +1247,7 @@ export default function BuscaPage() {
               <button
                 onClick={handleSearch}
                 disabled={!tema.trim()}
+                title={searchMode === 'alto' ? 'Alto Busca escolhe automaticamente a IA mais economica para o seu plano.' : undefined}
                 style={{
                   padding: '9px 20px', borderRadius: '8px', border: 'none',
                   background: !tema.trim() ? 'var(--surface2,#181d2e)' : currentMeta.color,
@@ -1269,6 +1270,7 @@ export default function BuscaPage() {
           <button
             onClick={() => handleSearchModeChange('alto')}
             disabled={isLoading}
+            title="Alto Busca escolhe automaticamente a IA mais economica para o seu plano."
             style={{
               padding: '5px 13px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
               border: `1px solid ${searchMode === 'alto' ? PROVIDER_META.auto.color : 'var(--border,#1f2640)'}`,
@@ -1355,7 +1357,7 @@ export default function BuscaPage() {
           )}
         </div>
 
-        <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        <div style={{ marginTop: '10px', display: searchMode === 'advanced' ? 'flex' : 'none', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '11px', color: 'var(--muted,#6b7194)', marginRight: '2px', whiteSpace: 'nowrap' }}>IA:</span>
 
           {searchMode === 'alto' ? (
@@ -1591,26 +1593,6 @@ export default function BuscaPage() {
                 </button>
               )}
 
-              {/* Toggle Sidebar Fontes */}
-              <button
-                onClick={() => setShowSources(!showSources)}
-                title={showSources ? "Esconder Fontes" : "Mostrar Fontes"}
-                style={{
-                  padding: '5px 12px', borderRadius: '7px', border: '1px solid var(--border,#1f2640)',
-                  background: showSources ? 'rgba(108,99,255,.1)' : 'transparent',
-                  color: showSources ? 'var(--accent,#6c63ff)' : 'var(--muted,#6b7194)',
-                  fontSize: '11px', fontWeight: 600, cursor: 'pointer', marginLeft: 'auto',
-                  display: 'flex', alignItems: 'center', gap: '6px'
-                }}
-              >
-                {showSources ? (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13l-5-5 5-5M11 13l-5-5 5-5"/></svg>
-                ) : (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 13l5-5-5-5M13 13l5-5-5-5"/></svg>
-                )}
-                <span className="hide-on-mobile">Fontes</span>
-              </button>
-
               {/* Status salvo */}
               {session.savedAt && (
                 <span style={{ marginLeft: 'auto', fontSize: '11px', color: 'var(--green,#10b981)', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -1672,21 +1654,54 @@ export default function BuscaPage() {
 
           {/* Painel lateral — fontes */}
           <div style={{ 
-            width: showSources ? '210px' : '0px', 
-            opacity: showSources ? 1 : 0,
-            pointerEvents: showSources ? 'auto' : 'none',
+            width: showSources ? '240px' : '48px', 
             background: 'var(--surface,#111420)', 
-            borderLeft: showSources ? '1px solid var(--border,#1f2640)' : 'none', 
+            borderLeft: '1px solid var(--border,#1f2640)', 
             display: 'flex', 
             flexDirection: 'column', 
             flexShrink: 0, 
             overflow: 'hidden',
-            transition: 'width 0.24s ease, opacity 0.2s ease'
+            transition: 'width 0.24s ease'
           }}>
-            <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border,#1f2640)', fontSize: '10px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '1px', whiteSpace: 'nowrap' }}>
-              Fontes consultadas
+            <div style={{
+              padding: showSources ? '12px 14px' : '12px 8px',
+              borderBottom: '1px solid var(--border,#1f2640)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: showSources ? 'space-between' : 'center',
+              gap: '8px',
+              minHeight: '46px',
+            }}>
+              {showSources && (
+                <div style={{ fontSize: '10px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '1px', whiteSpace: 'nowrap' }}>
+                  Fontes consultadas
+                </div>
+              )}
+              <button
+                onClick={() => setShowSources(!showSources)}
+                title={showSources ? "Esconder Fontes" : "Mostrar Fontes"}
+                style={{
+                  width: '30px',
+                  height: '30px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border,#1f2640)',
+                  background: showSources ? 'rgba(108,99,255,.1)' : 'transparent',
+                  color: showSources ? 'var(--accent,#6c63ff)' : 'var(--muted,#6b7194)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                {showSources ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
+                )}
+              </button>
             </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '8px 14px' }}>
+            <div style={{ display: showSources ? 'block' : 'none', flex: 1, overflowY: 'auto', padding: '8px 14px' }}>
               {session.sources.length === 0 ? (
                 <div style={{ fontSize: '11px', color: 'var(--muted,#6b7194)', padding: '10px 0' }}>Carregando...</div>
               ) : session.sources.map((s, i) => (
@@ -1709,7 +1724,7 @@ export default function BuscaPage() {
             </div>
 
             {session.query && (
-              <div style={{ padding: '12px 14px', borderTop: '1px solid var(--border,#1f2640)' }}>
+              <div style={{ display: showSources ? 'block' : 'none', padding: '12px 14px', borderTop: '1px solid var(--border,#1f2640)' }}>
                 <div style={{ fontSize: '10px', color: 'var(--muted,#6b7194)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '1px' }}>Tema</div>
                 <div style={{ fontSize: '12px', color: 'var(--text,#e8eaf6)', fontWeight: 500, lineHeight: 1.4 }}>{session.query}</div>
               </div>

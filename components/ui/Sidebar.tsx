@@ -85,7 +85,7 @@ export default function Sidebar({ user, profile }: { user: User; profile: Profil
         }
         .sb-nav-link:hover {
           color: var(--text);
-          background: rgba(255,255,255,0.04);
+          background: var(--sidebar-hover);
         }
         .sb-nav-link.active {
           color: #fff;
@@ -108,8 +108,8 @@ export default function Sidebar({ user, profile }: { user: User; profile: Profil
             width: 42px;
             height: 42px;
             border-radius: 12px;
-            border: 1px solid rgba(255,255,255,.08);
-            background: rgba(13,16,32,.92);
+            border: 1px solid var(--sidebar-mobile-border);
+            background: var(--sidebar-mobile-bg);
             color: var(--text);
             align-items: center;
             justify-content: center;
@@ -122,7 +122,7 @@ export default function Sidebar({ user, profile }: { user: User; profile: Profil
             position: fixed;
             inset: 0;
             z-index: 70;
-            background: rgba(4,5,10,.65);
+            background: var(--sidebar-backdrop);
             opacity: 0;
             pointer-events: none;
             transition: opacity .2s ease;
@@ -155,8 +155,8 @@ export default function Sidebar({ user, profile }: { user: User; profile: Profil
             width: 34px;
             height: 34px;
             border-radius: 10px;
-            border: 1px solid rgba(255,255,255,.08);
-            background: rgba(255,255,255,.04);
+            border: 1px solid var(--sidebar-mobile-border);
+            background: var(--sidebar-panel);
             color: var(--text);
             align-items: center;
             justify-content: center;
@@ -185,8 +185,8 @@ export default function Sidebar({ user, profile }: { user: User; profile: Profil
         style={{
           width: '215px',
           flexShrink: 0,
-          background: 'linear-gradient(180deg, #0e1124 0%, #080a14 100%)',
-          borderRight: '1px solid rgba(255,255,255,0.055)',
+          background: 'var(--sidebar-bg)',
+          borderRight: '1px solid var(--sidebar-border-subtle)',
           display: 'flex',
           flexDirection: 'column',
           height: '100vh',
@@ -202,14 +202,14 @@ export default function Sidebar({ user, profile }: { user: User; profile: Profil
           width: '200px',
           height: '200px',
           borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(116,97,255,0.12) 0%, transparent 70%)',
+          background: 'var(--sidebar-orb)',
           pointerEvents: 'none',
         }} />
 
         {/* Logo header */}
         <div style={{
           padding: '20px 16px 16px',
-          borderBottom: '1px solid rgba(255,255,255,0.05)',
+          borderBottom: '1px solid var(--sidebar-divider)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -255,10 +255,11 @@ export default function Sidebar({ user, profile }: { user: User; profile: Profil
             <div key={group.section} style={{ marginBottom: '10px' }}>
               <div style={{
                 fontSize: '9px',
-                color: 'rgba(93,100,144,0.7)',
+                color: 'var(--muted)',
                 letterSpacing: '2px',
                 textTransform: 'uppercase',
                 padding: '8px 11px 5px',
+                opacity: 0.85,
                 fontWeight: 600,
               }}>
                 {group.section}
@@ -284,7 +285,7 @@ export default function Sidebar({ user, profile }: { user: User; profile: Profil
         {/* User footer */}
         <div style={{
           padding: '12px 12px 16px',
-          borderTop: '1px solid rgba(255,255,255,0.05)',
+          borderTop: '1px solid var(--sidebar-divider)',
         }}>
           <div style={{
             display: 'flex',
@@ -293,8 +294,8 @@ export default function Sidebar({ user, profile }: { user: User; profile: Profil
             marginBottom: '10px',
             padding: '10px',
             borderRadius: '12px',
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.05)',
+            background: 'var(--sidebar-panel)',
+            border: '1px solid var(--sidebar-panel-border)',
           }}>
             <div style={{
               width: '32px',
