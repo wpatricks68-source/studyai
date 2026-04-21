@@ -4,6 +4,7 @@ export interface Profile {
   avatar_url: string | null
   daily_goal: number
   plan_tier: 'gratuito' | 'basico' | 'premium' | string | null
+  role: 'user' | 'admin' | string | null
   target_exam: string | null
   exam_date: string | null
   created_at: string
@@ -134,6 +135,16 @@ export interface UsageDaily {
   advanced_busca_count: number
   created_at: string
   updated_at: string
+}
+
+export interface AdminAuditLog {
+  id: string
+  admin_user_id: string
+  action: string
+  target_type: string
+  target_id: string | null
+  payload: Record<string, unknown> | null
+  created_at: string
 }
 
 export interface EditalBoard {
