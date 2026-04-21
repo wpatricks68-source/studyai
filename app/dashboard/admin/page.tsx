@@ -182,7 +182,55 @@ export default async function AdminPage() {
   )
 
   return (
-    <div style={{ padding: '28px 32px 36px', display: 'flex', flexDirection: 'column', gap: '18px', minHeight: '100%', background: 'var(--bg,#0a0c12)' }}>
+    <>
+      <style>{`
+        .admin-page-shell {
+          padding: 28px 32px 36px;
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
+          min-height: 100%;
+          background: var(--bg,#0a0c12);
+        }
+        .admin-hero {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 18px;
+          flex-wrap: wrap;
+        }
+        .admin-hero-metrics {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(120px, 1fr));
+          gap: 12px;
+          min-width: 380px;
+          max-width: 520px;
+          flex: 1;
+        }
+        @media (max-width: 1180px) {
+          .admin-page-shell {
+            padding: 22px 18px 28px;
+          }
+          .admin-hero-metrics {
+            min-width: 100%;
+          }
+        }
+        @media (max-width: 760px) {
+          .admin-page-shell {
+            padding: 18px 14px 24px;
+          }
+          .admin-hero-metrics {
+            grid-template-columns: repeat(2, minmax(120px, 1fr));
+          }
+        }
+        @media (max-width: 520px) {
+          .admin-hero-metrics {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
+
+      <div className="admin-page-shell">
       <section
         style={{
           background: 'linear-gradient(135deg, rgba(245,158,11,.16), rgba(108,99,255,.14) 58%, rgba(17,20,32,.94))',
@@ -191,7 +239,7 @@ export default async function AdminPage() {
           padding: '24px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '18px', flexWrap: 'wrap' }}>
+        <div className="admin-hero">
           <div style={{ maxWidth: '720px' }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', borderRadius: '999px', padding: '6px 11px', border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)', color: '#fff', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px' }}>
               Painel protegido
@@ -204,7 +252,7 @@ export default async function AdminPage() {
             </p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(120px, 1fr))', gap: '12px', minWidth: '380px', maxWidth: '520px', flex: 1 }}>
+          <div className="admin-hero-metrics">
             {[
               { label: 'Usuarios', value: String(totalUsers), color: '#fff' },
               { label: 'Admins', value: String(totalAdmins), color: '#fbbf24' },
@@ -256,6 +304,7 @@ export default async function AdminPage() {
 
       <AdminUsersPanel users={users} />
       <AdminUsagePanel usageRows={usageRows} />
-    </div>
+      </div>
+    </>
   )
 }

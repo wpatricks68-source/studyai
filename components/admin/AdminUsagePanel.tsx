@@ -106,18 +106,64 @@ export default function AdminUsagePanel({ usageRows }: AdminUsagePanelProps) {
           font-size: 13px;
           color: var(--text,#e8eaf6);
         }
-        @media (max-width: 980px) {
-          .admin-usage-wrap {
-            overflow-x: auto;
+        .admin-usage-toolbar {
+          padding: 18px 20px;
+          border-bottom: 1px solid var(--border,#1f2640);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+        .admin-usage-toolbar-controls {
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+        .admin-usage-mobile {
+          display: none;
+          padding: 14px;
+          gap: 12px;
+        }
+        .admin-usage-card {
+          border: 1px solid var(--border,#1f2640);
+          background: var(--surface2,#181d2e);
+          border-radius: 14px;
+          padding: 14px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        .admin-usage-card-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 10px;
+        }
+        @media (max-width: 1080px) {
+          .admin-usage-desktop {
+            display: none;
           }
-          .admin-usage-table {
-            min-width: 780px;
+          .admin-usage-mobile {
+            display: grid;
+          }
+        }
+        @media (max-width: 760px) {
+          .admin-usage-toolbar {
+            align-items: stretch;
+          }
+          .admin-usage-toolbar-controls {
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr;
+          }
+          .admin-usage-card-grid {
+            grid-template-columns: 1fr;
           }
         }
       `}</style>
 
       <section style={{ background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)', borderRadius: '18px', overflow: 'hidden' }}>
-        <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border,#1f2640)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+        <div className="admin-usage-toolbar">
           <div>
             <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text,#e8eaf6)' }}>Uso diario</div>
             <div style={{ fontSize: '12px', color: 'var(--muted,#6b7194)', marginTop: '4px' }}>
@@ -125,7 +171,7 @@ export default function AdminUsagePanel({ usageRows }: AdminUsagePanelProps) {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <div className="admin-usage-toolbar-controls">
             <select
               value={selectedDate}
               onChange={event => setSelectedDate(event.target.value)}
@@ -180,48 +226,98 @@ export default function AdminUsagePanel({ usageRows }: AdminUsagePanelProps) {
           ))}
         </div>
 
-        <div className="admin-usage-wrap">
-          <table className="admin-usage-table">
-            <thead>
-              <tr>
-                <th>Usuario</th>
-                <th>Role</th>
-                <th>Plano</th>
-                <th>Alto Busca</th>
-                <th>Avancada</th>
-                <th>Ultima atualizacao</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRows.length === 0 ? (
+        <div className="admin-usage-desktop">
+          <div className="admin-usage-wrap" style={{ overflowX: 'auto' }}>
+            <table className="admin-usage-table">
+              <thead>
                 <tr>
-                  <td colSpan={6} style={{ padding: '22px 14px', color: 'var(--muted,#6b7194)', textAlign: 'center' }}>
-                    Nenhum registro encontrado para os filtros atuais.
-                  </td>
+                  <th>Usuario</th>
+                  <th>Role</th>
+                  <th>Plano</th>
+                  <th>Alto Busca</th>
+                  <th>Avancada</th>
+                  <th>Ultima atualizacao</th>
                 </tr>
-              ) : filteredRows.map(row => (
-                <tr key={row.id}>
-                  <td>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                      <strong style={{ color: 'var(--text,#e8eaf6)', fontSize: '13px' }}>
-                        {formatUserLabel(row.name, row.email, row.user_id)}
-                      </strong>
-                      <span style={{ color: 'var(--muted,#6b7194)', fontSize: '12px' }}>
-                        {row.email || `${row.user_id.slice(0, 8)}...${row.user_id.slice(-4)}`}
-                      </span>
-                    </div>
-                  </td>
-                  <td style={{ color: row.role === 'admin' ? '#fbbf24' : 'var(--muted,#6b7194)', fontWeight: 700 }}>
+              </thead>
+              <tbody>
+                {filteredRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '22px 14px', color: 'var(--muted,#6b7194)', textAlign: 'center' }}>
+                      Nenhum registro encontrado para os filtros atuais.
+                    </td>
+                  </tr>
+                ) : filteredRows.map(row => (
+                  <tr key={row.id}>
+                    <td>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        <strong style={{ color: 'var(--text,#e8eaf6)', fontSize: '13px' }}>
+                          {formatUserLabel(row.name, row.email, row.user_id)}
+                        </strong>
+                        <span style={{ color: 'var(--muted,#6b7194)', fontSize: '12px' }}>
+                          {row.email || `${row.user_id.slice(0, 8)}...${row.user_id.slice(-4)}`}
+                        </span>
+                      </div>
+                    </td>
+                    <td style={{ color: row.role === 'admin' ? '#fbbf24' : 'var(--muted,#6b7194)', fontWeight: 700 }}>
+                      {row.role === 'admin' ? 'Admin' : 'User'}
+                    </td>
+                    <td style={{ color: 'var(--muted,#6b7194)' }}>{row.plan_tier || 'gratuito'}</td>
+                    <td style={{ color: '#34d399', fontWeight: 700 }}>{row.alto_busca_count}</td>
+                    <td style={{ color: '#60a5fa', fontWeight: 700 }}>{row.advanced_busca_count}</td>
+                    <td style={{ color: 'var(--muted,#6b7194)' }}>{formatDateTime(row.updated_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="admin-usage-mobile">
+          {filteredRows.length === 0 ? (
+            <div style={{ padding: '18px', borderRadius: '14px', border: '1px solid var(--border,#1f2640)', background: 'var(--surface2,#181d2e)', color: 'var(--muted,#6b7194)', textAlign: 'center' }}>
+              Nenhum registro encontrado para os filtros atuais.
+            </div>
+          ) : filteredRows.map(row => (
+            <div key={row.id} className="admin-usage-card">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <strong style={{ color: 'var(--text,#e8eaf6)', fontSize: '14px' }}>
+                  {formatUserLabel(row.name, row.email, row.user_id)}
+                </strong>
+                <span style={{ color: 'var(--muted,#6b7194)', fontSize: '12px' }}>
+                  {row.email || `${row.user_id.slice(0, 8)}...${row.user_id.slice(-4)}`}
+                </span>
+              </div>
+
+              <div className="admin-usage-card-grid">
+                <div>
+                  <div style={{ fontSize: '10px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Role</div>
+                  <div style={{ fontSize: '13px', color: row.role === 'admin' ? '#fbbf24' : 'var(--text,#e8eaf6)', fontWeight: 700 }}>
                     {row.role === 'admin' ? 'Admin' : 'User'}
-                  </td>
-                  <td style={{ color: 'var(--muted,#6b7194)' }}>{row.plan_tier || 'gratuito'}</td>
-                  <td style={{ color: '#34d399', fontWeight: 700 }}>{row.alto_busca_count}</td>
-                  <td style={{ color: '#60a5fa', fontWeight: 700 }}>{row.advanced_busca_count}</td>
-                  <td style={{ color: 'var(--muted,#6b7194)' }}>{formatDateTime(row.updated_at)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '10px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Plano</div>
+                  <div style={{ fontSize: '13px', color: 'var(--text,#e8eaf6)' }}>{row.plan_tier || 'gratuito'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '10px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Alto Busca</div>
+                  <div style={{ fontSize: '13px', color: '#34d399', fontWeight: 700 }}>{row.alto_busca_count}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '10px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Avancada</div>
+                  <div style={{ fontSize: '13px', color: '#60a5fa', fontWeight: 700 }}>{row.advanced_busca_count}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '10px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Data</div>
+                  <div style={{ fontSize: '13px', color: 'var(--text,#e8eaf6)' }}>{formatDate(row.usage_date)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '10px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Atualizado</div>
+                  <div style={{ fontSize: '13px', color: 'var(--text,#e8eaf6)' }}>{formatDateTime(row.updated_at)}</div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
     </>
