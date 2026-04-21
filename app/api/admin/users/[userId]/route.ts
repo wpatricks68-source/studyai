@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { normalizeUserRole } from '@/lib/auth/permissions'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 const ALLOWED_PLAN_TIERS = new Set(['gratuito', 'basico', 'premium'])
 
@@ -28,6 +29,15 @@ export async function PATCH(
     return NextResponse.json({ error: 'Acesso restrito a administradores.' }, { status: 403 })
   }
 
+  let adminSupabase
+  try {
+    adminSupabase = createAdminClient()
+  } catch (error) {
+    return NextResponse.json({
+      error: error instanceof Error ? error.message : 'Cliente administrativo indisponivel.',
+    }, { status: 500 })
+  }
+
   const body = await request.json().catch(() => null)
   const nextPlanTier = typeof body?.planTier === 'string' ? body.planTier.trim().toLowerCase() : ''
 
@@ -35,7 +45,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Plano informado e invalido.' }, { status: 400 })
   }
 
-  const { data: currentProfile, error: targetError } = await supabase
+  const { data: currentProfile, error: targetError } = await adminSupabase
     .from('profiles')
     .select('id, name, plan_tier, role')
     .eq('id', params.userId)
@@ -52,7 +62,7 @@ export async function PATCH(
     })
   }
 
-  const { data: updatedProfile, error: updateError } = await supabase
+  const { data: updatedProfile, error: updateError } = await adminSupabase
     .from('profiles')
     .update({ plan_tier: nextPlanTier })
     .eq('id', params.userId)
@@ -63,7 +73,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Nao foi possivel atualizar o plano do usuario.' }, { status: 500 })
   }
 
-  const { error: auditError } = await supabase
+  const { error: auditError } = await adminSupabase
     .from('admin_audit_logs')
     .insert({
       admin_user_id: user.id,

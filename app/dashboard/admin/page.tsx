@@ -1,15 +1,35 @@
 import AdminUsersPanel from '@/components/admin/AdminUsersPanel'
 import { requireAdminPage } from '@/lib/auth/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export default async function AdminPage() {
-  const { supabase } = await requireAdminPage()
+  await requireAdminPage()
 
-  const { data: rawUsers } = await supabase
-    .from('profiles')
-    .select('id, name, plan_tier, role, target_exam, created_at')
-    .order('created_at', { ascending: false })
+  let users: Array<{
+    id: string
+    name: string | null
+    plan_tier: string | null
+    role: string | null
+    target_exam: string | null
+    created_at: string
+  }> = []
+  let loadError = ''
 
-  const users = rawUsers ?? []
+  try {
+    const adminSupabase = createAdminClient()
+    const { data: rawUsers, error } = await adminSupabase
+      .from('profiles')
+      .select('id, name, plan_tier, role, target_exam, created_at')
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      loadError = error.message
+    } else {
+      users = rawUsers ?? []
+    }
+  } catch (error) {
+    loadError = error instanceof Error ? error.message : 'Falha ao carregar usuarios.'
+  }
 
   const totalUsers = users.length
   const totalAdmins = users.filter(user => user.role === 'admin').length
@@ -54,6 +74,22 @@ export default async function AdminPage() {
           </div>
         </div>
       </section>
+
+      {loadError && (
+        <div
+          style={{
+            padding: '14px 16px',
+            borderRadius: '14px',
+            border: '1px solid rgba(239,68,68,.25)',
+            background: 'rgba(239,68,68,.08)',
+            color: '#fca5a5',
+            fontSize: '13px',
+            lineHeight: 1.7,
+          }}
+        >
+          Nao foi possivel carregar a lista administrativa de usuarios. Detalhe: {loadError}
+        </div>
+      )}
 
       <AdminUsersPanel users={users} />
     </div>

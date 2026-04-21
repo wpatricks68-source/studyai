@@ -1,14 +1,23 @@
 import { NextResponse } from 'next/server'
 
+function isHostedEnvironment() {
+  return process.env.VERCEL === '1' || Boolean(process.env.VERCEL_ENV)
+}
+
+function sanitizeMessage(value: string) {
+  return value
+    .replace(/sk-[A-Za-z0-9_\-]+/g, '[redacted-secret]')
+    .replace(/tvly-[A-Za-z0-9_\-]+/g, '[redacted-secret]')
+}
+
 export async function GET() {
-  // ⚠️ Bloqueado em produção — apenas ambiente local
-  if (process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production') {
-    return NextResponse.json({ error: 'Rota de debug desabilitada em produção.' }, { status: 403 })
+  // Mantem a rota disponivel apenas em ambiente local para evitar exposicao publica.
+  if (process.env.NODE_ENV === 'production' || isHostedEnvironment()) {
+    return NextResponse.json({ error: 'Rota de debug desabilitada fora do ambiente local.' }, { status: 403 })
   }
 
   const results: Record<string, string> = {}
 
-  // 1. Checa variáveis de ambiente
   const anthropicKey = process.env.ANTHROPIC_API_KEY
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const tavilyKey = process.env.TAVILY_API_KEY
@@ -16,18 +25,12 @@ export async function GET() {
   results['ANTHROPIC_API_KEY'] = !anthropicKey
     ? 'AUSENTE'
     : anthropicKey.startsWith('sk-ant-')
-      ? `OK (${anthropicKey.slice(0, 12)}...)`
-      : `FORMATO ESTRANHO (começa com: ${anthropicKey.slice(0, 8)})`
+      ? 'PRESENTE (formato esperado)'
+      : 'PRESENTE (formato inesperado)'
 
-  results['NEXT_PUBLIC_SUPABASE_URL'] = supabaseUrl
-    ? `OK (${supabaseUrl.slice(0, 30)}...)`
-    : 'AUSENTE'
+  results['NEXT_PUBLIC_SUPABASE_URL'] = supabaseUrl ? 'PRESENTE' : 'AUSENTE'
+  results['TAVILY_API_KEY'] = tavilyKey ? 'PRESENTE' : 'AUSENTE'
 
-  results['TAVILY_API_KEY'] = tavilyKey
-    ? `OK (${tavilyKey.slice(0, 8)}...)`
-    : 'AUSENTE'
-
-  // 2. Testa conexão real com a Anthropic
   if (anthropicKey) {
     try {
       const res = await fetch('https://api.anthropic.com/v1/models', {
@@ -40,25 +43,24 @@ export async function GET() {
 
       if (res.ok) {
         const models: string[] = (data.data ?? []).map((m: { id: string }) => m.id)
-        const hasOpus   = models.some(m => m.includes('opus'))
-        const hasSonnet = models.some(m => m.includes('sonnet'))
-        const hasHaiku  = models.some(m => m.includes('haiku'))
+        const hasOpus = models.some(model => model.includes('opus'))
+        const hasSonnet = models.some(model => model.includes('sonnet'))
+        const hasHaiku = models.some(model => model.includes('haiku'))
 
-        results['Anthropic conexão'] = 'OK — chave válida'
-        results['claude-opus-4-6']   = hasOpus   ? 'DISPONÍVEL' : 'NÃO DISPONÍVEL'
-        results['claude-sonnet-4-6'] = hasSonnet ? 'DISPONÍVEL' : 'NÃO DISPONÍVEL'
-        results['claude-haiku-4-5']  = hasHaiku  ? 'DISPONÍVEL' : 'NÃO DISPONÍVEL'
+        results['Anthropic conexao'] = 'OK - chave valida'
+        results['claude-opus'] = hasOpus ? 'DISPONIVEL' : 'NAO DISPONIVEL'
+        results['claude-sonnet'] = hasSonnet ? 'DISPONIVEL' : 'NAO DISPONIVEL'
+        results['claude-haiku'] = hasHaiku ? 'DISPONIVEL' : 'NAO DISPONIVEL'
       } else {
-        results['Anthropic conexão'] = `ERRO ${res.status}: ${data?.error?.message ?? 'sem detalhes'}`
+        results['Anthropic conexao'] = `ERRO ${res.status}: ${sanitizeMessage(String(data?.error?.message ?? 'sem detalhes'))}`
       }
-    } catch (e) {
-      results['Anthropic conexão'] = `FALHA DE REDE: ${(e as Error).message}`
+    } catch (error) {
+      results['Anthropic conexao'] = `FALHA DE REDE: ${sanitizeMessage((error as Error).message)}`
     }
   } else {
-    results['Anthropic conexão'] = 'NÃO TESTADO — chave ausente'
+    results['Anthropic conexao'] = 'NAO TESTADO - chave ausente'
   }
 
-  // 3. Testa conexão com a Tavily
   if (tavilyKey) {
     try {
       const res = await fetch('https://api.tavily.com/search', {
@@ -66,17 +68,17 @@ export async function GET() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ api_key: tavilyKey, query: 'teste', max_results: 1 }),
       })
-      results['Tavily conexão'] = res.ok ? 'OK' : `ERRO ${res.status}`
-    } catch (e) {
-      results['Tavily conexão'] = `FALHA: ${(e as Error).message}`
+      results['Tavily conexao'] = res.ok ? 'OK' : `ERRO ${res.status}`
+    } catch (error) {
+      results['Tavily conexao'] = `FALHA: ${sanitizeMessage((error as Error).message)}`
     }
   } else {
-    results['Tavily conexão'] = 'NÃO TESTADO — chave ausente'
+    results['Tavily conexao'] = 'NAO TESTADO - chave ausente'
   }
 
   return NextResponse.json({
     timestamp: new Date().toISOString(),
-    ambiente:  process.env.VERCEL_ENV ?? 'local',
+    ambiente: process.env.VERCEL_ENV ?? 'local',
     resultados: results,
-  }, { status: 200 })
+  })
 }

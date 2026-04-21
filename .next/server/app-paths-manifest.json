@@ -1,7 +1,7 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
-  "/api/ai/generate/route": "app/api/ai/generate/route.js",
   "/api/admin/users/[userId]/route": "app/api/admin/users/[userId]/route.js",
+  "/api/ai/generate/route": "app/api/ai/generate/route.js",
   "/api/debug-generate/route": "app/api/debug-generate/route.js",
   "/api/debug/route": "app/api/debug/route.js",
   "/api/edital-verticalizado/parse/route": "app/api/edital-verticalizado/parse/route.js",
@@ -16,10 +16,10 @@
   "/dashboard/busca/page": "app/dashboard/busca/page.js",
   "/dashboard/controle-diario/page": "app/dashboard/controle-diario/page.js",
   "/dashboard/cronograma/page": "app/dashboard/cronograma/page.js",
+  "/dashboard/edital-verticalizado/page": "app/dashboard/edital-verticalizado/page.js",
   "/dashboard/estatisticas/page": "app/dashboard/estatisticas/page.js",
   "/dashboard/ferramentas/page": "app/dashboard/ferramentas/page.js",
   "/dashboard/flashcards/page": "app/dashboard/flashcards/page.js",
   "/dashboard/page": "app/dashboard/page.js",
-  "/dashboard/resumos/page": "app/dashboard/resumos/page.js",
-  "/dashboard/edital-verticalizado/page": "app/dashboard/edital-verticalizado/page.js"
+  "/dashboard/resumos/page": "app/dashboard/resumos/page.js"
 }
