@@ -40,6 +40,22 @@ async function listAllAuthUsers(adminSupabase: ReturnType<typeof createAdminClie
   return users
 }
 
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message
+  if (typeof error === 'string') return error
+
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = (error as { message?: unknown }).message
+    if (typeof message === 'string' && message.trim()) return message
+  }
+
+  try {
+    return JSON.stringify(error)
+  } catch {
+    return 'Falha inesperada ao carregar dados administrativos.'
+  }
+}
+
 function getRecentDateKey(daysBack: number) {
   const date = new Date()
   date.setDate(date.getDate() - daysBack)
@@ -79,18 +95,18 @@ export default async function AdminPage() {
   }> = []
 
   let loadError = ''
+  const warnings: string[] = []
 
   try {
     const adminSupabase = createAdminClient()
     const todayKey = getTodayKey()
     const usageSince = getRecentDateKey(29)
 
-    const [profilesRes, authUsersRes, usageRes] = await Promise.all([
+    const [profilesRes, usageRes] = await Promise.all([
       adminSupabase
         .from('profiles')
         .select('id, name, plan_tier, role, target_exam, created_at')
         .order('created_at', { ascending: false }),
-      listAllAuthUsers(adminSupabase),
       adminSupabase
         .from('usage_daily')
         .select('id, user_id, usage_date, alto_busca_count, advanced_busca_count, updated_at')
@@ -103,8 +119,14 @@ export default async function AdminPage() {
     if (usageRes.error) throw usageRes.error
 
     const profileRows = (profilesRes.data ?? []) as ProfileRow[]
-    const authUsers = authUsersRes
     const recentUsage = (usageRes.data ?? []) as UsageRow[]
+    let authUsers: Array<{ id: string; email: string | null }> = []
+
+    try {
+      authUsers = await listAllAuthUsers(adminSupabase)
+    } catch (error) {
+      warnings.push(`Nao foi possivel carregar emails via auth admin: ${getErrorMessage(error)}`)
+    }
 
     const authEmailMap = new Map(authUsers.map(user => [user.id, user.email]))
     const profileMap = new Map(profileRows.map(profile => [profile.id, profile]))
@@ -143,7 +165,7 @@ export default async function AdminPage() {
       }
     })
   } catch (error) {
-    loadError = error instanceof Error ? error.message : 'Falha ao carregar usuarios.'
+    loadError = getErrorMessage(error)
   }
 
   const totalUsers = users.length
@@ -213,6 +235,22 @@ export default async function AdminPage() {
           }}
         >
           Nao foi possivel carregar os dados administrativos. Detalhe: {loadError}
+        </div>
+      )}
+
+      {!loadError && warnings.length > 0 && (
+        <div
+          style={{
+            padding: '14px 16px',
+            borderRadius: '14px',
+            border: '1px solid rgba(245,158,11,.25)',
+            background: 'rgba(245,158,11,.08)',
+            color: '#fbbf24',
+            fontSize: '13px',
+            lineHeight: 1.7,
+          }}
+        >
+          {warnings.join(' | ')}
         </div>
       )}
 
