@@ -9,8 +9,9 @@ import type { Profile } from '@/types/database'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Menu, X } from 'lucide-react'
 import { GlobalTimer } from './GlobalTimer'
+import { isAdminRole } from '@/lib/auth/permissions'
 
-const navItems = [
+const baseNavItems = [
   {
     section: 'Principal',
     items: [
@@ -40,6 +41,18 @@ export default function Sidebar({ user, profile }: { user: User; profile: Profil
   const pathname = usePathname()
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const isAdmin = isAdminRole(profile?.role)
+  const navItems = [
+    ...baseNavItems,
+    ...(isAdmin
+      ? [
+          {
+            section: 'Administracao',
+            items: [{ href: '/dashboard/admin', label: 'Painel Admin', icon: IconShield }],
+          },
+        ]
+      : []),
+  ]
 
   useEffect(() => {
     setMobileOpen(false)
@@ -377,4 +390,7 @@ function IconLayers({ active }: { active: boolean }) {
 }
 function IconUser({ active }: { active: boolean }) {
   return <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: active ? 1 : 0.7, flexShrink: 0 }}><circle cx="8" cy="5" r="2.5" /><path d="M3 13c.8-2 2.6-3 5-3s4.2 1 5 3" /></svg>
+}
+function IconShield({ active }: { active: boolean }) {
+  return <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: active ? 1 : 0.7, flexShrink: 0 }}><path d="M8 1.5l5 2v3.9c0 3.1-1.9 5.9-5 7.1-3.1-1.2-5-4-5-7.1V3.5l5-2z" /><path d="M6.2 8.1l1.2 1.2 2.5-2.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
 }
