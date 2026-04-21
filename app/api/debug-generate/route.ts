@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+function isHostedEnvironment() {
+  return process.env.VERCEL === '1' || Boolean(process.env.VERCEL_ENV)
+}
+
+function sanitizeMessage(value: string) {
+  return value
+    .replace(/sk-[A-Za-z0-9_\-]+/g, '[redacted-secret]')
+    .replace(/tvly-[A-Za-z0-9_\-]+/g, '[redacted-secret]')
+}
+
 export async function POST(req: NextRequest) {
-  // ⚠️ Bloqueado em produção — apenas ambiente local
-  if (process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production') {
-    return NextResponse.json({ error: 'Rota de debug desabilitada em produção.' }, { status: 403 })
+  // Mantem a rota disponivel apenas em ambiente local para evitar exposicao publica.
+  if (process.env.NODE_ENV === 'production' || isHostedEnvironment()) {
+    return NextResponse.json({ error: 'Rota de debug desabilitada fora do ambiente local.' }, { status: 403 })
   }
 
   const log: string[] = []
@@ -11,44 +21,40 @@ export async function POST(req: NextRequest) {
   try {
     log.push('1. Iniciando')
 
-    // Lê body
     const body = await req.json()
-    log.push(`2. Body recebido: content=${!!body.content}, type=${body.type}, topic=${body.topic}`)
+    log.push(`2. Body recebido: content=${Boolean(body.content)}, type=${String(body.type ?? 'desconhecido')}, topic=${Boolean(body.topic)}`)
 
     const apiKey = process.env.ANTHROPIC_API_KEY
     log.push(`3. API key: ${apiKey ? 'presente' : 'AUSENTE'}`)
 
-    // Importa Anthropic
     const { default: Anthropic } = await import('@anthropic-ai/sdk')
     log.push('4. Anthropic importado')
 
     const anthropic = new Anthropic({ apiKey })
     log.push('5. Cliente criado')
 
-    // Chamada mínima
     const message = await anthropic.messages.create({
-      model:      'claude-haiku-4-5',
-      messages:   [{ role: 'user', content: `Responda em 1 linha: o que é ${body.topic ?? 'legalidade'}?` }],
+      model: 'claude-haiku-4-5',
+      messages: [{ role: 'user', content: `Responda em 1 linha: o que e ${body.topic ?? 'legalidade'}?` }],
       max_tokens: 50,
     })
     log.push('6. Message OK')
 
     const result = message.content[0]?.type === 'text' ? message.content[0].text : ''
-    log.push(`7. Resultado: "${result}"`)
+    log.push('7. Resultado recebido')
 
     return NextResponse.json({ ok: true, result, log })
-
   } catch (err: unknown) {
-    const e = err as Error & { status?: number; code?: string }
-    log.push(`ERRO: ${e.message}`)
+    const error = err as Error & { status?: number; code?: string }
+    const safeMessage = sanitizeMessage(error.message)
+    log.push(`ERRO: ${safeMessage}`)
 
     return NextResponse.json({
-      ok:      false,
+      ok: false,
       log,
-      error:   e.message,
-      status:  e.status,
-      code:    e.code,
-      stack:   e.stack?.split('\n').slice(0, 5),
+      error: safeMessage,
+      status: error.status,
+      code: error.code,
     }, { status: 200 })
   }
 }
