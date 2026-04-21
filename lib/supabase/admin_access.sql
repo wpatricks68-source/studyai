@@ -4,6 +4,12 @@ check (role in ('user', 'admin'));
 
 alter table public.profiles enable row level security;
 
+create index if not exists profiles_role_idx
+  on public.profiles (role);
+
+create index if not exists profiles_plan_tier_idx
+  on public.profiles (plan_tier);
+
 create or replace function public.is_admin(check_user_id uuid default auth.uid())
 returns boolean
 language sql
@@ -19,6 +25,19 @@ as $$
 $$;
 
 grant execute on function public.is_admin(uuid) to authenticated;
+
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.tables
+    where table_schema = 'public'
+      and table_name = 'usage_daily'
+  ) then
+    execute 'create index if not exists usage_daily_usage_date_idx on public.usage_daily (usage_date desc)';
+  end if;
+end;
+$$;
 
 create or replace function public.enforce_profile_admin_fields()
 returns trigger

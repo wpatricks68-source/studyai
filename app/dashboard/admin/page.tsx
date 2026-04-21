@@ -1,6 +1,54 @@
+import AdminUsagePanel from '@/components/admin/AdminUsagePanel'
 import AdminUsersPanel from '@/components/admin/AdminUsersPanel'
 import { requireAdminPage } from '@/lib/auth/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+
+type ProfileRow = {
+  id: string
+  name: string | null
+  plan_tier: string | null
+  role: string | null
+  target_exam: string | null
+  created_at: string
+}
+
+type UsageRow = {
+  id: string
+  user_id: string
+  usage_date: string
+  alto_busca_count: number
+  advanced_busca_count: number
+  updated_at: string
+}
+
+async function listAllAuthUsers(adminSupabase: ReturnType<typeof createAdminClient>) {
+  const users: Array<{ id: string; email: string | null }> = []
+  let page = 1
+  const perPage = 1000
+
+  while (true) {
+    const { data, error } = await adminSupabase.auth.admin.listUsers({ page, perPage })
+    if (error) throw error
+
+    const batch = data.users.map(user => ({ id: user.id, email: user.email ?? null }))
+    users.push(...batch)
+
+    if (batch.length < perPage) break
+    page += 1
+  }
+
+  return users
+}
+
+function getRecentDateKey(daysBack: number) {
+  const date = new Date()
+  date.setDate(date.getDate() - daysBack)
+  return date.toISOString().slice(0, 10)
+}
+
+function getTodayKey() {
+  return new Date().toISOString().slice(0, 10)
+}
 
 export default async function AdminPage() {
   await requireAdminPage()
@@ -8,25 +56,92 @@ export default async function AdminPage() {
   let users: Array<{
     id: string
     name: string | null
+    email: string | null
     plan_tier: string | null
     role: string | null
     target_exam: string | null
     created_at: string
+    alto_today: number
+    advanced_today: number
   }> = []
+
+  let usageRows: Array<{
+    id: string
+    user_id: string
+    usage_date: string
+    alto_busca_count: number
+    advanced_busca_count: number
+    updated_at: string
+    name: string | null
+    email: string | null
+    plan_tier: string | null
+    role: string | null
+  }> = []
+
   let loadError = ''
 
   try {
     const adminSupabase = createAdminClient()
-    const { data: rawUsers, error } = await adminSupabase
-      .from('profiles')
-      .select('id, name, plan_tier, role, target_exam, created_at')
-      .order('created_at', { ascending: false })
+    const todayKey = getTodayKey()
+    const usageSince = getRecentDateKey(29)
 
-    if (error) {
-      loadError = error.message
-    } else {
-      users = rawUsers ?? []
+    const [profilesRes, authUsersRes, usageRes] = await Promise.all([
+      adminSupabase
+        .from('profiles')
+        .select('id, name, plan_tier, role, target_exam, created_at')
+        .order('created_at', { ascending: false }),
+      listAllAuthUsers(adminSupabase),
+      adminSupabase
+        .from('usage_daily')
+        .select('id, user_id, usage_date, alto_busca_count, advanced_busca_count, updated_at')
+        .gte('usage_date', usageSince)
+        .order('usage_date', { ascending: false })
+        .order('updated_at', { ascending: false }),
+    ])
+
+    if (profilesRes.error) throw profilesRes.error
+    if (usageRes.error) throw usageRes.error
+
+    const profileRows = (profilesRes.data ?? []) as ProfileRow[]
+    const authUsers = authUsersRes
+    const recentUsage = (usageRes.data ?? []) as UsageRow[]
+
+    const authEmailMap = new Map(authUsers.map(user => [user.id, user.email]))
+    const profileMap = new Map(profileRows.map(profile => [profile.id, profile]))
+    const usageTodayByUser = new Map<string, { alto: number; advanced: number }>()
+
+    for (const row of recentUsage) {
+      if (row.usage_date !== todayKey) continue
+
+      const current = usageTodayByUser.get(row.user_id) ?? { alto: 0, advanced: 0 }
+      usageTodayByUser.set(row.user_id, {
+        alto: current.alto + (row.alto_busca_count ?? 0),
+        advanced: current.advanced + (row.advanced_busca_count ?? 0),
+      })
     }
+
+    users = profileRows.map(profile => {
+      const todayUsage = usageTodayByUser.get(profile.id) ?? { alto: 0, advanced: 0 }
+
+      return {
+        ...profile,
+        email: authEmailMap.get(profile.id) ?? null,
+        alto_today: todayUsage.alto,
+        advanced_today: todayUsage.advanced,
+      }
+    })
+
+    usageRows = recentUsage.map(row => {
+      const profile = profileMap.get(row.user_id)
+
+      return {
+        ...row,
+        name: profile?.name ?? null,
+        email: authEmailMap.get(row.user_id) ?? null,
+        plan_tier: profile?.plan_tier ?? null,
+        role: profile?.role ?? null,
+      }
+    })
   } catch (error) {
     loadError = error instanceof Error ? error.message : 'Falha ao carregar usuarios.'
   }
@@ -35,6 +150,14 @@ export default async function AdminPage() {
   const totalAdmins = users.filter(user => user.role === 'admin').length
   const premiumUsers = users.filter(user => user.plan_tier === 'premium').length
   const basicoUsers = users.filter(user => user.plan_tier === 'basico').length
+  const todayUsage = users.reduce(
+    (acc, user) => {
+      acc.alto += user.alto_today
+      acc.advanced += user.advanced_today
+      return acc
+    },
+    { alto: 0, advanced: 0 }
+  )
 
   return (
     <div style={{ padding: '28px 32px 36px', display: 'flex', flexDirection: 'column', gap: '18px', minHeight: '100%', background: 'var(--bg,#0a0c12)' }}>
@@ -52,19 +175,21 @@ export default async function AdminPage() {
               Painel protegido
             </div>
             <h1 style={{ margin: '14px 0 0', fontSize: '30px', lineHeight: 1.08, letterSpacing: '-1px', color: '#fff' }}>
-              Acoes administrativas centralizadas e isoladas da area do aluno.
+              Administracao operacional com governanca de acesso e visao diaria de consumo.
             </h1>
-            <p style={{ margin: '12px 0 0', maxWidth: '680px', fontSize: '14px', lineHeight: 1.75, color: 'rgba(232,234,246,.82)' }}>
-              Este MVP entrega a base segura para gerenciamento operacional: acesso exclusivo para admins, leitura de usuarios e alteracao de plano com validacao server-side.
+            <p style={{ margin: '12px 0 0', maxWidth: '700px', fontSize: '14px', lineHeight: 1.75, color: 'rgba(232,234,246,.82)' }}>
+              Esta segunda camada libera promocao e revogacao de admins, filtros operacionais completos e leitura consolidada do uso diario por usuario.
             </p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(140px, 1fr))', gap: '12px', minWidth: '320px', maxWidth: '420px', flex: 1 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(120px, 1fr))', gap: '12px', minWidth: '380px', maxWidth: '520px', flex: 1 }}>
             {[
               { label: 'Usuarios', value: String(totalUsers), color: '#fff' },
               { label: 'Admins', value: String(totalAdmins), color: '#fbbf24' },
               { label: 'Planos Basico', value: String(basicoUsers), color: '#34d399' },
               { label: 'Planos Premium', value: String(premiumUsers), color: '#60a5fa' },
+              { label: 'Alto hoje', value: String(todayUsage.alto), color: '#22c55e' },
+              { label: 'Avancada hoje', value: String(todayUsage.advanced), color: '#38bdf8' },
             ].map(item => (
               <div key={item.label} style={{ background: 'rgba(7,10,18,.34)', border: '1px solid rgba(255,255,255,.08)', borderRadius: '16px', padding: '14px 16px' }}>
                 <div style={{ fontSize: '11px', color: 'rgba(232,234,246,.62)', textTransform: 'uppercase', letterSpacing: '1px' }}>{item.label}</div>
@@ -87,11 +212,12 @@ export default async function AdminPage() {
             lineHeight: 1.7,
           }}
         >
-          Nao foi possivel carregar a lista administrativa de usuarios. Detalhe: {loadError}
+          Nao foi possivel carregar os dados administrativos. Detalhe: {loadError}
         </div>
       )}
 
       <AdminUsersPanel users={users} />
+      <AdminUsagePanel usageRows={usageRows} />
     </div>
   )
 }
