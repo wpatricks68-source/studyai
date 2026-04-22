@@ -6,6 +6,18 @@ export async function GET(request: Request) {
   const code = searchParams.get('code')
   const next = searchParams.get('next') ?? '/dashboard'
 
+  // Captura erros retornados diretamente pelo Supabase (ex: otp_expired)
+  const errorCode = searchParams.get('error_code')
+  const errorDescription = searchParams.get('error_description')
+
+  if (errorCode) {
+    const params = new URLSearchParams({
+      error: errorCode,
+      error_description: errorDescription ?? '',
+    })
+    return NextResponse.redirect(`${origin}/auth/login?${params.toString()}`)
+  }
+
   if (code) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
@@ -14,5 +26,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`)
+  return NextResponse.redirect(`${origin}/auth/login?error=auth_callback_failed`)
 }
