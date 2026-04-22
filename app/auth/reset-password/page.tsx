@@ -1,36 +1,17 @@
 'use client'
 
-import { Suspense, useState, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { LockKeyhole, ShieldCheck } from 'lucide-react'
 
-function ResetPasswordForm() {
+export default function ResetPasswordPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [exchanging, setExchanging] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
-
-  // Troca o code PKCE por sessão ao montar a página
-  useEffect(() => {
-    const code = searchParams.get('code')
-    if (!code) {
-      setExchanging(false)
-      return
-    }
-
-    const supabase = createClient()
-    supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
-      if (error) {
-        setError('Link inválido ou expirado. Solicite um novo link de recuperação.')
-      }
-      setExchanging(false)
-    })
-  }, [searchParams])
 
   function validatePasswordStrength(pass: string) {
     return /[A-Z]/.test(pass) && /[a-z]/.test(pass) && /[0-9]/.test(pass) && pass.length >= 8
@@ -65,14 +46,6 @@ function ResetPasswordForm() {
     setTimeout(() => {
       router.push('/dashboard')
     }, 3000)
-  }
-
-  if (exchanging) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
-        <div style={{ color: 'var(--muted)', fontSize: '14px' }}>Validando link...</div>
-      </div>
-    )
   }
 
   if (success) {
@@ -154,17 +127,5 @@ function ResetPasswordForm() {
         </form>
       </div>
     </div>
-  )
-}
-
-export default function ResetPasswordPage() {
-  return (
-    <Suspense fallback={
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
-        <div style={{ color: 'var(--muted)', fontSize: '14px' }}>Carregando...</div>
-      </div>
-    }>
-      <ResetPasswordForm />
-    </Suspense>
   )
 }
