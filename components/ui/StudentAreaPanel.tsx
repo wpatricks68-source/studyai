@@ -155,7 +155,7 @@ export default function StudentAreaPanel({
     setRecoverySent(false)
     const supabase = createClient()
     await supabase.auth.resetPasswordForEmail(user.email, {
-      redirectTo: `${window.location.origin}/auth/callback/reset-password`,
+      redirectTo: `${window.location.origin}/auth/reset-password`,
     })
     setSendingRecovery(false)
     setRecoverySent(true)

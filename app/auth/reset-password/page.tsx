@@ -1,17 +1,30 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { LockKeyhole, ShieldCheck } from 'lucide-react'
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const router = useRouter()
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [initializing, setInitializing] = useState(true)
+
+  useEffect(() => {
+    // Instanciar o cliente do Supabase na montagem do componente no client-side.
+    // O @supabase/ssr identifica automaticamente o parametro ?code= na URL 
+    // e consome o PKCE verifier alojado no client do browser.
+    const supabase = createClient()
+    
+    // Aguardar uma fracao de segundo para a troca automatica ocorrer
+    setTimeout(() => {
+      setInitializing(false)
+    }, 1500)
+  }, [])
 
   function validatePasswordStrength(pass: string) {
     return /[A-Z]/.test(pass) && /[a-z]/.test(pass) && /[0-9]/.test(pass) && pass.length >= 8
@@ -32,6 +45,8 @@ export default function ResetPasswordPage() {
     setError('')
 
     const supabase = createClient()
+    // Como o cliente ja trocou o codigo pela sessao transparentemente, 
+    // chama-se updateUser diretamente.
     const { error: updateError } = await supabase.auth.updateUser({ password })
 
     if (updateError) {
@@ -46,6 +61,14 @@ export default function ResetPasswordPage() {
     setTimeout(() => {
       router.push('/dashboard')
     }, 3000)
+  }
+
+  if (initializing) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+        <div style={{ color: 'var(--muted)', fontSize: '14px' }}>Preparando ambiente seguro...</div>
+      </div>
+    )
   }
 
   if (success) {
@@ -127,5 +150,13 @@ export default function ResetPasswordPage() {
         </form>
       </div>
     </div>
+  )
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}><div style={{ color: 'var(--muted)', fontSize: '14px' }}>Carregando...</div></div>}>
+      <ResetPasswordForm />
+    </Suspense>
   )
 }
