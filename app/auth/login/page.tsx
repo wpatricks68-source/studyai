@@ -1,16 +1,26 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // Erros vindos do callback de autenticacao (ex: link expirado)
+  const urlError = searchParams.get('error')
+  const urlErrorMap: Record<string, string> = {
+    otp_expired: 'O link de recuperacao expirou. Solicite um novo clicando em "Esqueci a senha?".',
+    auth_callback_failed: 'Falha na autenticacao. Tente novamente ou solicite um novo link.',
+    access_denied: 'Link invalido ou ja utilizado. Solicite um novo clicando em "Esqueci a senha?".',
+  }
+  const urlErrorMessage = urlError ? (urlErrorMap[urlError] ?? 'Ocorreu um erro. Tente novamente.') : null
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -94,6 +104,23 @@ export default function LoginPage() {
         >
           Continue de onde parou
         </div>
+
+        {urlErrorMessage && (
+          <div
+            style={{
+              background: 'rgba(245,158,11,.1)',
+              border: '1px solid rgba(245,158,11,.25)',
+              borderRadius: '8px',
+              padding: '10px 14px',
+              marginBottom: '16px',
+              fontSize: '13px',
+              color: '#fbbf24',
+              lineHeight: 1.5,
+            }}
+          >
+            {urlErrorMessage}
+          </div>
+        )}
 
         {error && (
           <div
