@@ -12,11 +12,17 @@ export async function GET(request: Request) {
     if (!error) {
       // Sessao estabelecida com sucesso — redirecionar para a pagina de nova senha
       return NextResponse.redirect(`${origin}/auth/reset-password`)
+    } else {
+      // Log no servidor para ajudar no debug
+      console.error('Supabase exchangeCodeForSession error:', error)
+      return NextResponse.redirect(
+        `${origin}/auth/login?error=${encodeURIComponent(error.name)}&error_description=${encodeURIComponent(error.message)}`
+      )
     }
   }
 
-  // Falha na troca — redirecionar para login com erro descritivo
+  // Falha caso nao haja 'code' na URL (erro do provedor de e-mail ou link corrompido)
   return NextResponse.redirect(
-    `${origin}/auth/login?error=otp_expired&error_description=Link+invalido+ou+expirado`
+    `${origin}/auth/login?error=missing_code&error_description=Link+incompleto+ou+invalido`
   )
 }
