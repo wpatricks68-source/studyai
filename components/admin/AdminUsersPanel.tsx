@@ -197,10 +197,19 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
         .admin-users-filters {
           padding: 16px 20px;
           border-bottom: 1px solid var(--border,#1f2640);
-          display: grid;
-          grid-template-columns: minmax(220px,1.4fr) repeat(3, minmax(160px,.6fr));
-          gap: 10px;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 12px;
         }
+        .admin-users-filters > * {
+          flex: 1;
+          min-width: 140px;
+        }
+        .admin-users-filters input {
+          flex: 2.2;
+          min-width: 280px;
+        }
+
         .admin-users-mobile {
           display: none;
           padding: 14px;
@@ -226,8 +235,8 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
           gap: 10px;
         }
         @media (max-width: 1400px) {
-          .admin-users-filters {
-            grid-template-columns: repeat(2, minmax(220px, 1fr));
+          .admin-users-filters input {
+             flex: 1 1 100%;
           }
         }
         @media (max-width: 1180px) {
@@ -241,6 +250,9 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
           }
           .admin-users-mobile {
             display: grid;
+          }
+          .admin-users-filters > * {
+            flex: 1 1 calc(50% - 12px);
           }
         }
         @media (max-width: 760px) {

@@ -47,8 +47,14 @@ set search_path = public
 as $$
 declare
   acting_user_id uuid := auth.uid();
+  acting_role text := auth.role();
   acting_is_admin boolean := public.is_admin(acting_user_id);
 begin
+  -- Allow everything if done by service_role (Admin API client)
+  if acting_role = 'service_role' then
+    return new;
+  end if;
+
   if acting_user_id is null then
     raise exception 'Authentication required to change profiles.';
   end if;
