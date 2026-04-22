@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { LockKeyhole, ShieldCheck } from 'lucide-react'
 
 function ResetPasswordForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -15,16 +16,38 @@ function ResetPasswordForm() {
   const [initializing, setInitializing] = useState(true)
 
   useEffect(() => {
-    // Instanciar o cliente do Supabase na montagem do componente no client-side.
-    // O @supabase/ssr identifica automaticamente o parametro ?code= na URL 
-    // e consome o PKCE verifier alojado no client do browser.
+    const code = searchParams?.get('code')
     const supabase = createClient()
-    
-    // Aguardar uma fracao de segundo para a troca automatica ocorrer
-    setTimeout(() => {
+
+    // Rotina de setup que gerencia as sessoes com seguranca
+    const setupSession = async () => {
+      // 1. Verifica se ja existe uma sessao ativa
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (session) {
+        // Se ja tiver sessao, ta pronto pra trocar a senha
+        setInitializing(false)
+        return
+      }
+
+      // 2. Se nao tiver sessao mas tiver o codigo na URL, faz o exchange manual
+      if (code) {
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+        
+        if (exchangeError) {
+          setError(`Erro de seguranca local: ${exchangeError.message} (${exchangeError.name}). Tente um novo link.`)
+        }
+        setInitializing(false)
+        return
+      }
+
+      // 3. Sem sessao e sem codigo
       setInitializing(false)
-    }, 1500)
-  }, [])
+      setError('Acesso invalido. Nenhum codigo de recuperacao encontrado na URL.')
+    }
+
+    setupSession()
+  }, [searchParams])
 
   function validatePasswordStrength(pass: string) {
     return /[A-Z]/.test(pass) && /[a-z]/.test(pass) && /[0-9]/.test(pass) && pass.length >= 8
@@ -45,12 +68,12 @@ function ResetPasswordForm() {
     setError('')
 
     const supabase = createClient()
-    // Como o cliente ja trocou o codigo pela sessao transparentemente, 
-    // chama-se updateUser diretamente.
+    
+    // Tenta atualizar a senha
     const { error: updateError } = await supabase.auth.updateUser({ password })
 
     if (updateError) {
-      setError(updateError.message)
+      setError(`Falha ao definir senha: ${updateError.message}`)
       setLoading(false)
       return
     }
@@ -142,7 +165,7 @@ function ResetPasswordForm() {
 
           <button
             type="submit"
-            disabled={loading || !!error}
+            disabled={loading || !!error} // Mantivemos o block quando tem error para o usuario nao forcar
             style={{ width: '100%', padding: '12px', borderRadius: '8px', background: loading || error ? 'var(--surface2)' : 'var(--accent)', color: loading || error ? 'var(--muted)' : '#fff', border: 'none', fontSize: '14px', fontWeight: 600, cursor: loading || error ? 'default' : 'pointer' }}
           >
             {loading ? 'Atualizando...' : 'Redefinir senha'}
