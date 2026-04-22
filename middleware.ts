@@ -42,7 +42,7 @@ export async function middleware(request: NextRequest) {
     user = null
   }
 
-  const publicRoutes = ['/auth/login', '/auth/register', '/auth/callback']
+  const publicRoutes = ['/auth/login', '/auth/register', '/auth/callback', '/auth/forgot-password']
   const isPublic = publicRoutes.some(
     route =>
       request.nextUrl.pathname === route ||
