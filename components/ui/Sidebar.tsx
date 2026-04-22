@@ -16,7 +16,6 @@ const baseNavItems = [
     section: 'Principal',
     items: [
       { href: '/dashboard', label: 'Dashboard', icon: IconGrid },
-      { href: '/dashboard/aluno', label: 'Area do Aluno', icon: IconUser },
       { href: '/dashboard/busca', label: 'Busca + IA', icon: IconSearch },
       { href: '/dashboard/resumos', label: 'Resumos', icon: IconBook },
       { href: '/dashboard/flashcards', label: 'Estudo Ativo', icon: IconCards },
@@ -257,6 +256,59 @@ export default function Sidebar({ user, profile }: { user: User; profile: Profil
           </div>
         </div>
 
+        {/* Account Section */}
+        <div style={{ padding: '4px 12px 0' }}>
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+            padding: '10px',
+            borderRadius: '16px',
+            background: 'var(--sidebar-panel)',
+            border: '1px solid var(--sidebar-panel-border)',
+            marginBottom: '4px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '2px' }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #7461ff, #00e5b0)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '12px',
+                fontWeight: 700,
+                color: '#fff',
+                flexShrink: 0,
+                boxShadow: '0 4px 12px rgba(116,97,255,0.35)',
+              }}>
+                {initials}
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '12px', color: 'var(--text)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {profile?.name?.split(' ')[0] ?? 'Usuário'}
+                </div>
+                <div style={{ fontSize: '10px', color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {profile?.target_exam ?? 'Concurso'}
+                </div>
+              </div>
+            </div>
+            
+            <div style={{ height: '1px', background: 'var(--sidebar-divider)', margin: '2px 0' }} />
+            
+            <Link
+              href="/dashboard/aluno"
+              onClick={() => setMobileOpen(false)}
+              className={`sb-nav-link${pathname === '/dashboard/aluno' ? ' active' : ''}`}
+              style={{ margin: 0, padding: '7px 9px' }}
+            >
+              <IconUser active={pathname === '/dashboard/aluno'} />
+              Area do Aluno
+            </Link>
+          </div>
+        </div>
+
         {/* Timer */}
         <div style={{ padding: '4px 12px 0' }}>
           <GlobalTimer />
@@ -297,44 +349,9 @@ export default function Sidebar({ user, profile }: { user: User; profile: Profil
 
         {/* User footer */}
         <div style={{
-          padding: '12px 12px 16px',
+          padding: '8px 12px 12px',
           borderTop: '1px solid var(--sidebar-divider)',
         }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            marginBottom: '10px',
-            padding: '10px',
-            borderRadius: '12px',
-            background: 'var(--sidebar-panel)',
-            border: '1px solid var(--sidebar-panel-border)',
-          }}>
-            <div style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, #7461ff, #00e5b0)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '12px',
-              fontWeight: 700,
-              color: '#fff',
-              flexShrink: 0,
-              boxShadow: '0 4px 12px rgba(116,97,255,0.35)',
-            }}>
-              {initials}
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: '12px', color: 'var(--text)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {profile?.name?.split(' ')[0] ?? 'Usuário'}
-              </div>
-              <div style={{ fontSize: '10px', color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {profile?.target_exam ?? 'Concurso'}
-              </div>
-            </div>
-          </div>
           <button
             onClick={handleLogout}
             style={{
