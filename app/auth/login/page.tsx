@@ -180,6 +180,22 @@ export default function LoginPage() {
               onFocus={e => (e.target.style.borderColor = 'var(--accent)')}
               onBlur={e => (e.target.style.borderColor = 'var(--border)')}
             />
+            <div style={{ textAlign: 'right', marginTop: '8px' }}>
+              <Link
+                href="/auth/forgot-password"
+                style={{
+                  fontSize: '12px',
+                  color: 'var(--accent)',
+                  textDecoration: 'none',
+                  fontWeight: 500,
+                  opacity: 0.85,
+                }}
+                onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
+                onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
+              >
+                Esqueci a senha?
+              </Link>
+            </div>
           </div>
 
           <button

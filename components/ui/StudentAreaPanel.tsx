@@ -78,6 +78,7 @@ export default function StudentAreaPanel({
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(initialProfile)
   const [email, setEmail] = useState(user.email)
+  const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [profileForm, setProfileForm] = useState({
@@ -135,23 +136,59 @@ export default function StudentAreaPanel({
 
     if (error) return setEmailNotice({ tone: 'error', text: error.message })
 
-    setEmailNotice({ tone: 'success', text: 'Solicitacao enviada. Confirme o novo email para concluir a troca.' })
+    setEmailNotice({ tone: 'success', text: 'Solicitacao enviada. O novo email so sera validado apos voce clicar no link de confirmacao enviado para o novo endereco.' })
     router.refresh()
+  }
+
+  function validatePasswordStrength(pass: string) {
+    const hasUpper = /[A-Z]/.test(pass)
+    const hasLower = /[a-z]/.test(pass)
+    const hasNumber = /[0-9]/.test(pass)
+    const isLongEnough = pass.length >= 8
+    return hasUpper && hasLower && hasNumber && isLongEnough
   }
 
   async function handlePasswordUpdate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (newPassword.length < 8) return setPasswordNotice({ tone: 'error', text: 'A senha precisa ter pelo menos 8 caracteres.' })
-    if (newPassword !== confirmPassword) return setPasswordNotice({ tone: 'error', text: 'A confirmacao da senha nao confere.' })
+    
+    if (!currentPassword) {
+      return setPasswordNotice({ tone: 'error', text: 'Informe sua senha atual para autorizar a mudanca.' })
+    }
+
+    if (!validatePasswordStrength(newPassword)) {
+      return setPasswordNotice({ 
+        tone: 'error', 
+        text: 'A nova senha deve conter letras (maiusculas e minusculas), numeros e no minimo 8 caracteres.' 
+      })
+    }
+
+    if (newPassword !== confirmPassword) {
+      return setPasswordNotice({ tone: 'error', text: 'A confirmacao da nova senha nao confere.' })
+    }
 
     setUpdatingPassword(true)
     setPasswordNotice(null)
+    
     const supabase = createClient()
+
+    // 1. Validar a senha atual tentando um login temporario
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: currentPassword,
+    })
+
+    if (authError) {
+      setUpdatingPassword(false)
+      return setPasswordNotice({ tone: 'error', text: 'Senha atual incorreta. Nao foi possivel autorizar a troca.' })
+    }
+
+    // 2. Proceder com a atualizacao
     const { error } = await supabase.auth.updateUser({ password: newPassword })
     setUpdatingPassword(false)
 
     if (error) return setPasswordNotice({ tone: 'error', text: error.message })
 
+    setCurrentPassword('')
     setNewPassword('')
     setConfirmPassword('')
     setPasswordNotice({ tone: 'success', text: 'Senha atualizada com sucesso.' })
@@ -288,11 +325,44 @@ export default function StudentAreaPanel({
 
               <form onSubmit={handlePasswordUpdate} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><LockKeyhole size={16} color="var(--accent2)" /><span style={{ fontSize: '12px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Alterar senha</span></div>
+                
+                <div style={{ marginBottom: '4px' }}>
+                  <input 
+                    className="student-field" 
+                    type="password" 
+                    value={currentPassword} 
+                    onChange={event => setCurrentPassword(event.target.value)} 
+                    placeholder="Senha atual obrigatoria" 
+                  />
+                  <div style={{ fontSize: '11px', color: 'var(--muted)', marginTop: '4px', marginLeft: '4px' }}>Voce precisa confirmar sua senha atual para definir uma nova.</div>
+                </div>
+
                 <div className="student-form-grid">
-                  <input className="student-field" type="password" value={newPassword} onChange={event => setNewPassword(event.target.value)} placeholder="Nova senha" />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <input 
+                      className="student-field" 
+                      type="password" 
+                      value={newPassword} 
+                      onChange={event => setNewPassword(event.target.value)} 
+                      placeholder="Nova senha" 
+                    />
+                    <div style={{ 
+                      fontSize: '10px', 
+                      display: 'flex', 
+                      gap: '8px', 
+                      flexWrap: 'wrap',
+                      marginTop: '2px',
+                      padding: '0 4px'
+                    }}>
+                      <span style={{ color: newPassword.length >= 8 ? '#34d399' : 'var(--muted)' }}>• 8+ chars</span>
+                      <span style={{ color: /[A-Z]/.test(newPassword) && /[a-z]/.test(newPassword) ? '#34d399' : 'var(--muted)' }}>• A-z</span>
+                      <span style={{ color: /[0-9]/.test(newPassword) ? '#34d399' : 'var(--muted)' }}>• 0-9</span>
+                    </div>
+                  </div>
                   <input className="student-field" type="password" value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} placeholder="Confirmar nova senha" />
                 </div>
-                <button className="student-button" type="submit" disabled={updatingPassword} style={{ background: 'var(--accent2)', color: '#03231b', alignSelf: 'flex-start' }}>{updatingPassword ? 'Salvando...' : 'Trocar senha'}</button>
+                
+                <button className="student-button" type="submit" disabled={updatingPassword} style={{ background: 'var(--accent2)', color: '#03231b', alignSelf: 'flex-start' }}>{updatingPassword ? 'Validando...' : 'Trocar senha'}</button>
                 {passwordNotice && <div style={{ ...noticeStyle(passwordNotice.tone), borderRadius: '10px', padding: '11px 13px', fontSize: '13px', lineHeight: 1.6 }}>{passwordNotice.text}</div>}
               </form>
             </section>
