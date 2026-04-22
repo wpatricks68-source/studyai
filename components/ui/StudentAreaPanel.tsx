@@ -93,6 +93,8 @@ export default function StudentAreaPanel({
   const [updatingEmail, setUpdatingEmail] = useState(false)
   const [updatingPassword, setUpdatingPassword] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
+  const [sendingRecovery, setSendingRecovery] = useState(false)
+  const [recoverySent, setRecoverySent] = useState(false)
 
   const effectivePlan = normalizePlanTier(profile?.plan_tier ?? normalizedPlan)
   const altoLimits = getSearchLimits(effectivePlan, 'alto')
@@ -146,6 +148,17 @@ export default function StudentAreaPanel({
     const hasNumber = /[0-9]/.test(pass)
     const isLongEnough = pass.length >= 8
     return hasUpper && hasLower && hasNumber && isLongEnough
+  }
+
+  async function handleSendRecovery() {
+    setSendingRecovery(true)
+    setRecoverySent(false)
+    const supabase = createClient()
+    await supabase.auth.resetPasswordForEmail(user.email, {
+      redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset-password`,
+    })
+    setSendingRecovery(false)
+    setRecoverySent(true)
   }
 
   async function handlePasswordUpdate(event: React.FormEvent<HTMLFormElement>) {
@@ -334,7 +347,32 @@ export default function StudentAreaPanel({
                     onChange={event => setCurrentPassword(event.target.value)} 
                     placeholder="Senha atual obrigatoria" 
                   />
-                  <div style={{ fontSize: '11px', color: 'var(--muted)', marginTop: '4px', marginLeft: '4px' }}>Voce precisa confirmar sua senha atual para definir uma nova.</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '5px', padding: '0 2px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--muted)' }}>Confirme sua senha atual para definir uma nova.</div>
+                    <button
+                      type="button"
+                      onClick={handleSendRecovery}
+                      disabled={sendingRecovery || recoverySent}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        fontSize: '11px',
+                        color: recoverySent ? '#34d399' : 'var(--accent)',
+                        cursor: sendingRecovery || recoverySent ? 'default' : 'pointer',
+                        textDecoration: recoverySent ? 'none' : 'underline',
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {recoverySent ? '✓ Link enviado!' : sendingRecovery ? 'Enviando...' : 'Nao lembro minha senha'}
+                    </button>
+                  </div>
+                  {recoverySent && (
+                    <div style={{ fontSize: '11px', color: '#34d399', marginTop: '4px', padding: '8px 10px', borderRadius: '8px', background: 'rgba(16,185,129,.08)', border: '1px solid rgba(16,185,129,.16)' }}>
+                      Enviamos um link para <strong>{user.email}</strong>. Clique nele para redefinir sua senha.
+                    </div>
+                  )}
                 </div>
 
                 <div className="student-form-grid">
