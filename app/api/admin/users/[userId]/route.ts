@@ -112,7 +112,11 @@ export async function PATCH(
     .single()
 
   if (updateError || !updatedProfile) {
-    return NextResponse.json({ error: 'Nao foi possivel atualizar o plano do usuario.' }, { status: 500 })
+    console.error('[AdminAPI] Erro ao atualizar perfil:', updateError)
+    return NextResponse.json({ 
+      error: 'Nao foi possivel atualizar o plano do usuario.',
+      details: updateError?.message 
+    }, { status: 500 })
   }
 
   const { error: auditError } = await adminSupabase
