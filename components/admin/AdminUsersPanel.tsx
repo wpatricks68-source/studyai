@@ -165,16 +165,24 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
   return (
     <>
       <style>{`
+        .admin-users-desktop {
+          display: block;
+          width: 100%;
+        }
         .admin-users-table {
           width: 100%;
           border-collapse: collapse;
+          table-layout: auto;
         }
         .admin-users-table th,
         .admin-users-table td {
-          padding: 12px 14px;
-          border-bottom: 1px solid var(--border,#1f2640);
+          padding: 14px 16px;
+          border-bottom: 1px solid rgba(255,255,255,0.06);
           text-align: left;
           vertical-align: middle;
+        }
+        .admin-users-table tr:hover td {
+          background: rgba(255,255,255,0.02);
         }
         .admin-users-table th {
           font-size: 11px;
@@ -256,8 +264,8 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
           }
         }
         @media (max-width: 760px) {
-          .admin-users-filters {
-            grid-template-columns: 1fr;
+          .admin-users-filters > * {
+            flex: 1 1 100%;
           }
           .admin-users-stats {
             grid-template-columns: 1fr;
