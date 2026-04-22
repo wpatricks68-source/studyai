@@ -1,29 +1,44 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { LockKeyhole, ShieldCheck } from 'lucide-react'
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [exchanging, setExchanging] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
 
+  // Troca o code PKCE por sessão ao montar a página
+  useEffect(() => {
+    const code = searchParams.get('code')
+    if (!code) {
+      setExchanging(false)
+      return
+    }
+
+    const supabase = createClient()
+    supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+      if (error) {
+        setError('Link inválido ou expirado. Solicite um novo link de recuperação.')
+      }
+      setExchanging(false)
+    })
+  }, [searchParams])
+
   function validatePasswordStrength(pass: string) {
-    const hasUpper = /[A-Z]/.test(pass)
-    const hasLower = /[a-z]/.test(pass)
-    const hasNumber = /[0-9]/.test(pass)
-    const isLongEnough = pass.length >= 8
-    return hasUpper && hasLower && hasNumber && isLongEnough
+    return /[A-Z]/.test(pass) && /[a-z]/.test(pass) && /[0-9]/.test(pass) && pass.length >= 8
   }
 
   async function handleReset(e: React.FormEvent) {
     e.preventDefault()
-    
+
     if (!validatePasswordStrength(password)) {
       return setError('A senha deve conter letras (maiusculas e minusculas), numeros e no minimo 8 caracteres.')
     }
@@ -46,11 +61,18 @@ export default function ResetPasswordPage() {
 
     setSuccess(true)
     setLoading(false)
-    
-    // Redirecionar para o dashboard apos 3 segundos
+
     setTimeout(() => {
       router.push('/dashboard')
     }, 3000)
+  }
+
+  if (exchanging) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+        <div style={{ color: 'var(--muted)', fontSize: '14px' }}>Validando link...</div>
+      </div>
+    )
   }
 
   if (success) {
@@ -61,7 +83,9 @@ export default function ResetPasswordPage() {
             <ShieldCheck size={32} />
           </div>
           <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', marginBottom: '12px' }}>Senha redefinida!</h1>
-          <p style={{ fontSize: '14px', color: 'var(--muted)', lineHeight: 1.6 }}>Sua senha foi atualizada com sucesso. Voce sera redirecionado para o painel em instantes.</p>
+          <p style={{ fontSize: '14px', color: 'var(--muted)', lineHeight: 1.6 }}>
+            Sua senha foi atualizada com sucesso. Voce sera redirecionado para o painel em instantes.
+          </p>
         </div>
       </div>
     )
@@ -81,14 +105,16 @@ export default function ResetPasswordPage() {
         </div>
 
         {error && (
-          <div style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.25)', borderRadius: '8px', padding: '10px 14px', marginBottom: '20px', fontSize: '13px', color: '#f87171' }}>
+          <div style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.25)', borderRadius: '8px', padding: '10px 14px', marginBottom: '20px', fontSize: '13px', color: '#f87171', lineHeight: 1.5 }}>
             {error}
           </div>
         )}
 
         <form onSubmit={handleReset}>
           <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', fontSize: '12px', color: 'var(--muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>Nova Senha</label>
+            <label style={{ display: 'block', fontSize: '12px', color: 'var(--muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+              Nova Senha
+            </label>
             <input
               type="password"
               value={password}
@@ -105,7 +131,9 @@ export default function ResetPasswordPage() {
           </div>
 
           <div style={{ marginBottom: '28px' }}>
-            <label style={{ display: 'block', fontSize: '12px', color: 'var(--muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>Confirmar Senha</label>
+            <label style={{ display: 'block', fontSize: '12px', color: 'var(--muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+              Confirmar Senha
+            </label>
             <input
               type="password"
               value={confirmPassword}
@@ -118,13 +146,25 @@ export default function ResetPasswordPage() {
 
           <button
             type="submit"
-            disabled={loading}
-            style={{ width: '100%', padding: '12px', borderRadius: '8px', background: loading ? 'var(--surface2)' : 'var(--accent)', color: loading ? 'var(--muted)' : '#fff', border: 'none', fontSize: '14px', fontWeight: 600, cursor: loading ? 'default' : 'pointer' }}
+            disabled={loading || !!error}
+            style={{ width: '100%', padding: '12px', borderRadius: '8px', background: loading || error ? 'var(--surface2)' : 'var(--accent)', color: loading || error ? 'var(--muted)' : '#fff', border: 'none', fontSize: '14px', fontWeight: 600, cursor: loading || error ? 'default' : 'pointer' }}
           >
             {loading ? 'Atualizando...' : 'Redefinir senha'}
           </button>
         </form>
       </div>
     </div>
+  )
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+        <div style={{ color: 'var(--muted)', fontSize: '14px' }}>Carregando...</div>
+      </div>
+    }>
+      <ResetPasswordForm />
+    </Suspense>
   )
 }
