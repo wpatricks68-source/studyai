@@ -247,6 +247,7 @@ export default function BuscaPage() {
 
   // ─── Estado do Sidebar Secundário ───
   const [showSources, setShowSources] = useState(true)
+  const [showSearchModal, setShowSearchModal] = useState(false)
 
   // Detect mobile and hide sources by default
   useEffect(() => {
@@ -1156,318 +1157,209 @@ export default function BuscaPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: 'var(--bg,#0a0c12)' }}>
 
-      {/* ── Barra de busca ── */}
-      <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border,#1f2640)', background: 'var(--surface,#111420)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+      {/* ── Botão Flutuante / Trigger para Busca ── */}
+      {!isLoading && (
+        <button
+          onClick={() => setShowSearchModal(true)}
+          title="Nova Busca / Configurações"
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: showSources ? '264px' : '72px',
+            width: '56px',
+            height: '56px',
+            borderRadius: '18px',
+            background: 'var(--accent,#6c63ff)',
+            color: '#fff',
+            border: 'none',
+            boxShadow: '0 8px 24px rgba(108,99,255,0.3)',
+            cursor: 'pointer',
+            zIndex: 90,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
+          onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+          </svg>
+        </button>
+      )}
 
-          {/* Campo Disciplina */}
-          <input
-            value={disciplina}
-            onChange={e => setDisciplina(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleSearch()}
-            placeholder="Disciplina (ex: Dir. Constitucional)"
-            disabled={isLoading}
+      {/* ── Modal de Busca ── */}
+      {(showSearchModal || (!hasContent && !isLoading)) && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 110,
+          background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '20px'
+        }} onClick={() => hasContent && setShowSearchModal(false)}>
+          <div 
+            onClick={e => e.stopPropagation()} 
             style={{
-              width: '210px', flexShrink: 0,
-              background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)',
-              borderRadius: '10px', padding: '9px 14px', color: 'var(--text,#e8eaf6)',
-              fontSize: '14px', outline: 'none', opacity: isLoading ? .6 : 1,
+              background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)',
+              borderRadius: '20px', width: '800px', maxWidth: '100%',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+              position: 'relative', overflow: 'hidden'
             }}
-          />
-
-          <span style={{ color: 'var(--muted,#6b7194)', fontSize: '16px', flexShrink: 0 }}>›</span>
-
-          {/* Campo Tema */}
-          <input
-            value={tema}
-            onChange={e => setTema(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleSearch()}
-            placeholder="Tema (ex: Princípio da Legalidade)"
-            disabled={isLoading}
-            style={{
-              flex: 1,
-              background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)',
-              borderRadius: '10px', padding: '9px 14px', color: 'var(--text,#e8eaf6)',
-              fontSize: '14px', outline: 'none', opacity: isLoading ? .6 : 1,
-            }}
-          />
-
-          {/* Arquivo (upload PDF/txt) */}
-          <label style={{
-            padding: '8px 14px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)',
-            color: 'var(--muted,#6b7194)',
-            fontSize: '13px', cursor: isLoading ? 'default' : 'pointer', whiteSpace: 'nowrap',
-            pointerEvents: isLoading ? 'none' : 'auto', opacity: isLoading ? .5 : 1,
-            display: 'flex', alignItems: 'center', gap: '5px',
-          }}>
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 2v9M4 7l4 4 4-4"/><rect x="2" y="12" width="12" height="2" rx="1"/></svg>
-            Arquivo
-            <input type="file" accept=".pdf,.txt,.md" style={{ display: 'none' }} onChange={handleUpload} disabled={isLoading} />
-          </label>
-
-
-
-          {isLoading ? (
-            <button onClick={cancel} style={{ padding: '9px 18px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)', background: 'transparent', color: 'var(--red,#ef4444)', fontSize: '13px', cursor: 'pointer' }}>
-              Cancelar
-            </button>
-          ) : (
-            <>
+          >
+            {/* Header do Modal */}
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border,#1f2640)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(108,99,255,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent,#6c63ff)' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                </div>
+                <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text,#e8eaf6)' }}>Nova Pesquisa StudyAI</div>
+              </div>
               {hasContent && (
-                <button
-                  onClick={handleClear}
-                  title="Limpar sessão para começar um novo projeto"
+                <button 
+                  onClick={() => setShowSearchModal(false)}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--muted,#6b7194)', cursor: 'pointer', padding: '5px' }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+              )}
+            </div>
+
+            <div style={{ padding: '24px' }}>
+              {/* Barra de busca interna */}
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '16px' }}>
+                <input
+                  value={disciplina}
+                  onChange={e => setDisciplina(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && (handleSearch(), setShowSearchModal(false))}
+                  placeholder="Disciplina (ex: Dir. Constitucional)"
+                  disabled={isLoading}
+                  autoFocus
                   style={{
-                    padding: '9px 14px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)',
-                    background: 'transparent', color: 'var(--text,#e8eaf6)',
-                    fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', gap: '5px'
+                    width: '240px',
+                    background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)',
+                    borderRadius: '12px', padding: '12px 16px', color: 'var(--text,#e8eaf6)',
+                    fontSize: '14px', outline: 'none'
+                  }}
+                />
+                <span style={{ color: 'var(--muted,#6b7194)', fontSize: '20px' }}>›</span>
+                <input
+                  value={tema}
+                  onChange={e => setTema(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && (handleSearch(), setShowSearchModal(false))}
+                  placeholder="Tema (ex: Princípio da Legalidade)"
+                  disabled={isLoading}
+                  style={{
+                    flex: 1,
+                    background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)',
+                    borderRadius: '12px', padding: '12px 16px', color: 'var(--text,#e8eaf6)',
+                    fontSize: '14px', outline: 'none'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'flex-end' }}>
+                <label style={{
+                  padding: '10px 18px', borderRadius: '10px', border: '1px solid var(--border,#1f2640)',
+                  color: 'var(--muted,#6b7194)', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
+                }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                  Arquivo
+                  <input type="file" accept=".pdf,.txt,.md" style={{ display: 'none' }} onChange={e => { handleUpload(e); setShowSearchModal(false); }} />
+                </label>
+                
+                <button
+                  onClick={() => { handleClear(); setShowSearchModal(false); }}
+                  style={{
+                    padding: '10px 18px', borderRadius: '10px', border: '1px solid var(--border,#1f2640)',
+                    background: 'transparent', color: 'var(--text,#e8eaf6)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
                   }}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>
                   Novo
                 </button>
-              )}
-              {!hasContent && (
+
                 <button
-                  onClick={handleManualCreate}
+                  onClick={() => { handleSearch(); setShowSearchModal(false); }}
                   disabled={!tema.trim()}
-                  title="Criar arquivo vazio manualmente"
                   style={{
-                    padding: '9px 14px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)',
-                    background: 'transparent', color: !tema.trim() ? 'var(--muted,#6b7194)' : 'var(--text,#e8eaf6)',
-                    fontSize: '13px', fontWeight: 600, cursor: !tema.trim() ? 'default' : 'pointer',
-                    display: 'flex', alignItems: 'center', gap: '5px'
+                    padding: '10px 24px', borderRadius: '10px', border: 'none',
+                    background: !tema.trim() ? 'var(--surface2,#181d2e)' : currentMeta.color,
+                    color: !tema.trim() ? 'var(--muted,#6b7194)' : '#fff',
+                    fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
                   }}
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>
-                  Manual
+                  <span>{currentMeta.icon}</span>
+                  {searchMode === 'alto' ? 'Iniciar Alto Busca' : `Buscar com ${currentMeta.label}`}
                 </button>
-              )}
-              <button
-                onClick={handleSearch}
-                disabled={!tema.trim()}
-                title={searchMode === 'alto' ? 'Alto Busca escolhe automaticamente a IA mais economica para o seu plano.' : undefined}
-                style={{
-                  padding: '9px 20px', borderRadius: '8px', border: 'none',
-                  background: !tema.trim() ? 'var(--surface2,#181d2e)' : currentMeta.color,
-                  color: !tema.trim() ? 'var(--muted,#6b7194)' : '#fff',
-                  fontSize: '13px', fontWeight: 600, cursor: !tema.trim() ? 'default' : 'pointer',
-                  display: 'flex', alignItems: 'center', gap: '6px',
-                }}
-              >
-                <span style={{ fontSize: '14px' }}>{currentMeta.icon}</span>
-                {searchMode === 'alto' ? 'Alto Busca' : `Busca Avancada com ${currentMeta.label}`}
-              </button>
-            </>
-          )}
-        </div>
+              </div>
 
-        {/* ── Seletor de Provider ── */}
-        <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '11px', color: 'var(--muted,#6b7194)', marginRight: '2px', whiteSpace: 'nowrap' }}>Modo:</span>
+              <div style={{ marginTop: '24px', padding: '16px', borderRadius: '14px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border,#1f2640)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>Configurações de IA</div>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => handleSearchModeChange('alto')}
+                    style={{
+                      padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
+                      border: `1px solid ${searchMode === 'alto' ? PROVIDER_META.auto.color : 'var(--border,#1f2640)'}`,
+                      background: searchMode === 'alto' ? PROVIDER_META.auto.bg : 'transparent',
+                      color: searchMode === 'alto' ? PROVIDER_META.auto.color : 'var(--muted,#6b7194)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ✦ Alto Busca
+                  </button>
+                  <button
+                    onClick={() => handleSearchModeChange('advanced')}
+                    style={{
+                      padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
+                      border: `1px solid ${searchMode === 'advanced' ? '#f59e0b' : 'var(--border,#1f2640)'}`,
+                      background: searchMode === 'advanced' ? 'rgba(245,158,11,.14)' : 'transparent',
+                      color: searchMode === 'advanced' ? '#fbbf24' : 'var(--muted,#6b7194)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Busca Avançada
+                  </button>
 
-          <button
-            onClick={() => handleSearchModeChange('alto')}
-            disabled={isLoading}
-            title="Alto Busca escolhe automaticamente a IA mais economica para o seu plano."
-            style={{
-              padding: '5px 13px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
-              border: `1px solid ${searchMode === 'alto' ? PROVIDER_META.auto.color : 'var(--border,#1f2640)'}`,
-              background: searchMode === 'alto' ? PROVIDER_META.auto.bg : 'transparent',
-              color: searchMode === 'alto' ? PROVIDER_META.auto.color : 'var(--muted,#6b7194)',
-              cursor: isLoading ? 'default' : 'pointer',
-              opacity: isLoading ? .6 : 1,
-            }}
-          >
-            Alto Busca
-          </button>
+                  <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--muted,#6b7194)', padding: '4px 10px', borderRadius: '8px', background: 'var(--surface2,#181d2e)' }}>
+                      Plano: {getPlanLabel(planTier)}
+                    </span>
+                    <span style={{ fontSize: '11px', color: 'var(--muted,#6b7194)', padding: '4px 10px', borderRadius: '8px', background: 'var(--surface2,#181d2e)' }}>
+                      Limite: {usageCounts.alto_busca_count}/{getSearchLimits(planTier, 'alto').dailySearchLimit}
+                    </span>
+                  </div>
+                </div>
 
-          <button
-            onClick={() => handleSearchModeChange('advanced')}
-            disabled={isLoading}
-            style={{
-              padding: '5px 13px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
-              border: `1px solid ${searchMode === 'advanced' ? '#f59e0b' : 'var(--border,#1f2640)'}`,
-              background: searchMode === 'advanced' ? 'rgba(245,158,11,.14)' : 'transparent',
-              color: searchMode === 'advanced' ? '#fbbf24' : 'var(--muted,#6b7194)',
-              cursor: isLoading ? 'default' : 'pointer',
-              opacity: isLoading ? .6 : 1,
-            }}
-          >
-            Busca Avancada com IA {planTier === 'gratuito' ? '• Pro' : ''}
-          </button>
-
-          <span style={{
-            fontSize: '10px',
-            color: 'var(--muted,#6b7194)',
-            border: '1px solid var(--border,#1f2640)',
-            borderRadius: '12px',
-            padding: '3px 10px',
-          }}>
-            Plano: <strong style={{ color: 'var(--text,#e8eaf6)' }}>{getPlanLabel(planTier)}</strong>
-          </span>
-
-          <span style={{
-            fontSize: '10px',
-            color: 'var(--muted,#6b7194)',
-            border: '1px solid var(--border,#1f2640)',
-            borderRadius: '12px',
-            padding: '3px 10px',
-          }}>
-            Alto hoje: <strong style={{ color: 'var(--text,#e8eaf6)' }}>{usageCounts.alto_busca_count}/{getSearchLimits(planTier, 'alto').dailySearchLimit}</strong>
-          </span>
-
-          <span style={{
-            fontSize: '10px',
-            color: 'var(--muted,#6b7194)',
-            border: '1px solid var(--border,#1f2640)',
-            borderRadius: '12px',
-            padding: '3px 10px',
-          }}>
-            Avancada hoje: <strong style={{ color: 'var(--text,#e8eaf6)' }}>
-              {planTier === 'gratuito' ? 'bloqueada' : `${usageCounts.advanced_busca_count}/${getSearchLimits(planTier, 'advanced').dailyAdvancedLimit}`}
-            </strong>
-          </span>
-
-          <span style={{
-            fontSize: '10px',
-            color: 'var(--muted,#6b7194)',
-            border: '1px solid var(--border,#1f2640)',
-            borderRadius: '12px',
-            padding: '3px 10px',
-          }}>
-            Resposta: ate {currentLimits.maxResponseChars.toLocaleString('pt-BR')} caracteres
-          </span>
-
-          {usedProvider && phase === 'done' && (
-            <span style={{
-              marginLeft: 'auto', fontSize: '10px', color: 'var(--muted,#6b7194)',
-              display: 'flex', alignItems: 'center', gap: '4px',
-              border: '1px solid var(--border,#1f2640)', borderRadius: '12px',
-              padding: '3px 10px',
-            }}>
-              Gerado por <strong style={{ color: PROVIDER_META[usedProvider as AIProvider]?.color ?? 'var(--text,#e8eaf6)' }}>
-                {PROVIDER_META[usedProvider as AIProvider]?.label ?? usedProvider}
-              </strong>
-              {usedModel && (
-                <span style={{ opacity: .6 }}>· {usedModel.split('-').slice(0,3).join('-')}</span>
-              )}
-            </span>
-          )}
-        </div>
-
-        <div style={{ marginTop: '10px', display: searchMode === 'advanced' ? 'flex' : 'none', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '11px', color: 'var(--muted,#6b7194)', marginRight: '2px', whiteSpace: 'nowrap' }}>IA:</span>
-
-          {searchMode === 'alto' ? (
-            <span style={{
-              fontSize: '11px',
-              color: PROVIDER_META.auto.color,
-              border: `1px solid ${PROVIDER_META.auto.color}`,
-              borderRadius: '999px',
-              padding: '5px 10px',
-              background: PROVIDER_META.auto.bg,
-            }}>
-              Alto Busca escolhe automaticamente a IA mais economica para o seu plano.
-            </span>
-          ) : availableProviders.map(provider => {
-            const meta = PROVIDER_META[provider]
-            const active = selectedProvider === provider
-            return (
-              <button
-                key={provider}
-                onClick={() => handleProviderChange(provider)}
-                disabled={isLoading}
-                style={{
-                  padding: '5px 13px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
-                  border: `1px solid ${active ? meta.color : 'var(--border,#1f2640)'}`,
-                  background: active ? meta.bg : 'transparent',
-                  color: active ? meta.color : 'var(--muted,#6b7194)',
-                  cursor: isLoading ? 'default' : 'pointer',
-                  opacity: isLoading ? .6 : 1,
-                  transition: 'all .15s',
-                  display: 'flex', alignItems: 'center', gap: '5px',
-                }}
-              >
-                <span style={{ fontSize: '13px' }}>{meta.icon}</span>
-                {meta.label}
-              </button>
-            )
-          })}
-
-          {/* Dropdown de modelo (quando não é Auto) */}
-          {searchMode === 'advanced' && availableModels.length > 0 && (
-            <select
-              value={aiModel}
-              onChange={e => setAiModel(e.target.value)}
-              disabled={isLoading}
-              style={{
-                marginLeft: '4px',
-                padding: '5px 10px', borderRadius: '8px', fontSize: '12px',
-                border: `1px solid ${currentMeta.color}`,
-                background: 'var(--surface2,#181d2e)',
-                color: currentMeta.color,
-                cursor: 'pointer',
-                opacity: isLoading ? .6 : 1,
-                outline: 'none',
-              }}
-            >
-              {availableModels.map(m => (
-                <option key={m.id} value={m.id} style={{ background: '#181d2e', color: '#e8eaf6' }}>
-                  {m.label}{m.tier === 'free' ? ' • Free' : ''}
-                </option>
-              ))}
-            </select>
-          )}
-
-          {/* Badge do provider/modelo usado na última geração */}
-          {usedProvider && phase === 'done' && (
-            <span style={{
-              marginLeft: 'auto', fontSize: '10px', color: 'var(--muted,#6b7194)',
-              display: 'flex', alignItems: 'center', gap: '4px',
-              border: '1px solid var(--border,#1f2640)', borderRadius: '12px',
-              padding: '3px 10px',
-            }}>
-              Gerado por <strong style={{ color: PROVIDER_META[usedProvider as AIProvider]?.color ?? 'var(--text,#e8eaf6)' }}>
-                {PROVIDER_META[usedProvider as AIProvider]?.label ?? usedProvider}
-              </strong>
-              {usedModel && (
-                <span style={{ opacity: .6 }}>· {usedModel.split('-').slice(0,3).join('-')}</span>
-              )}
-            </span>
-          )}
-        </div>
-
-        {/* Status da busca */}
-        {isLoading && (
-          <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '12px', height: '12px', borderRadius: '50%', border: `2px solid ${currentMeta.color}`, borderTopColor: 'transparent', animation: 'spin .7s linear infinite' }} />
-            <span style={{ fontSize: '12px', color: 'var(--muted,#6b7194)' }}>
-              {phase === 'searching'
-                ? 'Pesquisando na web...'
-                : genTarget === 'summary'
-                  ? `Gerando resumo com ${currentMeta.label}...`
-                  : genTarget === 'flashcards'
-                    ? `Criando flashcards com ${currentMeta.label}...`
-                    : `Gerando questões com ${currentMeta.label}...`}
-            </span>
+                {searchMode === 'advanced' && (
+                  <div style={{ marginTop: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    {availableProviders.map(provider => {
+                      const meta = PROVIDER_META[provider]
+                      const active = selectedProvider === provider
+                      return (
+                        <button
+                          key={provider}
+                          onClick={() => handleProviderChange(provider)}
+                          style={{
+                            padding: '5px 12px', borderRadius: '10px', fontSize: '11px', fontWeight: 600,
+                            border: `1px solid ${active ? meta.color : 'var(--border,#1f2640)'}`,
+                            background: active ? meta.bg : 'transparent',
+                            color: active ? meta.color : 'var(--muted,#6b7194)',
+                            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px'
+                          }}
+                        >
+                          <span>{meta.icon}</span>
+                          {meta.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        )}
-
-        {/* Erro */}
-        {error && (
-          <div style={{ marginTop: '10px', padding: '8px 12px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.25)', borderRadius: '8px', fontSize: '12px', color: '#f87171' }}>
-            {error}
-          </div>
-        )}
-
-        {aiNotice && (
-          <div style={{ marginTop: '10px', padding: '8px 12px', background: 'rgba(245,158,11,.10)', border: '1px solid rgba(245,158,11,.28)', borderRadius: '8px', fontSize: '12px', color: '#fbbf24' }}>
-            {aiNotice}
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* ── Estado vazio ── */}
       {!hasContent && !isLoading && (
