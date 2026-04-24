@@ -1266,7 +1266,14 @@ export default function BuscaPage() {
                 </label>
                 
                 <button
-                  onClick={() => { handleClear(); setShowSearchModal(false); }}
+                  onClick={async () => { 
+                    if (!tema.trim()) {
+                      setError('Insira pelo menos o tema para criar uma sessão.');
+                      return;
+                    }
+                    await handleManualCreate(); 
+                    setShowSearchModal(false); 
+                  }}
                   style={{
                     padding: '10px 18px', borderRadius: '10px', border: '1px solid var(--border,#1f2640)',
                     background: 'transparent', color: 'var(--text,#e8eaf6)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
