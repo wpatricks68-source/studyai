@@ -1190,13 +1190,13 @@ export default function BuscaPage() {
       )}
 
       {/* ── Modal de Busca ── */}
-      {(showSearchModal || (!hasContent && !isLoading)) && (
+      {showSearchModal && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 110,
           background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(8px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           padding: '20px'
-        }} onClick={() => hasContent && setShowSearchModal(false)}>
+        }} onClick={() => setShowSearchModal(false)}>
           <div 
             onClick={e => e.stopPropagation()} 
             style={{
@@ -1214,14 +1214,12 @@ export default function BuscaPage() {
                 </div>
                 <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text,#e8eaf6)' }}>Nova Pesquisa StudyAI</div>
               </div>
-              {hasContent && (
-                <button 
-                  onClick={() => setShowSearchModal(false)}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--muted,#6b7194)', cursor: 'pointer', padding: '5px' }}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                </button>
-              )}
+              <button 
+                onClick={() => setShowSearchModal(false)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--muted,#6b7194)', cursor: 'pointer', padding: '5px' }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </button>
             </div>
 
             <div style={{ padding: '24px' }}>
