@@ -1158,7 +1158,7 @@ export default function BuscaPage() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: 'var(--bg,#0a0c12)' }}>
 
       {/* ── Botão Flutuante / Trigger para Busca ── */}
-      {!isLoading && (
+      {!isLoading && hasContent && (
         <button
           onClick={() => setShowSearchModal(true)}
           title="Nova Busca / Configurações"
@@ -1362,12 +1362,22 @@ export default function BuscaPage() {
       {/* ── Estado vazio ── */}
       {!hasContent && !isLoading && (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '14px', padding: '40px' }}>
-          <div style={{ width: '56px', height: '56px', borderRadius: '14px', background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--muted,#6b7194)" strokeWidth="1.5">
-              <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-            </svg>
-          </div>
-          <div style={{ fontSize: '16px', fontWeight: 500, color: 'var(--text,#e8eaf6)' }}>Pesquise por Disciplina e Tema</div>
+          <button 
+            onClick={() => setShowSearchModal(true)}
+            style={{
+              width: '64px', height: '64px', borderRadius: '16px',
+              background: 'var(--accent,#6c63ff)', border: 'none',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#fff', cursor: 'pointer',
+              boxShadow: '0 8px 24px rgba(108,99,255,0.3)', transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
+            onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+            title="Nova Pesquisa"
+          >
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          </button>
+          <div style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text,#e8eaf6)', marginTop: '8px' }}>Pesquise por Disciplina e Tema</div>
           <div style={{ fontSize: '13px', color: 'var(--muted,#6b7194)', textAlign: 'center', maxWidth: '400px', lineHeight: 1.7 }}>
             Informe a disciplina (ex: Direito Administrativo) e o tema específico. A IA gera resumo, flashcards e questões salvos por disciplina.
           </div>
@@ -1509,7 +1519,12 @@ export default function BuscaPage() {
                 <FlashcardsView 
                   cards={session.flashcards} 
                   loading={genTarget === 'flashcards'} 
-                  onOpenManual={() => setShowManualFcModal(true)} 
+                  onOpenManual={() => {
+                    setEditingFcId(null)
+                    setManualFcFront('')
+                    setManualFcBack('')
+                    setShowManualFcModal(true)
+                  }} 
                   onGenerateAI={handleFlashcards}
                   onDelete={handleDeleteFc}
                   onEdit={handleOpenEditFc}
@@ -1527,7 +1542,15 @@ export default function BuscaPage() {
                 <QuestoesView 
                   questions={session.questions} 
                   loading={genTarget === 'questions'} 
-                  onOpenManual={() => setShowManualQModal(true)} 
+                  onOpenManual={() => {
+                    setEditingQId(null)
+                    setManualQQuestion('')
+                    setManualQOptions(['', '', '', '', ''])
+                    setManualQCorrect(0)
+                    setManualQGabarito('C')
+                    setManualQExpl('')
+                    setShowManualQModal(true)
+                  }} 
                   onGenerateAI={handleQuestions}
                   onDelete={handleDeleteQ}
                   onEdit={handleOpenEditQ}
