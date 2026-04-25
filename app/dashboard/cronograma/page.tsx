@@ -269,8 +269,10 @@ export default function CronogramaPage() {
 
       if (s.day_of_week !== dbDay) return false
       const start = parseInt(s.start_time.split(':')[0])
-      const end = parseInt(s.end_time.split(':')[0])
-      return hrNum >= start && hrNum < end
+      let end = parseInt(s.end_time.split(':')[0])
+      if (end === 0) end = 24
+      const endMins = parseInt(s.end_time.split(':')[1])
+      return hrNum >= start && (hrNum < end || (hrNum === end && endMins > 0))
     })
   }
 
