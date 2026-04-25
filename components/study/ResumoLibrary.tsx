@@ -2,9 +2,10 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { StudySession } from '@/types/database'
+import type { StudySession, Flashcard, Question } from '@/types/database'
 import { formatDate } from '@/lib/utils'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
+import { FileDown, CreditCard, HelpCircle, PencilLine, CheckCircle2, ChevronRight, ChevronLeft } from 'lucide-react'
 
 export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }) {
   const [list, setList]             = useState(sessions)
@@ -15,6 +16,9 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
   const [notas, setNotas]           = useState('')
   const [savingNota, setSavingNota] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [sessionFlashcards, setSessionFlashcards] = useState<Flashcard[]>([])
+  const [sessionQuestions, setSessionQuestions] = useState<Question[]>([])
+  const contentRef = useRef<HTMLDivElement>(null)
 
   // Auto-hide on mobile
   useEffect(() => {
@@ -33,10 +37,17 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
     return matchQ && matchMat
   })
 
-  function openSession(s: StudySession) {
+  async function openSession(s: StudySession) {
     setSelected(s)
     setNotas(s.notas ?? '')
     setActiveTab('resumo')
+    
+    // Fetch flashcards and questions associated with this session
+    const supabase = createClient()
+    const { data: fcs } = await supabase.from('flashcards').select('*').eq('session_id', s.id)
+    const { data: qs } = await supabase.from('questions').select('*').eq('session_id', s.id)
+    setSessionFlashcards(fcs || [])
+    setSessionQuestions(qs || [])
   }
 
   async function saveNotas() {
@@ -73,8 +84,37 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
 
   const acertoCor = (v: number) => v >= 80 ? '#10b981' : v >= 65 ? '#f59e0b' : '#ef4444'
 
+  function handleExportPDF() {
+    window.print()
+  }
+
+  function scrollToSection(id: string) {
+    setActiveTab('resumo')
+    setTimeout(() => {
+      const el = document.getElementById(id)
+      if (el) el.scrollIntoView({ behavior: 'smooth' })
+    }, 100)
+  }
+
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+      <style>{`
+        @media print {
+          body * { visibility: hidden; }
+          #printable-content, #printable-content * { visibility: visible; }
+          #printable-content {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            padding: 0;
+            margin: 0;
+            color: #000 !important;
+            background: #fff !important;
+          }
+          .student-shell, .sidebar, .ev-toolbar, button, a:not([href^="/dashboard/resumos"]) { display: none !important; }
+        }
+      `}</style>
 
       {/* Library sidebar */}
       <div style={{ 
@@ -228,18 +268,34 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
                     {selected.title}
                   </h2>
                 </div>
-                <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                  {sessionFlashcards.length > 0 && (
+                    <button
+                      onClick={() => scrollToSection('sec-flashcards')}
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(108,99,255,0.2)', background: 'rgba(108,99,255,0.05)', color: 'var(--accent)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      <CreditCard size={14} /> FLASHCARDS
+                    </button>
+                  )}
+                  {sessionQuestions.length > 0 && (
+                    <button
+                      onClick={() => scrollToSection('sec-questoes')}
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(0,212,170,0.2)', background: 'rgba(0,212,170,0.05)', color: '#00d4aa', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      <HelpCircle size={14} /> QUESTÕES
+                    </button>
+                  )}
                   <button
-                    onClick={registerRevisao}
-                    style={{ padding: '6px 12px', borderRadius: '7px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--muted)', fontSize: '12px', cursor: 'pointer' }}
+                    onClick={handleExportPDF}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px', border: 'none', background: 'var(--accent)', color: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}
                   >
-                    + Revisão
+                    <FileDown size={14} /> EXPORTAR PDF
                   </button>
                   <a
                     href={`/dashboard/busca?id=${selected.id}`}
-                    style={{ padding: '6px 12px', borderRadius: '7px', border: 'none', background: 'var(--accent)', color: '#fff', fontSize: '12px', textDecoration: 'none' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontSize: '11px', fontWeight: 600, textDecoration: 'none' }}
                   >
-                    Abrir editor
+                    <PencilLine size={14} /> EDITAR
                   </a>
                 </div>
               </div>
@@ -276,26 +332,82 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
             {/* Tab content */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '22px 28px' }}>
               {activeTab === 'resumo' && (
-                <div className="ed-library-content" style={{ fontSize: '14px', lineHeight: 1.9, color: 'var(--text)' }}>
-                  {(() => {
-                    if (!selected.content) return 'Conteúdo não disponível.'
-                    try {
-                      const data = JSON.parse(selected.content)
-                      if (data.type === 'rich') {
-                        return (
-                          <div style={{ position: 'relative' }}>
-                            <div dangerouslySetInnerHTML={{ __html: data.html }} />
-                            {data.canvas && (
-                              <img src={data.canvas} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 'auto', pointerEvents: 'none' }} alt="Anotações" />
+                <div ref={contentRef} id="printable-content" className="ed-library-content" style={{ fontSize: '14px', lineHeight: 1.9, color: 'var(--text)' }}>
+                  <div style={{ marginBottom: '40px' }}>
+                    {(() => {
+                      if (!selected.content) return 'Conteúdo não disponível.'
+                      try {
+                        const data = JSON.parse(selected.content)
+                        if (data.type === 'rich') {
+                          return (
+                            <div style={{ position: 'relative' }}>
+                              <div dangerouslySetInnerHTML={{ __html: data.html }} />
+                              {data.canvas && (
+                                <img src={data.canvas} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 'auto', pointerEvents: 'none' }} alt="Anotações" />
+                              )}
+                            </div>
+                          )
+                        }
+                      } catch {}
+                      
+                      return <div style={{ whiteSpace: 'pre-wrap' }}>{selected.content}</div>
+                    })()}
+                  </div>
+
+                  {sessionFlashcards.length > 0 && (
+                    <div id="sec-flashcards" style={{ marginTop: '60px', borderTop: '1px solid var(--border)', paddingTop: '32px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
+                        <CreditCard size={20} color="var(--accent)" />
+                        <h3 style={{ fontSize: '18px', fontWeight: 700, margin: 0 }}>Flashcards do Tema</h3>
+                      </div>
+                      <div style={{ display: 'grid', gap: '16px' }}>
+                        {sessionFlashcards.map((fc, i) => (
+                          <div key={fc.id} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '12px', padding: '16px' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Card {i + 1}</div>
+                            <div style={{ fontWeight: 600, color: 'var(--text)', marginBottom: '12px' }}>{fc.front}</div>
+                            <div style={{ padding: '12px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', color: 'rgba(232,234,246,0.8)', fontSize: '13px', borderLeft: '3px solid var(--accent)' }}>
+                              {fc.back}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {sessionQuestions.length > 0 && (
+                    <div id="sec-questoes" style={{ marginTop: '60px', borderTop: '1px solid var(--border)', paddingTop: '32px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
+                        <HelpCircle size={20} color="#00d4aa" />
+                        <h3 style={{ fontSize: '18px', fontWeight: 700, margin: 0 }}>Questões do Tema</h3>
+                      </div>
+                      <div style={{ display: 'grid', gap: '20px' }}>
+                        {sessionQuestions.map((q, i) => (
+                          <div key={q.id} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--muted)', textTransform: 'uppercase', marginBottom: '12px' }}>Questão {i + 1}</div>
+                            <div style={{ fontSize: '15px', fontWeight: 500, color: 'var(--text)', marginBottom: '16px', lineHeight: 1.6 }}>{q.question}</div>
+                            {q.options && (
+                              <div style={{ display: 'grid', gap: '8px', marginBottom: '16px' }}>
+                                {q.options.map((opt, optIdx) => (
+                                  <div key={optIdx} style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '13px', background: 'rgba(255,255,255,0.02)', display: 'flex', gap: '10px' }}>
+                                    <span style={{ color: 'var(--muted)', fontWeight: 700 }}>{String.fromCharCode(65 + optIdx)})</span>
+                                    {opt}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            <div style={{ padding: '12px 16px', borderRadius: '8px', background: 'rgba(0,212,170,0.08)', border: '1px solid rgba(0,212,170,0.15)', color: '#00d4aa', fontSize: '13px' }}>
+                              <strong>Gabarito:</strong> {q.gabarito}
+                            </div>
+                            {q.explanation && (
+                              <div style={{ marginTop: '12px', fontSize: '13px', color: 'var(--muted)', lineHeight: 1.6 }}>
+                                <strong>Explicação:</strong> {q.explanation}
+                              </div>
                             )}
                           </div>
-                        )
-                      }
-                    } catch {}
-                    
-                    // Fallback para markdown antigo usando html simples ou whiteSpace
-                    return <div style={{ whiteSpace: 'pre-wrap' }}>{selected.content}</div>
-                  })()}
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -401,13 +513,7 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
                     </div>
                   )}
 
-                  {/* Register button */}
-                  <button
-                    onClick={registerRevisao}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: 'none', background: 'var(--accent)', color: '#fff', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}
-                  >
-                    Registrar nova revisão
-                  </button>
+                  {/* Register button removed as per user request */}
                 </div>
               )}
             </div>
