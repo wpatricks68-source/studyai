@@ -45,19 +45,14 @@ type ParsedResponse = {
 }
 
 const box: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.05)',
-  backdropFilter: 'blur(12px)',
-  WebkitBackdropFilter: 'blur(12px)',
-  border: '1px solid rgba(255,255,255,0.1)',
+  background: 'var(--surface,#111420)',
+  border: '1px solid var(--border,#1f2640)',
   borderRadius: 18,
 }
 
 const buttonBase: React.CSSProperties = {
   borderRadius: 12,
-  border: '1px solid rgba(255,255,255,0.12)',
-  background: 'rgba(255,255,255,0.08)',
-  backdropFilter: 'blur(8px)',
-  WebkitBackdropFilter: 'blur(8px)',
+  border: '1px solid rgba(255,255,255,.08)',
   fontSize: 13,
   fontWeight: 700,
   cursor: 'pointer',
@@ -71,10 +66,8 @@ const buttonBase: React.CSSProperties = {
 const inputBase: React.CSSProperties = {
   width: '100%',
   borderRadius: 12,
-  border: '1px solid rgba(255,255,255,0.1)',
-  background: 'rgba(0,0,0,0.2)',
-  backdropFilter: 'blur(8px)',
-  WebkitBackdropFilter: 'blur(8px)',
+  border: '1px solid var(--border,#1f2640)',
+  background: 'var(--surface2,#181d2e)',
   color: 'var(--text,#e8eaf6)',
   padding: '11px 13px',
   fontSize: 14,
@@ -858,20 +851,18 @@ export default function EditalVerticalizadoPage() {
   return (
     <>
       <style>{`
-        .ev-btn:hover { transform: translateY(-1px); background: rgba(255,255,255,0.12); }
-        .ev-btn:active { transform: translateY(0); }
+        .ev-btn:hover { transform: translateY(-1px); }
         .ev-input:focus, .ev-select:focus, .ev-textarea:focus {
           outline: none;
-          border-color: rgba(108,99,255,.6);
-          box-shadow: 0 0 0 3px rgba(108,99,255,.15);
-          background: rgba(0,0,0,0.3);
+          border-color: rgba(108,99,255,.7);
+          box-shadow: 0 0 0 3px rgba(108,99,255,.12);
         }
         .ev-tab::-webkit-scrollbar { display: none; }
         .spin{animation:spin .9s linear infinite}
         @keyframes spin{to{transform:rotate(360deg)}}
         .ev-top-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(360px,.95fr);gap:16px;align-items:stretch}
         .ev-stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
-        .ev-panel-header{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:10px}
+        .ev-panel-header{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;border-bottom:1px solid var(--border,#1f2640);padding-bottom:10px}
         .ev-toolbar{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}
         .ev-toolbar-left{display:flex;align-items:center;gap:10px;flex:1 1 320px}
         .ev-toolbar-right{display:flex;gap:8px;flex-wrap:wrap}
@@ -881,7 +872,7 @@ export default function EditalVerticalizadoPage() {
         .ev-head-actions,.ev-upload-actions,.ev-meta-row{display:flex;gap:10px;flex-wrap:wrap}
         .ev-title{margin:0;font-size:32px;font-weight:800;letter-spacing:-.04em}
         .ev-subtitle{margin:8px 0 0;color:var(--muted,#6b7194);font-size:14px}
-        .ev-table-wrap{border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:auto;background:rgba(255,255,255,0.03)}
+        .ev-table-wrap{border:1px solid rgba(255,255,255,.06);border-radius:16px;overflow:auto}
         
         /* New Table Styles */
         .ev-table-container { min-width: 900px; display: grid; gap: 4px; }
@@ -889,49 +880,45 @@ export default function EditalVerticalizadoPage() {
           display: grid;
           grid-template-columns: 50px 1fr 100px 100px 160px 120px 110px;
           padding: 16px 20px;
-          background: rgba(255,255,255,0.04);
+          background: rgba(255,255,255,0.02);
           border-radius: 12px 12px 0 0;
           font-size: 11px;
           font-weight: 700;
-          color: #8a92a9;
+          color: #6b7194;
           text-transform: uppercase;
           letter-spacing: 1px;
           align-items: center;
-          border-bottom: 1px solid rgba(255,255,255,0.06);
         }
         .ev-discipline-row {
           display: flex;
           align-items: center;
-          background: rgba(108,99,255,0.08);
-          backdropFilter: blur(8px);
+          background: rgba(108,99,255,0.05);
           padding: 12px 20px;
           cursor: pointer;
           border-left: 3px solid var(--accent);
           transition: background 0.2s;
           color: var(--text);
         }
-        .ev-discipline-row:hover { background: rgba(108,99,255,0.12); }
+        .ev-discipline-row:hover { background: rgba(108,99,255,0.08); }
         .ev-topic-row {
           display: grid;
           grid-template-columns: 50px 1fr 100px 100px 160px 120px 110px;
           padding: 12px 20px;
           align-items: center;
-          border-bottom: 1px solid rgba(255,255,255,0.05);
+          border-bottom: 1px solid var(--border);
           transition: background 0.2s;
           color: var(--text);
-          background: rgba(255,255,255,0.02);
         }
-        .ev-topic-row:hover { background: rgba(255,255,255,0.05); }
-        .light .ev-topic-row:hover { background: rgba(0,0,0,0.04); }
+        .ev-topic-row:hover { background: rgba(255,255,255,0.015); }
+        .light .ev-topic-row:hover { background: rgba(0,0,0,0.015); }
         
         .ev-theme-row {
           display: grid;
           grid-template-columns: 50px 1fr 100px 100px 160px 120px 110px;
           padding: 12px 20px;
           align-items: center;
-          border-bottom: 1px solid rgba(255,255,255,0.05);
-          background: rgba(255,255,255,0.04);
-          backdropFilter: blur(4px);
+          border-bottom: 1px solid var(--border);
+          background: var(--surface2);
           font-weight: 700;
           color: var(--text);
         }
@@ -940,24 +927,21 @@ export default function EditalVerticalizadoPage() {
           width: 24px;
           height: 24px;
           border-radius: 6px;
-          border: 1px solid rgba(255,255,255,0.15);
-          background: rgba(255,255,255,0.06);
-          backdropFilter: blur(4px);
+          border: 1px solid var(--border);
+          background: var(--surface2);
           cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
           transition: all 0.2s;
         }
-        .ev-status-check:hover { background: rgba(255,255,255,0.12); }
         .ev-rev-group { display: flex; gap: 6px; }
         .ev-rev-btn {
           width: 32px;
           height: 32px;
           border-radius: 50%;
-          border: 1px solid rgba(255,255,255,0.12);
-          background: rgba(255,255,255,0.06);
-          backdropFilter: blur(4px);
+          border: 1px solid rgba(255,255,255,0.1);
+          background: rgba(255,255,255,0.04);
           font-size: 10px;
           font-weight: 700;
           cursor: pointer;
@@ -965,9 +949,8 @@ export default function EditalVerticalizadoPage() {
           align-items: center;
           justify-content: center;
           transition: all 0.2s;
-          color: #8a92a9;
+          color: #6b7194;
         }
-        .ev-rev-btn:hover { background: rgba(255,255,255,0.12); }
         
         .ev-action-btns { display: flex; gap: 8px; }
         .ev-icon-btn {
@@ -975,15 +958,14 @@ export default function EditalVerticalizadoPage() {
           height: 34px;
           border-radius: 8px;
           border: 1px solid rgba(255,255,255,0.1);
-          background: rgba(255,255,255,0.06);
-          backdropFilter: blur(4px);
+          background: rgba(255,255,255,0.04);
           display: flex;
           align-items: center;
           justify-content: center;
           cursor: pointer;
           transition: all 0.2s;
         }
-        .ev-icon-btn:hover { transform: translateY(-1px); background: rgba(255,255,255,0.12); }
+        .ev-icon-btn:hover { transform: translateY(-1px); }
 
         .ev-desktop-table { display: block; }
         .ev-mobile-cards { display: none; }
@@ -1231,7 +1213,7 @@ export default function EditalVerticalizadoPage() {
                 style={{
                   ...buttonBase,
                   padding: '9px 14px',
-                  background: 'rgba(255,255,255,0.06)',
+                  background: 'var(--surface2)',
                   color: 'var(--text)',
                   fontSize: 12,
                   opacity: missingTables ? 0.5 : 1,
@@ -1380,7 +1362,7 @@ export default function EditalVerticalizadoPage() {
                                     <button
                                       className="ev-icon-btn"
                                       onClick={() => openEditGroup(group)}
-                                      style={{ color: 'var(--amber)', background: 'rgba(255,255,255,0.06)', width: 28, height: 28 }}
+                                      style={{ color: 'var(--amber)', background: 'var(--surface2)', width: 28, height: 28 }}
                                     >
                                       <PencilLine size={13} />
                                     </button>
@@ -1457,7 +1439,7 @@ export default function EditalVerticalizadoPage() {
                                       <button
                                         className="ev-icon-btn"
                                         onClick={() => deleteTopic(topic.id)}
-                                        style={{ color: 'var(--muted)', background: 'rgba(255,255,255,0.06)', opacity: 0.5 }}
+                                        style={{ color: 'var(--muted)', background: 'var(--surface2)', opacity: 0.5 }}
                                       >
                                         <Trash2 size={14} />
                                       </button>
@@ -1631,7 +1613,7 @@ export default function EditalVerticalizadoPage() {
 
 function StatCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)', borderRadius: 14, padding: '10px 12px', textAlign: 'center' }}>
+    <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 14, padding: '10px 12px', textAlign: 'center' }}>
       <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: 1.4, color: 'var(--muted,#6b7194)', marginBottom: 8 }}>
         {label}
       </div>
@@ -1663,7 +1645,7 @@ function Badge({ color, label }: { color: string; label: string }) {
 
 function MetaPill({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ padding: '9px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)', maxWidth: 280 }}>
+    <div style={{ padding: '9px 12px', borderRadius: 12, background: 'var(--surface2)', border: '1px solid var(--border)', maxWidth: 280 }}>
       <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: 'var(--muted,#6b7194)', marginBottom: 4 }}>
         {label}
       </div>
