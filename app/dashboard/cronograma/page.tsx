@@ -7,7 +7,7 @@ import { Plus, Disc, Calendar, Map, Check, RotateCw, X, CircleDashed, MoreVertic
 import type { PlannerSubject, Schedule, StudyCycle } from '@/types/database'
 
 const DAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
-const HOURS = Array.from({ length: 11 }, (_, i) => i + 8) // 08:00 - 18:00
+const HOURS = Array.from({ length: 16 }, (_, i) => i + 8) // 08:00 - 23:00
 
 // Modals Overlay Component
 const Modal = ({ show, onClose, title, children }: { show: boolean, onClose: () => void, title: string, children: React.ReactNode }) => {
