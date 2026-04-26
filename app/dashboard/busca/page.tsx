@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { EditableResumo } from '@/components/study/EditableResumo'
 import ResumoPrintWindow from '@/components/study/ResumoPrintWindow'
+import InteractiveQuestionsPanel from '@/components/study/InteractiveQuestionsPanel'
 import { getSearchLimits, isProviderAllowed, normalizePlanTier, type PlanTier, type SearchMode } from '@/lib/search-plans'
 
 type GenType   = 'summary' | 'flashcards' | 'questions'
@@ -1532,6 +1533,24 @@ export default function BuscaPage() {
                   loading={genTarget === 'summary'} 
                   sessionId={session.sessionId} 
                 />
+                <div style={{ maxWidth: '820px', margin: '24px auto 0', paddingBottom: '24px' }}>
+                  <InteractiveQuestionsPanel
+                    questions={session.questions}
+                    loading={genTarget === 'questions'}
+                    title="Questões do Tema"
+                    maxWidth="100%"
+                    onGenerateAI={handleQuestions}
+                    onOpenManual={() => {
+                      setEditingQId(null)
+                      setManualQQuestion('')
+                      setManualQOptions(['', '', '', '', ''])
+                      setManualQCorrect(0)
+                      setManualQGabarito('C')
+                      setManualQExpl('')
+                      setShowManualQModal(true)
+                    }}
+                  />
+                </div>
               </div>
 
               {/* ── FLASHCARDS ── */}
