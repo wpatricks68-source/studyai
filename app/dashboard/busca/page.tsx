@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { EditableResumo } from '@/components/study/EditableResumo'
+import ResumoPrintWindow from '@/components/study/ResumoPrintWindow'
 import { getSearchLimits, isProviderAllowed, normalizePlanTier, type PlanTier, type SearchMode } from '@/lib/search-plans'
 
 type GenType   = 'summary' | 'flashcards' | 'questions'
@@ -248,6 +249,7 @@ export default function BuscaPage() {
   // ─── Estado do Sidebar Secundário ───
   const [showSources, setShowSources] = useState(true)
   const [showSearchModal, setShowSearchModal] = useState(false)
+  const [showResumoWindow, setShowResumoWindow] = useState(false)
 
   // Detect mobile and hide sources by default
   useEffect(() => {
@@ -1366,6 +1368,17 @@ export default function BuscaPage() {
         </div>
       )}
 
+      {showResumoWindow && hasContent && (
+        <ResumoPrintWindow
+          title={session.disciplina ? `${session.disciplina} - ${session.tema || 'Resumo'}` : (session.tema || 'StudyAI - Resumo')}
+          subtitle={[session.disciplina, session.tema, session.savedAt ? `Salvo as ${session.savedAt}` : null].filter(Boolean).join(' - ')}
+          resumo={session.resumo}
+          flashcards={session.flashcards}
+          questions={session.questions}
+          onClose={() => setShowResumoWindow(false)}
+        />
+      )}
+
       {/* ── Estado vazio ── */}
       {!hasContent && !isLoading && (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '14px', padding: '40px' }}>
@@ -1483,11 +1496,11 @@ export default function BuscaPage() {
                 {genTarget === 'questions' ? 'Gerando...' : `Questões ${session.questions.length > 0 ? `(${session.questions.length}) ✓` : ''}`}
               </button>
 
-              {/* Botão EXPORTAR PDF */}
-              {hasContent && (
+              {/* Botão ABRIR JANELA */}
+              {hasContent && view === 'resumo' && (
                 <button
-                  onClick={handleExportPDF}
-                  title="Exportar todo o conteúdo em PDF"
+                  onClick={() => setShowResumoWindow(true)}
+                  title="Abrir resumo em janela"
                   style={{
                     padding: '5px 14px', borderRadius: '7px', border: '1px solid #6c63ff',
                     background: 'rgba(108,99,255,.12)', color: 'var(--accent,#6c63ff)',
@@ -1495,8 +1508,8 @@ export default function BuscaPage() {
                     display: 'flex', alignItems: 'center', gap: '5px', marginLeft: '8px'
                   }}
                 >
-                  <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M2 4h8l4 4v6a1 1 0 01-1 1H3a1 1 0 01-1-1V5a1 1 0 011-1z"/><path d="M10 4v4h4"/><path d="M6 10v3M4.5 11.5L6 13l1.5-1.5" strokeLinecap="round"/></svg>
-                  Exportar PDF
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6"/><path d="M10 14L21 3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
+                  Abrir janela
                 </button>
               )}
 

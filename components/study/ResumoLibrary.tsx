@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { StudySession, Flashcard, Question } from '@/types/database'
 import { formatDate } from '@/lib/utils'
-import { useEffect, useRef } from 'react'
-import { FileDown, CreditCard, HelpCircle, PencilLine, CheckCircle2, ChevronRight, ChevronLeft } from 'lucide-react'
+import { CreditCard, HelpCircle, PencilLine, Maximize2 } from 'lucide-react'
+import ResumoPrintWindow from '@/components/study/ResumoPrintWindow'
 
 export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }) {
   const [list, setList]             = useState(sessions)
@@ -16,9 +16,9 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
   const [notas, setNotas]           = useState('')
   const [savingNota, setSavingNota] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [showResumoWindow, setShowResumoWindow] = useState(false)
   const [sessionFlashcards, setSessionFlashcards] = useState<Flashcard[]>([])
   const [sessionQuestions, setSessionQuestions] = useState<Question[]>([])
-  const contentRef = useRef<HTMLDivElement>(null)
 
   // Auto-hide on mobile
   useEffect(() => {
@@ -84,10 +84,6 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
 
   const acertoCor = (v: number) => v >= 80 ? '#10b981' : v >= 65 ? '#f59e0b' : '#ef4444'
 
-  function handleExportPDF() {
-    window.print()
-  }
-
   function scrollToSection(id: string) {
     setActiveTab('resumo')
     setTimeout(() => {
@@ -98,24 +94,6 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
 
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
-      <style>{`
-        @media print {
-          body * { visibility: hidden; }
-          #printable-content, #printable-content * { visibility: visible; }
-          #printable-content {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            padding: 0;
-            margin: 0;
-            color: #000 !important;
-            background: #fff !important;
-          }
-          .student-shell, .sidebar, .ev-toolbar, button, a:not([href^="/dashboard/resumos"]) { display: none !important; }
-        }
-      `}</style>
-
       {/* Library sidebar */}
       <div style={{ 
         width: isSidebarOpen ? '300px' : '0px', 
@@ -286,10 +264,10 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
                     </button>
                   )}
                   <button
-                    onClick={handleExportPDF}
+                    onClick={() => setShowResumoWindow(true)}
                     style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px', border: 'none', background: 'var(--accent)', color: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}
                   >
-                    <FileDown size={14} /> EXPORTAR PDF
+                    <Maximize2 size={14} /> ABRIR JANELA
                   </button>
                   <a
                     href={`/dashboard/busca?id=${selected.id}`}
@@ -332,7 +310,7 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
             {/* Tab content */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '22px 28px' }}>
               {activeTab === 'resumo' && (
-                <div ref={contentRef} id="printable-content" className="ed-library-content" style={{ fontSize: '14px', lineHeight: 1.9, color: 'var(--text)' }}>
+                <div className="ed-library-content" style={{ fontSize: '14px', lineHeight: 1.9, color: 'var(--text)' }}>
                   <div style={{ marginBottom: '40px' }}>
                     {(() => {
                       if (!selected.content) return 'Conteúdo não disponível.'
@@ -520,6 +498,17 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
           </>
         )}
       </div>
+
+      {showResumoWindow && selected && (
+        <ResumoPrintWindow
+          title={selected.title}
+          subtitle={[selected.materia, formatDate(selected.created_at), `${selected.revisoes} revisoes`].filter(Boolean).join(' - ')}
+          resumo={selected.content}
+          flashcards={sessionFlashcards}
+          questions={sessionQuestions}
+          onClose={() => setShowResumoWindow(false)}
+        />
+      )}
     </div>
   )
 }
