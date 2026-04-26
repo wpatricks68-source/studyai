@@ -6,6 +6,7 @@ import type { StudySession, Flashcard, Question } from '@/types/database'
 import { formatDate } from '@/lib/utils'
 import { CreditCard, HelpCircle, PencilLine, Maximize2 } from 'lucide-react'
 import ResumoPrintWindow from '@/components/study/ResumoPrintWindow'
+import InteractiveQuestionsPanel from '@/components/study/InteractiveQuestionsPanel'
 
 export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }) {
   const [list, setList]             = useState(sessions)
@@ -354,36 +355,12 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
 
                   {sessionQuestions.length > 0 && (
                     <div id="sec-questoes" style={{ marginTop: '60px', borderTop: '1px solid var(--border)', paddingTop: '32px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
-                        <HelpCircle size={20} color="#00d4aa" />
-                        <h3 style={{ fontSize: '18px', fontWeight: 700, margin: 0 }}>Questões do Tema</h3>
-                      </div>
-                      <div style={{ display: 'grid', gap: '20px' }}>
-                        {sessionQuestions.map((q, i) => (
-                          <div key={q.id} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px' }}>
-                            <div style={{ fontSize: '11px', color: 'var(--muted)', textTransform: 'uppercase', marginBottom: '12px' }}>Questão {i + 1}</div>
-                            <div style={{ fontSize: '15px', fontWeight: 500, color: 'var(--text)', marginBottom: '16px', lineHeight: 1.6 }}>{q.question}</div>
-                            {q.options && (
-                              <div style={{ display: 'grid', gap: '8px', marginBottom: '16px' }}>
-                                {q.options.map((opt, optIdx) => (
-                                  <div key={optIdx} style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '13px', background: 'rgba(255,255,255,0.02)', display: 'flex', gap: '10px' }}>
-                                    <span style={{ color: 'var(--muted)', fontWeight: 700 }}>{String.fromCharCode(65 + optIdx)})</span>
-                                    {opt}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            <div style={{ padding: '12px 16px', borderRadius: '8px', background: 'rgba(0,212,170,0.08)', border: '1px solid rgba(0,212,170,0.15)', color: '#00d4aa', fontSize: '13px' }}>
-                              <strong>Gabarito:</strong> {q.gabarito}
-                            </div>
-                            {q.explanation && (
-                              <div style={{ marginTop: '12px', fontSize: '13px', color: 'var(--muted)', lineHeight: 1.6 }}>
-                                <strong>Explicação:</strong> {q.explanation}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
+                      <InteractiveQuestionsPanel
+                        questions={sessionQuestions}
+                        title="Questões do Tema"
+                        maxWidth="100%"
+                        showEmptyState={false}
+                      />
                     </div>
                   )}
                 </div>

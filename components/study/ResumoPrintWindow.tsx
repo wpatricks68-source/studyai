@@ -1,6 +1,7 @@
 'use client'
 
 import { FileDown, X } from 'lucide-react'
+import InteractiveQuestionsPanel, { type InteractiveQuestion } from '@/components/study/InteractiveQuestionsPanel'
 
 interface PrintableFlashcard {
   id?: string
@@ -8,23 +9,12 @@ interface PrintableFlashcard {
   back: string
 }
 
-interface PrintableQuestion {
-  id?: string
-  question: string
-  tipo?: 'cv' | 'mc' | string
-  options?: string[] | null
-  correct?: number | null
-  gabarito?: string | null
-  explanation?: string | null
-  banca?: string | null
-}
-
 interface Props {
   title: string
   subtitle?: string | null
   resumo: string | null
   flashcards?: PrintableFlashcard[]
-  questions?: PrintableQuestion[]
+  questions?: InteractiveQuestion[]
   onClose: () => void
 }
 
@@ -94,22 +84,6 @@ function getCanvas(content: string | null) {
   return ''
 }
 
-function getQuestionAnswer(question: PrintableQuestion) {
-  if (question.tipo === 'cv') {
-    if (question.gabarito === 'C') return 'CERTO'
-    if (question.gabarito === 'E') return 'ERRADO'
-    return question.gabarito || '-'
-  }
-
-  if (typeof question.correct === 'number') {
-    const letter = ['A', 'B', 'C', 'D', 'E'][question.correct] ?? String(question.correct + 1)
-    const option = question.options?.[question.correct]
-    return option ? `${letter} - ${option}` : letter
-  }
-
-  return question.gabarito || '-'
-}
-
 export default function ResumoPrintWindow({
   title,
   subtitle,
@@ -162,6 +136,45 @@ export default function ResumoPrintWindow({
         #resumo-print-window .resumo-print-content li,
         #resumo-print-window .resumo-print-content .ed-li {
           margin: 6px 0;
+        }
+
+        @media (max-width: 720px) {
+          #resumo-print-window .resumo-print-topbar {
+            height: auto !important;
+            min-height: 60px;
+            align-items: flex-start !important;
+            padding: 12px 14px !important;
+            gap: 12px !important;
+          }
+
+          #resumo-print-window .resumo-print-topbar > div:first-child {
+            flex: 1 1 auto;
+            min-width: 0;
+          }
+
+          #resumo-print-window .resumo-print-topbar > div:last-child {
+            gap: 8px !important;
+          }
+
+          #resumo-print-window .resumo-print-scroll {
+            padding: 14px 10px !important;
+          }
+
+          #resumo-print-window .resumo-print-page {
+            padding: 22px 16px !important;
+            border-radius: 8px !important;
+            min-height: calc(100vh - 88px) !important;
+          }
+
+          #resumo-print-window .resumo-print-page h1 {
+            font-size: 19px !important;
+          }
+        }
+
+        @media (max-width: 420px) {
+          #resumo-print-window .resumo-export-label {
+            display: none;
+          }
         }
 
         @media print {
@@ -290,7 +303,7 @@ export default function ResumoPrintWindow({
               fontWeight: 700,
             }}
           >
-            <FileDown size={14} /> Exportar PDF
+            <FileDown size={14} /> <span className="resumo-export-label">Exportar PDF</span>
           </button>
 
           <button
@@ -388,55 +401,12 @@ export default function ResumoPrintWindow({
 
           {questions.length > 0 && (
             <section className="resumo-print-section" style={{ marginTop: '34px' }}>
-              <div className="resumo-print-section-title" style={{ color: '#00d4aa', fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>
-                Questões ({questions.length})
-              </div>
-              <div style={{ display: 'grid', gap: '14px' }}>
-                {questions.map((question, index) => (
-                  <div
-                    key={question.id ?? index}
-                    className="resumo-print-question"
-                    style={{ border: '1px solid var(--border,#1f2640)', borderRadius: '8px', padding: '16px 18px', background: 'var(--surface2,#181d2e)' }}
-                  >
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '11px', color: '#00d4aa', fontWeight: 800 }}>Q{index + 1}</span>
-                      <span style={{ fontSize: '10px', color: 'var(--muted,#9aa3bd)', textTransform: 'uppercase' }}>
-                        {question.tipo === 'cv' ? 'Certo / Errado' : 'Múltipla escolha'}
-                      </span>
-                      {question.banca && (
-                        <span style={{ fontSize: '10px', color: 'var(--muted,#9aa3bd)', marginLeft: 'auto' }}>
-                          {question.banca}
-                        </span>
-                      )}
-                    </div>
-
-                    <div style={{ fontSize: '14px', color: 'var(--text,#e8eaf6)', fontWeight: 600, lineHeight: 1.65, marginBottom: '12px' }}>
-                      {question.question}
-                    </div>
-
-                    {question.tipo === 'mc' && question.options && (
-                      <div style={{ display: 'grid', gap: '8px', marginBottom: '12px' }}>
-                        {question.options.map((option, optionIndex) => (
-                          <div key={optionIndex} style={{ display: 'flex', gap: '8px', fontSize: '13px', lineHeight: 1.55, color: 'var(--muted,#9aa3bd)' }}>
-                            <strong>{['A', 'B', 'C', 'D', 'E'][optionIndex]})</strong>
-                            <span>{option}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    <div style={{ fontSize: '13px', color: '#00d4aa', fontWeight: 700, borderTop: '1px dashed var(--border,#1f2640)', paddingTop: '10px' }}>
-                      Gabarito: {getQuestionAnswer(question)}
-                    </div>
-
-                    {question.explanation && (
-                      <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--muted,#9aa3bd)', lineHeight: 1.65 }}>
-                        <strong>Explicação:</strong> {question.explanation}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+              <InteractiveQuestionsPanel
+                questions={questions}
+                title="Questões"
+                maxWidth="none"
+                showEmptyState={false}
+              />
             </section>
           )}
         </article>
