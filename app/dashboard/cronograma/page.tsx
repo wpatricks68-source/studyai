@@ -294,10 +294,88 @@ export default function CronogramaPage() {
   }
 
   return (
-    <div style={{ display: 'flex', gap: '24px', height: '100%', padding: '24px', background: 'var(--bg,#0a0c12)', overflow: 'hidden', color: 'var(--text,#e8eaf6)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', height: '100%', padding: '24px', background: 'var(--bg,#0a0c12)', overflow: 'hidden', color: 'var(--text,#e8eaf6)' }}>
+      <div style={{ flex: '1 1 0', minHeight: 0, display: 'flex', gap: '24px', overflow: 'hidden' }}>
+        <div style={{ flex: '1 1 auto', minWidth: '720px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px', borderBottom: '1px solid var(--border,#1f2640)' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text,#fff)', letterSpacing: '0.5px' }}>PAINEL DE CRONOGRAMA</h2>
+            <button onClick={() => setShowScheduleModal(true)} style={{ background: 'transparent', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '6px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', transition: 'all .2s' }}>+ Alocar HorÃ¡rio</button>
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+             <div style={{ display: 'grid', gridTemplateColumns: '70px repeat(7, 1fr)', minWidth: '800px' }}>
+               <div style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface2,#181d2e)' }} />
+               {DAYS.map(d => (
+                 <div key={d} style={{ padding: '14px', textAlign: 'center', fontSize: '12px', fontWeight: 700, color: 'var(--text,#fff)', borderBottom: '1px solid var(--border)', background: 'var(--surface2,#181d2e)', borderLeft: '1px solid var(--border)' }}>
+                   {d}
+                 </div>
+               ))}
+               {HOURS.map(h => (
+                 <React.Fragment key={h}>
+                   <div style={{ padding: '16px 8px', textAlign: 'center', fontSize: '11px', fontWeight: 600, color: 'var(--muted)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                     {String(h).padStart(2, '0')}:00
+                   </div>
+                   {DAYS.map((_, dayIndex) => {
+                     const blocks = getBlocksForSlot(dayIndex, String(h).padStart(2, '0') + ':00')
+                     return (
+                       <div key={`${h}-${dayIndex}`} style={{ borderLeft: '1px solid var(--border)', borderBottom: '1px solid var(--border)', minHeight: '80px', padding: '6px', position: 'relative', background: 'rgba(255,255,255,0.01)' }}>
+                         {blocks.map(b => (
+                           <div key={b.id} onClick={() => removeSchedule(b.id)} style={{ background: b.color, color: 'var(--text,#fff)', padding: '10px', borderRadius: '10px', fontSize: '11px', fontWeight: 700, display: 'flex', flexDirection: 'column', gap: '4px', cursor: 'pointer', marginBottom: '6px', boxShadow: `0 8px 16px ${b.color}30`, border: '1px solid rgba(255,255,255,0.1)' }}>
+                             <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.subject}</div>
+                             <div style={{ fontSize: '9px', opacity: 0.9, background: 'rgba(0,0,0,0.1)', padding: '2px 0', borderRadius: '4px', textAlign: 'center' }}>{b.start_time.slice(0,5)} - {b.end_time.slice(0,5)}</div>
+                           </div>
+                         ))}
+                       </div>
+                     )
+                   })}
+                 </React.Fragment>
+               ))}
+             </div>
+          </div>
+        </div>
+
+        <div style={{ width: '420px', minWidth: '360px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px', borderBottom: '1px solid var(--border,#1f2640)' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text,#fff)', letterSpacing: '0.5px' }}>CICLO DE ESTUDO</h2>
+            <button onClick={() => setShowCycleModal(true)} style={{ background: 'transparent', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '6px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>+ Adicionar</button>
+          </div>
+          <div style={{ flex: 1, minHeight: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', background: 'radial-gradient(circle at center, rgba(108,99,255,0.05) 0%, transparent 70%)' }}>
+            {cycles.length === 0 ? (
+              <div style={{ textAlign: 'center', color: 'var(--muted)' }}>
+                 <div style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.1 }}>âš™ï¸</div>
+                 <div style={{ fontSize: '14px' }}>O ciclo estÃ¡ vazio. Comece a girar!</div>
+              </div>
+            ) : (
+              <div style={{ position: 'relative', width: '360px', height: '360px', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto' }}>
+                 <div style={{ position: 'absolute', width: '250px', height: '250px', borderRadius: '50%', border: '20px solid var(--surface2,#181d2e)', opacity: 0.5 }} />
+                 <div style={{ textAlign: 'center', zIndex: 10, background: 'var(--surface,#0a0c12)', padding: '24px', borderRadius: '50%', border: '2px dashed var(--border)', boxShadow: '0 0 40px rgba(0,0,0,0.3)' }}>
+                    <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--text,#fff)' }}>CICLO DE</div>
+                    <div style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 700, letterSpacing: '2px' }}>ESTUDO</div>
+                    <div style={{ fontSize: '10px', color: 'var(--muted)', marginTop: '8px', fontWeight: 600 }}>{cycles.length} BLOCOS</div>
+                 </div>
+                 {cycles.map((cyc, i) => {
+                    const subj = subjects.find(s => s.id === cyc.subject_id)
+                    if (!subj) return null
+                    const R = 138
+                    const angle = (i / cycles.length) * 2 * Math.PI - Math.PI / 2
+                    const x = R * Math.cos(angle)
+                    const y = R * Math.sin(angle)
+                    return (
+                      <div key={cyc.id} onClick={() => removeCycle(cyc.id)} style={{ position: 'absolute', left: `calc(50% + ${x}px)`, top: `calc(50% + ${y}px)`, transform: 'translate(-50%, -50%)', background: subj.color, color: 'var(--text,#fff)', padding: '10px 14px', borderRadius: '14px', fontSize: '12px', fontWeight: 700, boxShadow: `0 10px 30px ${subj.color}40`, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', zIndex: 11, transition: 'all .3s', border: '2px solid rgba(255,255,255,0.2)', maxWidth: '150px' }}>
+                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{subj.name}</span>
+                        <span style={{ padding: '3px 8px', background: 'rgba(0,0,0,0.15)', borderRadius: '6px', fontSize: '10px', flex: '0 0 auto' }}>{cyc.duration_minutes >= 60 ? `${Math.floor(cyc.duration_minutes/60)}h${cyc.duration_minutes%60>0?cyc.duration_minutes%60:''}` : `${cyc.duration_minutes}m`}</span>
+                      </div>
+                    )
+                 })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ flex: '0 0 320px', minHeight: 0, display: 'flex', gap: '24px', overflow: 'hidden' }}>
       
       {/* ── PAINEL 1: DISCIPLINAS (Esquerda) ── */}
-      <div style={{ width: '360px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+      <div style={{ flex: '1 1 auto', minWidth: '520px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
         <div style={{ padding: '24px 24px 16px', borderBottom: '1px solid var(--border,#1f2640)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text,#fff)', letterSpacing: '0.5px' }}>PAINEL DE DISCIPLINAS</h2>
@@ -357,7 +435,7 @@ export default function CronogramaPage() {
       </div>
 
       {/* ── PAINEL 2: CRONOGRAMA & CICLOS (Centro) ── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+      <div style={{ display: 'none' }}>
         
         {/* Header com Toggle */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px', borderBottom: '1px solid var(--border,#1f2640)' }}>
@@ -535,6 +613,7 @@ export default function CronogramaPage() {
               </div>
            </div>
         </div>
+      </div>
       </div>
 
       {/* MODALS COMPONENTS */}
