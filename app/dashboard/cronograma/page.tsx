@@ -29,10 +29,19 @@ const INITIAL_SUBJECT_FORM = { name: '', code: '', description: '', target_sessi
 
 type RevisionRow = {
   id: string
+  selected: boolean
   revisionType: 'partial' | 'general'
-  subjectId: string
+  subjectIds: string[]
   date: string
 }
+
+const createRevisionRow = (): RevisionRow => ({
+  id: `revision-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  selected: false,
+  revisionType: 'partial',
+  subjectIds: [],
+  date: ''
+})
 
 export default function CronogramaPage() {
   const [loading, setLoading] = useState(true)
@@ -42,7 +51,7 @@ export default function CronogramaPage() {
 
   const [viewMode, setViewMode] = useState<'calendar' | 'cycle'>('calendar')
   const [revisionRows, setRevisionRows] = useState<RevisionRow[]>([
-    { id: 'revision-1', revisionType: 'partial', subjectId: '', date: '' }
+    createRevisionRow()
   ])
 
   // Modals state
@@ -266,21 +275,31 @@ export default function CronogramaPage() {
     setSubjects(s => s.filter(su => su.id !== id))
     setCycles(s => s.filter(sc => sc.subject_id !== id))
     setRevisionRows(rows => rows.map(row => (
-      row.subjectId === id ? { ...row, subjectId: '' } : row
+      row.subjectIds.includes(id)
+        ? { ...row, subjectIds: row.subjectIds.filter(subjectId => subjectId !== id) }
+        : row
     )))
   }
 
   function addRevisionRow() {
-    setRevisionRows(rows => [
-      ...rows,
-      { id: `revision-${Date.now()}`, revisionType: 'partial', subjectId: '', date: '' }
-    ])
+    setRevisionRows(rows => [...rows, createRevisionRow()])
   }
 
   function updateRevisionRow<K extends keyof Omit<RevisionRow, 'id'>>(id: string, field: K, value: RevisionRow[K]) {
     setRevisionRows(rows => rows.map(row => (
       row.id === id ? { ...row, [field]: value } : row
     )))
+  }
+
+  function toggleAllRevisionRows(checked: boolean) {
+    setRevisionRows(rows => rows.map(row => ({ ...row, selected: checked })))
+  }
+
+  function removeSelectedRevisionRows() {
+    setRevisionRows(rows => {
+      const remainingRows = rows.filter(row => !row.selected)
+      return remainingRows.length > 0 ? remainingRows : [createRevisionRow()]
+    })
   }
 
   // ==== HELPERS ====
@@ -310,6 +329,8 @@ export default function CronogramaPage() {
   }))
 
   const totalSessions = chartData.reduce((acc, curr) => acc + curr.sessions, 0)
+  const hasSelectedRevisionRows = revisionRows.some(row => row.selected)
+  const allRevisionRowsSelected = revisionRows.length > 0 && revisionRows.every(row => row.selected)
 
   if (loading) {
      return (
@@ -320,9 +341,9 @@ export default function CronogramaPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', height: '100%', padding: '24px', background: 'var(--bg,#0a0c12)', overflow: 'hidden', color: 'var(--text,#e8eaf6)' }}>
-      <div style={{ flex: '1 1 0', minHeight: 0, display: 'flex', gap: '24px', overflow: 'hidden' }}>
-        <div style={{ flex: '1 1 auto', minWidth: '720px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', minHeight: '100vh', padding: '24px', background: 'var(--bg,#0a0c12)', overflowY: 'auto', overflowX: 'hidden', color: 'var(--text,#e8eaf6)' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch', gap: '24px' }}>
+        <div style={{ flex: '999 1 760px', minWidth: 'min(100%, 620px)', minHeight: '520px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px', borderBottom: '1px solid var(--border,#1f2640)' }}>
             <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text,#fff)', letterSpacing: '0.5px' }}>PAINEL DE CRONOGRAMA</h2>
             <button onClick={() => setShowScheduleModal(true)} style={{ background: 'transparent', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '6px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', transition: 'all .2s' }}>+ Alocar HorÃ¡rio</button>
@@ -359,25 +380,32 @@ export default function CronogramaPage() {
           </div>
         </div>
 
-        <div style={{ width: '420px', minWidth: '360px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px', borderBottom: '1px solid var(--border,#1f2640)' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text,#fff)', letterSpacing: '0.5px' }}>PAINEL DE REVIS&Atilde;O</h2>
-            <button onClick={addRevisionRow} title="Adicionar revisao" style={{ background: 'var(--accent,#6c63ff)', color: 'var(--text,#fff)', border: 'none', width: '34px', height: '34px', borderRadius: '10px', fontSize: '18px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>+</button>
+        <div style={{ flex: '1 1 460px', minWidth: 'min(100%, 360px)', minHeight: '360px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '20px', borderBottom: '1px solid var(--border,#1f2640)' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text,#fff)', letterSpacing: '0.5px' }}>PAINEL DE REVISAO</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input type="checkbox" checked={allRevisionRowsSelected} onChange={e => toggleAllRevisionRows(e.target.checked)} title="Selecionar revisoes" style={{ width: '18px', height: '18px', accentColor: 'var(--accent,#6c63ff)', cursor: 'pointer' }} />
+              <button onClick={removeSelectedRevisionRows} disabled={!hasSelectedRevisionRows} title="Excluir revisoes selecionadas" style={{ background: hasSelectedRevisionRows ? '#ef444420' : 'var(--surface2,#181d2e)', color: hasSelectedRevisionRows ? '#ef4444' : 'var(--muted,#6b7194)', border: '1px solid var(--border,#1f2640)', width: '34px', height: '34px', borderRadius: '10px', cursor: hasSelectedRevisionRows ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Trash2 size={16} />
+              </button>
+              <button onClick={addRevisionRow} title="Adicionar revisao" style={{ background: 'var(--accent,#6c63ff)', color: 'var(--text,#fff)', border: 'none', width: '34px', height: '34px', borderRadius: '10px', fontSize: '18px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>+</button>
+            </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: '8px', padding: '12px 16px', fontSize: '10px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '1px', borderBottom: '1px solid var(--border,#1f2640)' }}>
-            <span>REVIS&Atilde;O</span>
+          <div style={{ display: 'grid', gridTemplateColumns: '28px minmax(120px, 1fr) minmax(160px, 1.3fr) 130px', gap: '8px', padding: '12px 16px', fontSize: '10px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '1px', borderBottom: '1px solid var(--border,#1f2640)', minWidth: '640px' }}>
+            <span />
+            <span>REVISAO</span>
             <span>DISCIPLINAS</span>
             <span>DATA</span>
           </div>
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {revisionRows.map(row => (
-              <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: '8px', alignItems: 'center' }}>
+              <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '28px minmax(120px, 1fr) minmax(160px, 1.3fr) 130px', gap: '8px', alignItems: 'center', minWidth: '640px' }}>
+                <input type="checkbox" checked={row.selected} onChange={e => updateRevisionRow(row.id, 'selected', e.target.checked)} title="Selecionar linha" style={{ width: '18px', height: '18px', accentColor: 'var(--accent,#6c63ff)', cursor: 'pointer' }} />
                 <select value={row.revisionType} onChange={e => updateRevisionRow(row.id, 'revisionType', e.target.value as RevisionRow['revisionType'])} style={{ minWidth: 0, width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '10px', padding: '10px 8px', color: 'var(--text,#fff)', outline: 'none', fontSize: '12px' }}>
                   <option value="partial">Revisao parcial</option>
                   <option value="general">Revisao geral</option>
                 </select>
-                <select value={row.subjectId} onChange={e => updateRevisionRow(row.id, 'subjectId', e.target.value)} style={{ minWidth: 0, width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '10px', padding: '10px 8px', color: 'var(--text,#fff)', outline: 'none', fontSize: '12px' }}>
-                  <option value="">Disciplina</option>
+                <select multiple value={row.subjectIds} onChange={e => updateRevisionRow(row.id, 'subjectIds', Array.from(e.currentTarget.selectedOptions, option => option.value))} style={{ minWidth: 0, width: '100%', minHeight: '74px', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '10px', padding: '8px', color: 'var(--text,#fff)', outline: 'none', fontSize: '12px' }}>
                   {subjects.map(subject => (
                     <option key={subject.id} value={subject.id}>{subject.name}</option>
                   ))}
@@ -427,10 +455,10 @@ export default function CronogramaPage() {
         </div>
       </div>
 
-      <div style={{ flex: '0 0 320px', minHeight: 0, display: 'flex', gap: '24px', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch', gap: '24px' }}>
       
       {/* ── PAINEL 1: DISCIPLINAS (Esquerda) ── */}
-      <div style={{ flex: '1 1 auto', minWidth: '420px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+      <div style={{ flex: '2 1 520px', minWidth: 'min(100%, 420px)', minHeight: '360px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
         <div style={{ padding: '24px 24px 16px', borderBottom: '1px solid var(--border,#1f2640)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text,#fff)', letterSpacing: '0.5px' }}>PAINEL DE DISCIPLINAS</h2>
@@ -490,7 +518,7 @@ export default function CronogramaPage() {
       </div>
 
       {/* ── PAINEL 2: CRONOGRAMA & CICLOS (Centro) ── */}
-      <div style={{ width: '360px', minWidth: '320px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+      <div style={{ flex: '1 1 360px', minWidth: 'min(100%, 320px)', minHeight: '360px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px', borderBottom: '1px solid var(--border,#1f2640)' }}>
           <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text,#fff)', letterSpacing: '0.5px' }}>CICLO DE ESTUDO</h2>
           <button onClick={() => setShowCycleModal(true)} style={{ background: 'transparent', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>+ Adicionar</button>
@@ -647,7 +675,7 @@ export default function CronogramaPage() {
       </div>
 
       {/* ── PAINEL 3: ESTATÍSTICA (Direita) ── */}
-      <div style={{ width: '300px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+      <div style={{ flex: '1 1 300px', minWidth: 'min(100%, 280px)', minHeight: '360px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
         <div style={{ padding: '24px', borderBottom: '1px solid var(--border,#1f2640)' }}>
           <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text,#fff)', letterSpacing: '0.5px' }}>VISÃO GERAL</h2>
         </div>
