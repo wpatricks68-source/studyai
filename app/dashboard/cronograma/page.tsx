@@ -27,6 +27,13 @@ const Modal = ({ show, onClose, title, children }: { show: boolean, onClose: () 
 
 const INITIAL_SUBJECT_FORM = { name: '', code: '', description: '', target_sessions: 20, color: '#6c63ff' }
 
+type RevisionRow = {
+  id: string
+  revisionType: 'partial' | 'general'
+  subjectId: string
+  date: string
+}
+
 export default function CronogramaPage() {
   const [loading, setLoading] = useState(true)
   const [subjects, setSubjects] = useState<PlannerSubject[]>([])
@@ -34,6 +41,9 @@ export default function CronogramaPage() {
   const [cycles, setCycles] = useState<StudyCycle[]>([])
 
   const [viewMode, setViewMode] = useState<'calendar' | 'cycle'>('calendar')
+  const [revisionRows, setRevisionRows] = useState<RevisionRow[]>([
+    { id: 'revision-1', revisionType: 'partial', subjectId: '', date: '' }
+  ])
 
   // Modals state
   const [showSubjectModal, setShowSubjectModal] = useState(false)
@@ -255,6 +265,22 @@ export default function CronogramaPage() {
     await supabase.from('planner_subjects').delete().eq('id', id)
     setSubjects(s => s.filter(su => su.id !== id))
     setCycles(s => s.filter(sc => sc.subject_id !== id))
+    setRevisionRows(rows => rows.map(row => (
+      row.subjectId === id ? { ...row, subjectId: '' } : row
+    )))
+  }
+
+  function addRevisionRow() {
+    setRevisionRows(rows => [
+      ...rows,
+      { id: `revision-${Date.now()}`, revisionType: 'partial', subjectId: '', date: '' }
+    ])
+  }
+
+  function updateRevisionRow<K extends keyof Omit<RevisionRow, 'id'>>(id: string, field: K, value: RevisionRow[K]) {
+    setRevisionRows(rows => rows.map(row => (
+      row.id === id ? { ...row, [field]: value } : row
+    )))
   }
 
   // ==== HELPERS ====
@@ -335,6 +361,35 @@ export default function CronogramaPage() {
 
         <div style={{ width: '420px', minWidth: '360px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px', borderBottom: '1px solid var(--border,#1f2640)' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text,#fff)', letterSpacing: '0.5px' }}>PAINEL DE REVIS&Atilde;O</h2>
+            <button onClick={addRevisionRow} title="Adicionar revisao" style={{ background: 'var(--accent,#6c63ff)', color: 'var(--text,#fff)', border: 'none', width: '34px', height: '34px', borderRadius: '10px', fontSize: '18px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>+</button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: '8px', padding: '12px 16px', fontSize: '10px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '1px', borderBottom: '1px solid var(--border,#1f2640)' }}>
+            <span>REVIS&Atilde;O</span>
+            <span>DISCIPLINAS</span>
+            <span>DATA</span>
+          </div>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {revisionRows.map(row => (
+              <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: '8px', alignItems: 'center' }}>
+                <select value={row.revisionType} onChange={e => updateRevisionRow(row.id, 'revisionType', e.target.value as RevisionRow['revisionType'])} style={{ minWidth: 0, width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '10px', padding: '10px 8px', color: 'var(--text,#fff)', outline: 'none', fontSize: '12px' }}>
+                  <option value="partial">Revisao parcial</option>
+                  <option value="general">Revisao geral</option>
+                </select>
+                <select value={row.subjectId} onChange={e => updateRevisionRow(row.id, 'subjectId', e.target.value)} style={{ minWidth: 0, width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '10px', padding: '10px 8px', color: 'var(--text,#fff)', outline: 'none', fontSize: '12px' }}>
+                  <option value="">Disciplina</option>
+                  {subjects.map(subject => (
+                    <option key={subject.id} value={subject.id}>{subject.name}</option>
+                  ))}
+                </select>
+                <input type="date" value={row.date} onChange={e => updateRevisionRow(row.id, 'date', e.target.value)} style={{ minWidth: 0, width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '10px', padding: '9px 8px', color: 'var(--text,#fff)', outline: 'none', fontSize: '12px' }} />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: 'none' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px', borderBottom: '1px solid var(--border,#1f2640)' }}>
             <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text,#fff)', letterSpacing: '0.5px' }}>CICLO DE ESTUDO</h2>
             <button onClick={() => setShowCycleModal(true)} style={{ background: 'transparent', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '6px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>+ Adicionar</button>
           </div>
@@ -375,7 +430,7 @@ export default function CronogramaPage() {
       <div style={{ flex: '0 0 320px', minHeight: 0, display: 'flex', gap: '24px', overflow: 'hidden' }}>
       
       {/* ── PAINEL 1: DISCIPLINAS (Esquerda) ── */}
-      <div style={{ flex: '1 1 auto', minWidth: '520px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+      <div style={{ flex: '1 1 auto', minWidth: '420px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
         <div style={{ padding: '24px 24px 16px', borderBottom: '1px solid var(--border,#1f2640)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text,#fff)', letterSpacing: '0.5px' }}>PAINEL DE DISCIPLINAS</h2>
@@ -435,6 +490,44 @@ export default function CronogramaPage() {
       </div>
 
       {/* ── PAINEL 2: CRONOGRAMA & CICLOS (Centro) ── */}
+      <div style={{ width: '360px', minWidth: '320px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px', borderBottom: '1px solid var(--border,#1f2640)' }}>
+          <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text,#fff)', letterSpacing: '0.5px' }}>CICLO DE ESTUDO</h2>
+          <button onClick={() => setShowCycleModal(true)} style={{ background: 'transparent', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>+ Adicionar</button>
+        </div>
+        <div style={{ flex: 1, minHeight: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', background: 'radial-gradient(circle at center, rgba(108,99,255,0.05) 0%, transparent 70%)' }}>
+          {cycles.length === 0 ? (
+            <div style={{ textAlign: 'center', color: 'var(--muted)' }}>
+              <div style={{ fontSize: '34px', marginBottom: '10px', opacity: 0.15 }}><RotateCw size={34} /></div>
+              <div style={{ fontSize: '13px' }}>Ciclo vazio</div>
+            </div>
+          ) : (
+            <div style={{ position: 'relative', width: '270px', height: '230px', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto' }}>
+              <div style={{ position: 'absolute', width: '168px', height: '168px', borderRadius: '50%', border: '16px solid var(--surface2,#181d2e)', opacity: 0.5 }} />
+              <div style={{ textAlign: 'center', zIndex: 10, background: 'var(--surface,#0a0c12)', padding: '18px', borderRadius: '50%', border: '2px dashed var(--border)', boxShadow: '0 0 30px rgba(0,0,0,0.3)' }}>
+                <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text,#fff)' }}>CICLO</div>
+                <div style={{ fontSize: '9px', color: 'var(--muted)', marginTop: '5px', fontWeight: 700 }}>{cycles.length} blocos</div>
+              </div>
+              {cycles.map((cyc, i) => {
+                const subj = subjects.find(s => s.id === cyc.subject_id)
+                if (!subj) return null
+                const radiusX = 112
+                const radiusY = 88
+                const angle = (i / cycles.length) * 2 * Math.PI - Math.PI / 2
+                const x = radiusX * Math.cos(angle)
+                const y = radiusY * Math.sin(angle)
+                return (
+                  <div key={cyc.id} onClick={() => removeCycle(cyc.id)} style={{ position: 'absolute', left: `calc(50% + ${x}px)`, top: `calc(50% + ${y}px)`, transform: 'translate(-50%, -50%)', background: subj.color, color: 'var(--text,#fff)', padding: '8px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 700, boxShadow: `0 8px 20px ${subj.color}40`, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', zIndex: 11, border: '2px solid rgba(255,255,255,0.2)', maxWidth: '126px' }}>
+                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{subj.name}</span>
+                    <span style={{ padding: '2px 6px', background: 'rgba(0,0,0,0.15)', borderRadius: '6px', fontSize: '9px', flex: '0 0 auto' }}>{cyc.duration_minutes >= 60 ? `${Math.floor(cyc.duration_minutes/60)}h${cyc.duration_minutes%60>0?cyc.duration_minutes%60:''}` : `${cyc.duration_minutes}m`}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
       <div style={{ display: 'none' }}>
         
         {/* Header com Toggle */}
