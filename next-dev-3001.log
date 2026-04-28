@@ -14,3 +14,7 @@
  ✓ Compiled /auth/login in 7.3s (611 modules)
  GET /auth/login 200 in 7706ms
  GET /auth/login 200 in 7718ms
+ GET /auth/login 200 in 79ms
+ GET /auth/login 200 in 54ms
+ GET /auth/login 200 in 81ms
+ GET /auth/login 200 in 56ms
