@@ -329,7 +329,7 @@ export default function ResumoPrintWindow({
 
       <div
         className="resumo-print-scroll"
-        style={{ flex: 1, overflowY: 'auto', padding: '32px 20px', display: 'flex', justifyContent: 'center' }}
+        style={{ flex: 1, overflowY: 'auto', padding: '32px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}
       >
         <article
           className="resumo-print-page"
@@ -340,7 +340,10 @@ export default function ResumoPrintWindow({
             border: '1px solid var(--border,#1f2640)',
             borderRadius: '10px',
             padding: '34px 42px',
+            height: 'auto',
             minHeight: 'calc(100vh - 124px)',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+            marginBottom: '32px'
           }}
         >
           <header style={{ marginBottom: '28px', borderBottom: '1px solid var(--border,#1f2640)', paddingBottom: '16px' }}>
