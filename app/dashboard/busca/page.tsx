@@ -1269,6 +1269,17 @@ export default function BuscaPage() {
                 </label>
                 
                 <button
+                  onClick={() => { handleClear(); }}
+                  style={{
+                    padding: '10px 18px', borderRadius: '10px', border: '1px solid var(--border,#1f2640)',
+                    background: 'transparent', color: 'var(--text,#e8eaf6)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 6L6 19M6 6l13 13"/></svg>
+                  Novo
+                </button>
+                
+                <button
                   onClick={async () => { 
                     if (!tema.trim()) {
                       setError('Insira pelo menos o tema para criar uma sessão.');
@@ -1283,7 +1294,7 @@ export default function BuscaPage() {
                   }}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>
-                  Novo
+                  Manual
                 </button>
 
                 <button
@@ -1418,6 +1429,29 @@ export default function BuscaPage() {
                 {s.tema}
               </button>
             ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+             <button
+                onClick={() => { 
+                  if (!tema.trim()) {
+                    setError('Insira um tema para criar uma sessão manual.');
+                    setShowSearchModal(true);
+                    return;
+                  }
+                  handleManualCreate(); 
+                }}
+                style={{ padding: '8px 16px', borderRadius: '10px', border: '1px solid var(--border,#1f2640)', background: 'rgba(108,99,255,0.05)', color: 'var(--accent,#6c63ff)', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>
+                Sessão Manual
+              </button>
+              <button
+                onClick={handleClear}
+                style={{ padding: '8px 16px', borderRadius: '10px', border: '1px solid var(--border,#1f2640)', background: 'transparent', color: 'var(--muted,#6b7194)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Novo / Limpar
+              </button>
           </div>
         </div>
       )}
