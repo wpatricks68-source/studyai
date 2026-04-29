@@ -316,10 +316,15 @@ export function EditableResumo({ content, sessionId, loading }: Props) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxWidth: '800px', margin: '0 auto', background: 'var(--surface)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%', height: 'auto', maxWidth: '820px', margin: '0 auto', background: 'var(--surface)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'visible', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
       
       {/* TOOLBAR */}
-      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', padding: '12px 14px', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
+      <div style={{ 
+        display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', 
+        padding: '12px 14px', borderBottom: '1px solid var(--border)', 
+        background: 'var(--surface)', position: 'sticky', top: 0, zIndex: 110,
+        borderRadius: '12px 12px 0 0'
+      }}>
         
         {/* Undo / Redo */}
         <div style={{ display: 'flex', gap: '2px', background: 'var(--surface2)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border)' }}>
@@ -452,7 +457,7 @@ export function EditableResumo({ content, sessionId, loading }: Props) {
       {/* EDITOR AREA */}
       <div 
         ref={containerRef}
-        style={{ position: 'relative', flex: 1, overflowY: 'auto', overflowX: 'hidden' }}
+        style={{ position: 'relative', flex: 1, overflow: 'visible' }}
       >
         <div 
           ref={editorRef}

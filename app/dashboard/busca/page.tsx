@@ -1561,7 +1561,7 @@ export default function BuscaPage() {
             <div style={{ flex: 1, overflow: 'auto', padding: '24px 32px' }}>
 
               {/* ── RESUMO ── */}
-              <div style={{ display: view === 'resumo' ? 'block' : 'none', height: '100%' }}>
+              <div style={{ display: view === 'resumo' ? 'block' : 'none', minHeight: '100%' }}>
                 <EditableResumo 
                   content={session.resumo} 
                   loading={genTarget === 'summary'} 
@@ -1588,7 +1588,7 @@ export default function BuscaPage() {
               </div>
 
               {/* ── FLASHCARDS ── */}
-              <div style={{ display: view === 'flashcards' ? 'block' : 'none', height: '100%' }}>
+              <div style={{ display: view === 'flashcards' ? 'block' : 'none', minHeight: '100%', maxWidth: '820px', margin: '0 auto' }}>
                 <FlashcardsView 
                   cards={session.flashcards} 
                   loading={genTarget === 'flashcards'} 
@@ -1611,7 +1611,7 @@ export default function BuscaPage() {
               </div>
 
               {/* ── QUESTÕES ── */}
-              <div style={{ display: view === 'questoes' ? 'block' : 'none', height: '100%' }}>
+              <div style={{ display: view === 'questoes' ? 'block' : 'none', minHeight: '100%', maxWidth: '820px', margin: '0 auto' }}>
                 <QuestoesView 
                   questions={session.questions} 
                   loading={genTarget === 'questions'} 

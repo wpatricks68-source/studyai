@@ -309,9 +309,9 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
             </div>
 
             {/* Tab content */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '22px 28px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '22px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               {activeTab === 'resumo' && (
-                <div className="ed-library-content" style={{ fontSize: '14px', lineHeight: 1.9, color: 'var(--text)' }}>
+                <div className="ed-library-content" style={{ fontSize: '14px', lineHeight: 1.9, color: 'var(--text)', maxWidth: '820px', width: '100%' }}>
                   <div style={{ marginBottom: '40px' }}>
                     {(() => {
                       if (!selected.content) return 'Conteúdo não disponível.'
@@ -339,7 +339,7 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
                         <CreditCard size={20} color="var(--accent)" />
                         <h3 style={{ fontSize: '18px', fontWeight: 700, margin: 0 }}>Flashcards do Tema</h3>
                       </div>
-                      <div style={{ display: 'grid', gap: '16px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
                         {sessionFlashcards.map((fc, i) => (
                           <div key={fc.id} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '12px', padding: '16px' }}>
                             <div style={{ fontSize: '11px', color: 'var(--muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Card {i + 1}</div>
@@ -367,7 +367,7 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
               )}
 
               {activeTab === 'notas' && (
-                <div>
+                <div style={{ maxWidth: '820px', width: '100%' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                     <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>Minhas anotações</span>
                     <button
@@ -405,7 +405,7 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
               )}
 
               {activeTab === 'progresso' && (
-                <div>
+                <div style={{ maxWidth: '820px', width: '100%' }}>
                   {/* Stats cards */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: '10px', marginBottom: '20px' }}>
                     {[
