@@ -395,7 +395,7 @@ export default function ResumoPrintWindow({
                     <div style={{ fontSize: '13px', color: 'var(--text,#e8eaf6)', fontWeight: 700, lineHeight: 1.6, marginBottom: '8px' }}>
                       {card.front}
                     </div>
-                    <div style={{ fontSize: '13px', color: 'var(--muted,#9aa3bd)', lineHeight: 1.65 }}>
+                    <div style={{ fontSize: '13px', color: 'var(--text,#e8eaf6)', lineHeight: 1.65, background: 'rgba(0,212,170,0.08)', borderLeft: '3px solid var(--accent2,#00d4aa)', borderRadius: '6px', padding: '10px 12px' }}>
                       {card.back}
                     </div>
                   </div>
