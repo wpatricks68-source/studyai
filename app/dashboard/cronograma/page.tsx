@@ -8,7 +8,23 @@ import type { PlannerSubject, Schedule, StudyCycle } from '@/types/database'
 
 const DAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
 const DAY_DB_VALUES = [1, 2, 3, 4, 5, 6, 0]
-const HOURS = Array.from({ length: 16 }, (_, i) => i + 8) // 08:00 - 23:00
+const FIRST_CALENDAR_HOUR = 6
+const LAST_CALENDAR_HOUR = 23
+const HOURS = Array.from({ length: LAST_CALENDAR_HOUR - FIRST_CALENDAR_HOUR + 1 }, (_, i) => i + FIRST_CALENDAR_HOUR)
+const SCHEDULE_SLOTS = HOURS.map(hour => ({
+  start: hour * 60,
+  end: (hour + 1) * 60,
+  label: `${formatFixedHour(hour)}-${formatFixedHour(hour + 1)}`
+}))
+
+function formatFixedHour(hour: number) {
+  return `${String(hour % 24).padStart(2, '0')}:00`
+}
+
+function timeToMinutes(time: string) {
+  const [hour = '0', minute = '0'] = time.split(':')
+  return Number(hour) * 60 + Number(minute)
+}
 
 // Modals Overlay Component
 const Modal = ({ show, onClose, title, children }: { show: boolean, onClose: () => void, title: string, children: React.ReactNode }) => {
@@ -305,7 +321,12 @@ export default function CronogramaPage() {
 
   // ==== HELPERS ====
   function getBlocksForSlot(dayIndex: number, hourStr: string) {
-    const hrNum = parseInt(hourStr)
+    const slotStart = timeToMinutes(hourStr)
+    const slotEnd = slotStart + 60
+    return getBlocksForTimeSlot(dayIndex, slotStart, slotEnd)
+  }
+
+  function getBlocksForTimeSlot(dayIndex: number, slotStart: number, slotEnd: number) {
     return schedules.filter(s => {
       // Assuming DB day_of_week: 0=Dom, 1=Seg...
       // Our DAYS array starts with Seg, so we match carefully.
@@ -313,12 +334,23 @@ export default function CronogramaPage() {
       const dbDay = DAY_DB_VALUES[dayIndex] ?? dayIndex
 
       if (s.day_of_week !== dbDay) return false
-      const start = parseInt(s.start_time.split(':')[0])
-      let end = parseInt(s.end_time.split(':')[0])
-      if (end === 0) end = 24
-      const endMins = parseInt(s.end_time.split(':')[1])
-      return hrNum >= start && (hrNum < end || (hrNum === end && endMins > 0))
+      const start = timeToMinutes(s.start_time)
+      const end = timeToMinutes(s.end_time)
+      const normalizedEnd = end <= start ? end + 24 * 60 : end
+      return Math.max(start, slotStart) < Math.min(normalizedEnd, slotEnd)
     })
+  }
+
+  function toggleRevisionSubject(id: string, subjectId: string, checked: boolean) {
+    setRevisionRows(rows => rows.map(row => {
+      if (row.id !== id) return row
+      return {
+        ...row,
+        subjectIds: checked
+          ? Array.from(new Set([...row.subjectIds, subjectId]))
+          : row.subjectIds.filter(currentId => currentId !== subjectId)
+      }
+    }))
   }
 
   function getDayIndexFromDb(dayOfWeek: number) {
@@ -327,10 +359,6 @@ export default function CronogramaPage() {
 
   function formatScheduleTime(time: string) {
     return time?.slice(0, 5) ?? '--:--'
-  }
-
-  function getScheduleRowKey(schedule: Schedule) {
-    return `${formatScheduleTime(schedule.start_time)}-${formatScheduleTime(schedule.end_time)}`
   }
 
   const chartData = subjects.map(s => ({
@@ -349,18 +377,6 @@ export default function CronogramaPage() {
     || a.end_time.localeCompare(b.end_time)
     || a.subject.localeCompare(b.subject)
   ))
-  const scheduleRows = Array.from(
-    new Map(
-      sortedSchedules.map(schedule => [
-        getScheduleRowKey(schedule),
-        {
-          key: getScheduleRowKey(schedule),
-          startTime: formatScheduleTime(schedule.start_time),
-          endTime: formatScheduleTime(schedule.end_time)
-        }
-      ])
-    ).values()
-  ).sort((a, b) => a.startTime.localeCompare(b.startTime) || a.endTime.localeCompare(b.endTime))
 
   if (loading) {
      return (
@@ -391,25 +407,26 @@ export default function CronogramaPage() {
                 {DAYS.map(day => (
                   <div key={day} style={{ padding: '10px 8px', background: 'var(--surface2,#181d2e)', color: 'var(--text,#e8eaf6)', fontSize: '10px', fontWeight: 900, textAlign: 'center', textTransform: 'uppercase', borderLeft: '1px solid var(--border,#1f2640)', borderBottom: '1px solid var(--border,#1f2640)' }}>{day}</div>
                 ))}
-                {scheduleRows.map(row => (
-                  <React.Fragment key={row.key}>
-                    <div style={{ padding: '10px 8px', color: 'var(--accent,#6c63ff)', fontSize: '10px', fontWeight: 900, borderBottom: '1px solid var(--border,#1f2640)', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-                      {row.startTime}<br />{row.endTime}
+                {SCHEDULE_SLOTS.map(row => (
+                  <React.Fragment key={row.label}>
+                    <div style={{ padding: '10px 8px', color: 'var(--accent,#6c63ff)', fontSize: '10px', fontWeight: 600, borderBottom: '1px solid var(--border,#1f2640)', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+                      {row.label}
                     </div>
                     {DAYS.map((_, dayIndex) => {
-                      const blocks = sortedSchedules.filter(schedule => getDayIndexFromDb(schedule.day_of_week) === dayIndex && getScheduleRowKey(schedule) === row.key)
+                      const blocks = getBlocksForTimeSlot(dayIndex, row.start, row.end)
                       return (
-                        <div key={`${row.key}-${dayIndex}`} style={{ minHeight: '76px', padding: '6px', borderLeft: '1px solid var(--border,#1f2640)', borderBottom: '1px solid var(--border,#1f2640)', background: blocks.length ? 'linear-gradient(135deg, rgba(255,255,255,0.055), rgba(255,255,255,0.015))' : 'transparent' }}>
+                        <div key={`${row.label}-${dayIndex}`} style={{ minHeight: '76px', padding: '6px', borderLeft: '1px solid var(--border,#1f2640)', borderBottom: '1px solid var(--border,#1f2640)', background: blocks.length ? 'linear-gradient(135deg, rgba(255,255,255,0.055), rgba(255,255,255,0.015))' : 'transparent' }}>
                           {blocks.map(schedule => (
                             <button
                               key={schedule.id}
                               onClick={() => removeSchedule(schedule.id)}
                               title="Clique para remover este horário"
-                              style={{ width: '100%', minHeight: '58px', border: '1px solid rgba(255,255,255,0.22)', borderRadius: '10px', padding: '8px', background: `linear-gradient(135deg, ${schedule.color}e6, ${schedule.color}aa)`, color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '4px', textAlign: 'left', cursor: 'pointer', boxShadow: `0 10px 24px ${schedule.color}30`, backdropFilter: 'blur(12px)' }}
+                              style={{ width: '100%', minHeight: '58px', border: '1px solid rgba(255,255,255,0.22)', borderRadius: '10px', padding: '8px', background: `linear-gradient(135deg, ${schedule.color}e6, ${schedule.color}aa)`, color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', textAlign: 'center', cursor: 'pointer', boxShadow: `0 10px 24px ${schedule.color}30`, backdropFilter: 'blur(12px)' }}
                             >
-                              <span style={{ fontSize: '10px', fontWeight: 900, lineHeight: 1.25, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{schedule.subject}</span>
+                              <span style={{ fontSize: '10px', fontWeight: 400, lineHeight: 1.25, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{schedule.subject}</span>
+                              <span style={{ fontSize: '9px', fontWeight: 400, opacity: 0.95, lineHeight: 1.2 }}>{formatScheduleTime(schedule.start_time)} - {formatScheduleTime(schedule.end_time)}</span>
                               {schedule.materia && (
-                                <span style={{ fontSize: '9px', fontWeight: 800, opacity: 0.9, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{schedule.materia}</span>
+                                <span style={{ maxWidth: '100%', fontSize: '9px', fontWeight: 400, opacity: 0.9, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{schedule.materia}</span>
                               )}
                             </button>
                           ))}
@@ -423,7 +440,7 @@ export default function CronogramaPage() {
           </div>
         </div>
 
-        <div style={{ width: '100%', minHeight: '260px', display: 'flex', flexDirection: 'column', background: 'linear-gradient(135deg, rgba(255,255,255,0.055), rgba(255,255,255,0.018))', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden', boxShadow: '0 18px 44px rgba(0,0,0,0.22)', backdropFilter: 'blur(16px)' }}>
+        <div style={{ width: '100%', minHeight: '260px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '20px', borderBottom: '1px solid var(--border,#1f2640)' }}>
             <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text,#fff)', letterSpacing: '0.5px' }}>PAINEL DE REVISAO</h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -442,20 +459,24 @@ export default function CronogramaPage() {
           </div>
           <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '14px 16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {revisionRows.map(row => (
-              <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '24px minmax(140px, .9fr) minmax(180px, 1.2fr) minmax(140px, .8fr)', gap: '10px', alignItems: 'center', padding: '12px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.12)', background: 'linear-gradient(135deg, rgba(255,255,255,0.075), rgba(255,255,255,0.025))', boxShadow: '0 12px 26px rgba(0,0,0,0.18)', backdropFilter: 'blur(14px)' }}>
+              <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '24px minmax(140px, .9fr) minmax(180px, 1.2fr) minmax(140px, .8fr)', gap: '10px', alignItems: 'center', padding: '12px', borderRadius: '14px', border: '1px solid var(--border,#1f2640)', background: 'var(--surface2,#181d2e)' }}>
                 <input type="checkbox" checked={row.selected} onChange={e => updateRevisionRow(row.id, 'selected', e.target.checked)} title="Selecionar linha" style={{ width: '18px', height: '18px', accentColor: 'var(--accent,#6c63ff)', cursor: 'pointer' }} />
-                <select value={row.revisionType} onChange={e => updateRevisionRow(row.id, 'revisionType', e.target.value as RevisionRow['revisionType'])} style={{ minWidth: 0, width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '10px', padding: '10px 8px', color: row.revisionType ? 'var(--text,#fff)' : 'var(--muted,#6b7194)', outline: 'none', fontSize: '12px' }}>
+                <select value={row.revisionType} onChange={e => updateRevisionRow(row.id, 'revisionType', e.target.value as RevisionRow['revisionType'])} style={{ minWidth: 0, width: '100%', background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)', borderRadius: '10px', padding: '10px 8px', color: row.revisionType ? 'var(--text,#fff)' : 'var(--muted,#6b7194)', outline: 'none', fontSize: '12px' }}>
                   <option value="">Tipo de revisão</option>
                   <option value="partial">Revisao parcial</option>
                   <option value="general">Revisao geral</option>
                 </select>
-                <select value={row.subjectIds[0] ?? ''} onChange={e => updateRevisionRow(row.id, 'subjectIds', e.target.value ? [e.target.value] : [])} style={{ minWidth: 0, width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '10px', padding: '10px 8px', color: row.subjectIds.length ? 'var(--text,#fff)' : 'var(--muted,#6b7194)', outline: 'none', fontSize: '12px' }}>
-                  <option value="">Selecionar disciplina</option>
-                  {subjects.map(subject => (
-                    <option key={subject.id} value={subject.id}>{subject.name}</option>
+                <div style={{ minWidth: 0, width: '100%', maxHeight: '112px', overflowY: 'auto', background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)', borderRadius: '10px', padding: '8px', color: row.subjectIds.length ? 'var(--text,#fff)' : 'var(--muted,#6b7194)', fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {subjects.length === 0 ? (
+                    <span>Nenhuma disciplina</span>
+                  ) : subjects.map(subject => (
+                    <label key={subject.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text,#fff)', cursor: 'pointer', minWidth: 0 }}>
+                      <input type="checkbox" checked={row.subjectIds.includes(subject.id)} onChange={e => toggleRevisionSubject(row.id, subject.id, e.target.checked)} style={{ width: '14px', height: '14px', accentColor: 'var(--accent,#6c63ff)', cursor: 'pointer', flex: '0 0 auto' }} />
+                      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subject.name}</span>
+                    </label>
                   ))}
-                </select>
-                <input type="date" value={row.date} onChange={e => updateRevisionRow(row.id, 'date', e.target.value)} style={{ minWidth: 0, width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '10px', padding: '9px 8px', color: row.date ? 'var(--text,#fff)' : 'var(--muted,#6b7194)', outline: 'none', fontSize: '12px' }} />
+                </div>
+                <input type="date" value={row.date} onChange={e => updateRevisionRow(row.id, 'date', e.target.value)} style={{ minWidth: 0, width: '100%', background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)', borderRadius: '10px', padding: '9px 8px', color: row.date ? 'var(--text,#fff)' : 'var(--muted,#6b7194)', outline: 'none', fontSize: '12px' }} />
               </div>
             ))}
           </div>
