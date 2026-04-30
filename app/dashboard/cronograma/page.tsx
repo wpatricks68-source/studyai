@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts'
-import { Plus, Disc, Calendar, Map, Check, RotateCw, X, CircleDashed, MoreVertical, Edit3, Trash2 } from 'lucide-react'
+import { Plus, Disc, Calendar, RotateCw, X, CircleDashed, Edit3, Trash2 } from 'lucide-react'
 import type { PlannerSubject, Schedule, StudyCycle } from '@/types/database'
 
 const DAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
@@ -329,6 +329,10 @@ export default function CronogramaPage() {
     return time?.slice(0, 5) ?? '--:--'
   }
 
+  function getScheduleRowKey(schedule: Schedule) {
+    return `${formatScheduleTime(schedule.start_time)}-${formatScheduleTime(schedule.end_time)}`
+  }
+
   const chartData = subjects.map(s => ({
     name: s.name,
     value: s.target_sessions || 1,
@@ -345,6 +349,18 @@ export default function CronogramaPage() {
     || a.end_time.localeCompare(b.end_time)
     || a.subject.localeCompare(b.subject)
   ))
+  const scheduleRows = Array.from(
+    new Map(
+      sortedSchedules.map(schedule => [
+        getScheduleRowKey(schedule),
+        {
+          key: getScheduleRowKey(schedule),
+          startTime: formatScheduleTime(schedule.start_time),
+          endTime: formatScheduleTime(schedule.end_time)
+        }
+      ])
+    ).values()
+  ).sort((a, b) => a.startTime.localeCompare(b.startTime) || a.endTime.localeCompare(b.endTime))
 
   if (loading) {
      return (
@@ -356,8 +372,8 @@ export default function CronogramaPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', minHeight: '100vh', padding: '24px', background: 'var(--bg,#0a0c12)', overflowY: 'auto', overflowX: 'hidden', color: 'var(--text,#e8eaf6)' }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch', gap: '24px' }}>
-        <div style={{ flex: '999 1 720px', minWidth: 'min(100%, 320px)', minHeight: '360px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch', gap: '16px' }}>
+        <div style={{ flex: '1 1 680px', minWidth: 'min(100%, 560px)', minHeight: '360px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px', borderBottom: '1px solid var(--border,#1f2640)' }}>
             <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text,#fff)', letterSpacing: '0.5px' }}>PAINEL DE CRONOGRAMA</h2>
             <button onClick={() => setShowScheduleModal(true)} style={{ background: 'transparent', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '6px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', transition: 'all .2s', whiteSpace: 'nowrap' }}>+ Alocar Horário</button>
@@ -370,54 +386,44 @@ export default function CronogramaPage() {
                 <div style={{ fontSize: '12px', lineHeight: 1.6, maxWidth: '320px' }}>Clique em + Alocar Horário para adicionar a primeira célula do cronograma.</div>
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '10px' }}>
-                {sortedSchedules.map(schedule => {
-                  const dayLabel = DAYS[getDayIndexFromDb(schedule.day_of_week)] ?? 'Dia'
-                  return (
-                    <button
-                      key={schedule.id}
-                      onClick={() => removeSchedule(schedule.id)}
-                      title="Clique para remover este horário"
-                      style={{
-                        width: '100%',
-                        minHeight: '92px',
-                        border: '1px solid rgba(255,255,255,0.14)',
-                        borderRadius: '12px',
-                        padding: '12px',
-                        background: schedule.color,
-                        color: '#fff',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'stretch',
-                        gap: '8px',
-                        textAlign: 'left',
-                        cursor: 'pointer',
-                        boxShadow: `0 10px 24px ${schedule.color}30`,
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                        <span style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase' }}>{dayLabel}</span>
-                        <span style={{ flex: '0 0 auto', fontSize: '10px', fontWeight: 800, background: 'rgba(0,0,0,0.18)', padding: '3px 7px', borderRadius: '999px' }}>
-                          {formatScheduleTime(schedule.start_time)} - {formatScheduleTime(schedule.end_time)}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: '13px', fontWeight: 900, lineHeight: 1.25, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                        {schedule.subject}
-                      </div>
-                      {schedule.materia && (
-                        <div style={{ fontSize: '10px', fontWeight: 800, opacity: 0.88, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {schedule.materia}
+              <div style={{ display: 'grid', gridTemplateColumns: '86px repeat(7, minmax(82px, 1fr))', minWidth: '720px', border: '1px solid var(--border,#1f2640)', borderRadius: '12px', overflow: 'hidden' }}>
+                <div style={{ padding: '10px 8px', background: 'var(--surface2,#181d2e)', color: 'var(--muted,#6b7194)', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.7px', borderBottom: '1px solid var(--border,#1f2640)' }}>Horário</div>
+                {DAYS.map(day => (
+                  <div key={day} style={{ padding: '10px 8px', background: 'var(--surface2,#181d2e)', color: 'var(--text,#e8eaf6)', fontSize: '10px', fontWeight: 900, textAlign: 'center', textTransform: 'uppercase', borderLeft: '1px solid var(--border,#1f2640)', borderBottom: '1px solid var(--border,#1f2640)' }}>{day}</div>
+                ))}
+                {scheduleRows.map(row => (
+                  <React.Fragment key={row.key}>
+                    <div style={{ padding: '10px 8px', color: 'var(--accent,#6c63ff)', fontSize: '10px', fontWeight: 900, borderBottom: '1px solid var(--border,#1f2640)', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+                      {row.startTime}<br />{row.endTime}
+                    </div>
+                    {DAYS.map((_, dayIndex) => {
+                      const blocks = sortedSchedules.filter(schedule => getDayIndexFromDb(schedule.day_of_week) === dayIndex && getScheduleRowKey(schedule) === row.key)
+                      return (
+                        <div key={`${row.key}-${dayIndex}`} style={{ minHeight: '76px', padding: '6px', borderLeft: '1px solid var(--border,#1f2640)', borderBottom: '1px solid var(--border,#1f2640)', background: blocks.length ? 'rgba(255,255,255,0.015)' : 'transparent' }}>
+                          {blocks.map(schedule => (
+                            <button
+                              key={schedule.id}
+                              onClick={() => removeSchedule(schedule.id)}
+                              title="Clique para remover este horário"
+                              style={{ width: '100%', minHeight: '58px', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '9px', padding: '8px', background: schedule.color, color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '4px', textAlign: 'left', cursor: 'pointer', boxShadow: `0 8px 18px ${schedule.color}25` }}
+                            >
+                              <span style={{ fontSize: '10px', fontWeight: 900, lineHeight: 1.25, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{schedule.subject}</span>
+                              {schedule.materia && (
+                                <span style={{ fontSize: '9px', fontWeight: 800, opacity: 0.9, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{schedule.materia}</span>
+                              )}
+                            </button>
+                          ))}
                         </div>
-                      )}
-                    </button>
-                  )
-                })}
+                      )
+                    })}
+                  </React.Fragment>
+                ))}
               </div>
             )}
           </div>
         </div>
 
-        <div style={{ flex: '1 1 460px', minWidth: 'min(100%, 360px)', minHeight: '360px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+        <div style={{ flex: '1 1 500px', minWidth: 'min(100%, 500px)', minHeight: '360px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '20px', borderBottom: '1px solid var(--border,#1f2640)' }}>
             <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text,#fff)', letterSpacing: '0.5px' }}>PAINEL DE REVISAO</h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -428,15 +434,15 @@ export default function CronogramaPage() {
               <button onClick={addRevisionRow} title="Adicionar revisao" style={{ background: 'var(--accent,#6c63ff)', color: 'var(--text,#fff)', border: 'none', width: '34px', height: '34px', borderRadius: '10px', fontSize: '18px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>+</button>
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '28px minmax(120px, 1fr) minmax(160px, 1.3fr) 130px', gap: '8px', padding: '12px 16px', fontSize: '10px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '1px', borderBottom: '1px solid var(--border,#1f2640)', minWidth: '640px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '24px minmax(100px, .9fr) minmax(0, 1.35fr) minmax(112px, .8fr)', gap: '8px', padding: '12px', fontSize: '10px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '1px', borderBottom: '1px solid var(--border,#1f2640)' }}>
             <span />
             <span>REVISAO</span>
             <span>DISCIPLINAS</span>
             <span>DATA</span>
           </div>
-          <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {revisionRows.map(row => (
-              <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '28px minmax(120px, 1fr) minmax(160px, 1.3fr) 130px', gap: '8px', alignItems: 'center', minWidth: '640px' }}>
+              <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '24px minmax(100px, .9fr) minmax(0, 1.35fr) minmax(112px, .8fr)', gap: '8px', alignItems: 'center' }}>
                 <input type="checkbox" checked={row.selected} onChange={e => updateRevisionRow(row.id, 'selected', e.target.checked)} title="Selecionar linha" style={{ width: '18px', height: '18px', accentColor: 'var(--accent,#6c63ff)', cursor: 'pointer' }} />
                 <select value={row.revisionType} onChange={e => updateRevisionRow(row.id, 'revisionType', e.target.value as RevisionRow['revisionType'])} style={{ minWidth: 0, width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '10px', padding: '10px 8px', color: 'var(--text,#fff)', outline: 'none', fontSize: '12px' }}>
                   <option value="partial">Revisao parcial</option>

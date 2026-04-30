@@ -7,9 +7,8 @@
   - Environments: .env.local
 
  ✓ Starting...
- ✓ Ready in 7.4s
- ✓ Compiled /middleware in 462ms (124 modules)
+ ✓ Ready in 3.5s
+ ✓ Compiled /middleware in 477ms (124 modules)
  ○ Compiling /auth/login ...
- ✓ Compiled /auth/login in 4.2s (611 modules)
- GET /auth/login 200 in 4575ms
- GET /auth/login 200 in 49ms
+ ✓ Compiled /auth/login in 1406ms (597 modules)
+ GET /auth/login 200 in 2119ms
