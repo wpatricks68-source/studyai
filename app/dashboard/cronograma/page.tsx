@@ -393,7 +393,7 @@ export default function CronogramaPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', minHeight: '100vh', padding: '24px', background: 'var(--bg,#0a0c12)', overflowY: 'auto', overflowX: 'hidden', color: 'var(--text,#e8eaf6)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', minHeight: '100vh', padding: '24px', background: 'var(--bg,#0a0c12)', overflowY: 'auto', overflowX: 'hidden', color: 'var(--text,#e8eaf6)' }} onClick={() => setOpenRevisionDropdown(null)}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div style={{ width: '100%', minHeight: '360px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px', borderBottom: '1px solid var(--border,#1f2640)' }}>
@@ -472,7 +472,7 @@ export default function CronogramaPage() {
                   <option value="partial">Revisao parcial</option>
                   <option value="general">Revisao geral</option>
                 </select>
-                <div style={{ position: 'relative', minWidth: 0, width: '100%' }}>
+                <div style={{ position: 'relative', minWidth: 0, width: '100%' }} onClick={e => e.stopPropagation()}>
                   {/* Trigger box */}
                   <div
                     onClick={() => setOpenRevisionDropdown(openRevisionDropdown === row.id ? null : row.id)}
@@ -492,15 +492,29 @@ export default function CronogramaPage() {
                   </div>
                   {/* Dropdown list */}
                   {openRevisionDropdown === row.id && (
-                    <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 60, background: 'var(--surface,#111420)', border: '1px solid var(--accent,#6c63ff)', borderRadius: '10px', padding: '6px', maxHeight: '180px', overflowY: 'auto', boxShadow: '0 12px 32px rgba(0,0,0,0.5)' }}>
-                      {subjects.length === 0 ? (
-                        <span style={{ color: 'var(--muted,#6b7194)', fontSize: '12px', padding: '4px 8px', display: 'block' }}>Nenhuma disciplina cadastrada</span>
-                      ) : subjects.map(subject => (
-                        <label key={subject.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text,#fff)', cursor: 'pointer', padding: '6px 8px', borderRadius: '8px', background: row.subjectIds.includes(subject.id) ? `${subject.color}18` : 'transparent', transition: 'background .15s' }}>
-                          <input type="checkbox" checked={row.subjectIds.includes(subject.id)} onChange={e => toggleRevisionSubject(row.id, subject.id, e.target.checked)} style={{ width: '14px', height: '14px', accentColor: 'var(--accent,#6c63ff)', cursor: 'pointer', flex: '0 0 auto' }} />
-                          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '12px' }}>{subject.name}</span>
-                        </label>
-                      ))}
+                    <div
+                      onClick={e => e.stopPropagation()}
+                      style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 60, background: 'var(--surface,#111420)', border: '1px solid var(--accent,#6c63ff)', borderRadius: '10px', padding: '6px', boxShadow: '0 12px 32px rgba(0,0,0,0.5)' }}
+                    >
+                      <div style={{ maxHeight: '160px', overflowY: 'auto' }}>
+                        {subjects.length === 0 ? (
+                          <span style={{ color: 'var(--muted,#6b7194)', fontSize: '12px', padding: '4px 8px', display: 'block' }}>Nenhuma disciplina cadastrada</span>
+                        ) : subjects.map(subject => (
+                          <label key={subject.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text,#fff)', cursor: 'pointer', padding: '6px 8px', borderRadius: '8px', background: row.subjectIds.includes(subject.id) ? `${subject.color}18` : 'transparent', transition: 'background .15s' }}>
+                            <input type="checkbox" checked={row.subjectIds.includes(subject.id)} onChange={e => toggleRevisionSubject(row.id, subject.id, e.target.checked)} style={{ width: '14px', height: '14px', accentColor: 'var(--accent,#6c63ff)', cursor: 'pointer', flex: '0 0 auto' }} />
+                            <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '12px' }}>{subject.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                      {/* Confirm button to close dropdown */}
+                      <div style={{ borderTop: '1px solid var(--border,#1f2640)', marginTop: '4px', paddingTop: '6px' }}>
+                        <button
+                          onClick={() => setOpenRevisionDropdown(null)}
+                          style={{ width: '100%', background: 'var(--accent,#6c63ff)', color: '#fff', border: 'none', borderRadius: '8px', padding: '7px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                        >
+                          Confirmar{row.subjectIds.length > 0 ? ` (${row.subjectIds.length})` : ''}
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
