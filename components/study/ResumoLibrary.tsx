@@ -344,7 +344,7 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
                           <div key={fc.id} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '12px', padding: '16px' }}>
                             <div style={{ fontSize: '11px', color: 'var(--muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Card {i + 1}</div>
                             <div style={{ fontWeight: 600, color: 'var(--text)', marginBottom: '12px' }}>{fc.front}</div>
-                            <div style={{ padding: '12px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', color: 'rgba(232,234,246,0.8)', fontSize: '13px', borderLeft: '3px solid var(--accent)' }}>
+                            <div style={{ padding: '12px', borderRadius: '8px', background: 'rgba(0,212,170,0.08)', color: 'var(--text)', fontSize: '13px', borderLeft: '3px solid var(--accent2)' }}>
                               {fc.back}
                             </div>
                           </div>

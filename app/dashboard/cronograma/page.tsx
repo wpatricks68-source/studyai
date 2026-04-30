@@ -7,6 +7,7 @@ import { Plus, Disc, Calendar, Map, Check, RotateCw, X, CircleDashed, MoreVertic
 import type { PlannerSubject, Schedule, StudyCycle } from '@/types/database'
 
 const DAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
+const DAY_DB_VALUES = [1, 2, 3, 4, 5, 6, 0]
 const HOURS = Array.from({ length: 16 }, (_, i) => i + 8) // 08:00 - 23:00
 
 // Modals Overlay Component
@@ -309,8 +310,7 @@ export default function CronogramaPage() {
       // Assuming DB day_of_week: 0=Dom, 1=Seg...
       // Our DAYS array starts with Seg, so we match carefully.
       // If dayIndex is 0 (Seg), s.day_of_week should be 1.
-      let dbDay = dayIndex + 1
-      if (dbDay > 6) dbDay = 0 // Dom
+      const dbDay = DAY_DB_VALUES[dayIndex] ?? dayIndex
 
       if (s.day_of_week !== dbDay) return false
       const start = parseInt(s.start_time.split(':')[0])
@@ -319,6 +319,14 @@ export default function CronogramaPage() {
       const endMins = parseInt(s.end_time.split(':')[1])
       return hrNum >= start && (hrNum < end || (hrNum === end && endMins > 0))
     })
+  }
+
+  function getDayIndexFromDb(dayOfWeek: number) {
+    return dayOfWeek === 0 ? 6 : Math.max(0, dayOfWeek - 1)
+  }
+
+  function formatScheduleTime(time: string) {
+    return time?.slice(0, 5) ?? '--:--'
   }
 
   const chartData = subjects.map(s => ({
@@ -331,6 +339,12 @@ export default function CronogramaPage() {
   const totalSessions = chartData.reduce((acc, curr) => acc + curr.sessions, 0)
   const hasSelectedRevisionRows = revisionRows.some(row => row.selected)
   const allRevisionRowsSelected = revisionRows.length > 0 && revisionRows.every(row => row.selected)
+  const sortedSchedules = [...schedules].sort((a, b) => (
+    getDayIndexFromDb(a.day_of_week) - getDayIndexFromDb(b.day_of_week)
+    || a.start_time.localeCompare(b.start_time)
+    || a.end_time.localeCompare(b.end_time)
+    || a.subject.localeCompare(b.subject)
+  ))
 
   if (loading) {
      return (
@@ -343,40 +357,63 @@ export default function CronogramaPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', minHeight: '100vh', padding: '24px', background: 'var(--bg,#0a0c12)', overflowY: 'auto', overflowX: 'hidden', color: 'var(--text,#e8eaf6)' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch', gap: '24px' }}>
-        <div style={{ flex: '999 1 760px', minWidth: 'min(100%, 620px)', minHeight: '520px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+        <div style={{ flex: '999 1 720px', minWidth: 'min(100%, 320px)', minHeight: '360px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px', borderBottom: '1px solid var(--border,#1f2640)' }}>
             <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text,#fff)', letterSpacing: '0.5px' }}>PAINEL DE CRONOGRAMA</h2>
-            <button onClick={() => setShowScheduleModal(true)} style={{ background: 'transparent', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '6px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', transition: 'all .2s' }}>+ Alocar HorÃ¡rio</button>
+            <button onClick={() => setShowScheduleModal(true)} style={{ background: 'transparent', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '6px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', transition: 'all .2s', whiteSpace: 'nowrap' }}>+ Alocar Horário</button>
           </div>
-          <div style={{ flex: 1, overflowY: 'auto' }}>
-             <div style={{ display: 'grid', gridTemplateColumns: '70px repeat(7, 1fr)', minWidth: '800px' }}>
-               <div style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface2,#181d2e)' }} />
-               {DAYS.map(d => (
-                 <div key={d} style={{ padding: '14px', textAlign: 'center', fontSize: '12px', fontWeight: 700, color: 'var(--text,#fff)', borderBottom: '1px solid var(--border)', background: 'var(--surface2,#181d2e)', borderLeft: '1px solid var(--border)' }}>
-                   {d}
-                 </div>
-               ))}
-               {HOURS.map(h => (
-                 <React.Fragment key={h}>
-                   <div style={{ padding: '16px 8px', textAlign: 'center', fontSize: '11px', fontWeight: 600, color: 'var(--muted)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                     {String(h).padStart(2, '0')}:00
-                   </div>
-                   {DAYS.map((_, dayIndex) => {
-                     const blocks = getBlocksForSlot(dayIndex, String(h).padStart(2, '0') + ':00')
-                     return (
-                       <div key={`${h}-${dayIndex}`} style={{ borderLeft: '1px solid var(--border)', borderBottom: '1px solid var(--border)', minHeight: '80px', padding: '6px', position: 'relative', background: 'rgba(255,255,255,0.01)' }}>
-                         {blocks.map(b => (
-                           <div key={b.id} onClick={() => removeSchedule(b.id)} style={{ background: b.color, color: 'var(--text,#fff)', padding: '10px', borderRadius: '10px', fontSize: '11px', fontWeight: 700, display: 'flex', flexDirection: 'column', gap: '4px', cursor: 'pointer', marginBottom: '6px', boxShadow: `0 8px 16px ${b.color}30`, border: '1px solid rgba(255,255,255,0.1)' }}>
-                             <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.subject}</div>
-                             <div style={{ fontSize: '9px', opacity: 0.9, background: 'rgba(0,0,0,0.1)', padding: '2px 0', borderRadius: '4px', textAlign: 'center' }}>{b.start_time.slice(0,5)} - {b.end_time.slice(0,5)}</div>
-                           </div>
-                         ))}
-                       </div>
-                     )
-                   })}
-                 </React.Fragment>
-               ))}
-             </div>
+          <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '16px' }}>
+            {sortedSchedules.length === 0 ? (
+              <div style={{ minHeight: '220px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', color: 'var(--muted,#6b7194)', textAlign: 'center', border: '1px dashed var(--border,#1f2640)', borderRadius: '14px', background: 'rgba(255,255,255,0.015)', padding: '24px' }}>
+                <Calendar size={30} />
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text,#e8eaf6)' }}>Nenhum horário alocado</div>
+                <div style={{ fontSize: '12px', lineHeight: 1.6, maxWidth: '320px' }}>Clique em + Alocar Horário para adicionar a primeira célula do cronograma.</div>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '10px' }}>
+                {sortedSchedules.map(schedule => {
+                  const dayLabel = DAYS[getDayIndexFromDb(schedule.day_of_week)] ?? 'Dia'
+                  return (
+                    <button
+                      key={schedule.id}
+                      onClick={() => removeSchedule(schedule.id)}
+                      title="Clique para remover este horário"
+                      style={{
+                        width: '100%',
+                        minHeight: '92px',
+                        border: '1px solid rgba(255,255,255,0.14)',
+                        borderRadius: '12px',
+                        padding: '12px',
+                        background: schedule.color,
+                        color: '#fff',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'stretch',
+                        gap: '8px',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        boxShadow: `0 10px 24px ${schedule.color}30`,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase' }}>{dayLabel}</span>
+                        <span style={{ flex: '0 0 auto', fontSize: '10px', fontWeight: 800, background: 'rgba(0,0,0,0.18)', padding: '3px 7px', borderRadius: '999px' }}>
+                          {formatScheduleTime(schedule.start_time)} - {formatScheduleTime(schedule.end_time)}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '13px', fontWeight: 900, lineHeight: 1.25, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                        {schedule.subject}
+                      </div>
+                      {schedule.materia && (
+                        <div style={{ fontSize: '10px', fontWeight: 800, opacity: 0.88, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {schedule.materia}
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
 
