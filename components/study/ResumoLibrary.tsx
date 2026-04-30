@@ -309,9 +309,9 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
             </div>
 
             {/* Tab content */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '22px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '22px 28px' }}>
               {activeTab === 'resumo' && (
-                <div className="ed-library-content" style={{ fontSize: '14px', lineHeight: 1.9, color: 'var(--text)', maxWidth: '820px', width: '100%' }}>
+                <div className="ed-library-content" style={{ fontSize: '14px', lineHeight: 1.9, color: 'var(--text)', maxWidth: '820px', width: '100%', margin: '0 auto' }}>
                   <div style={{ marginBottom: '40px' }}>
                     {(() => {
                       if (!selected.content) return 'Conteúdo não disponível.'
@@ -367,7 +367,7 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
               )}
 
               {activeTab === 'notas' && (
-                <div style={{ maxWidth: '820px', width: '100%' }}>
+                <div style={{ maxWidth: '820px', width: '100%', margin: '0 auto' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                     <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>Minhas anotações</span>
                     <button
@@ -405,7 +405,7 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
               )}
 
               {activeTab === 'progresso' && (
-                <div style={{ maxWidth: '820px', width: '100%' }}>
+                <div style={{ maxWidth: '820px', width: '100%', margin: '0 auto' }}>
                   {/* Stats cards */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: '10px', marginBottom: '20px' }}>
                     {[

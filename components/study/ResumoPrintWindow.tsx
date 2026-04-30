@@ -329,11 +329,13 @@ export default function ResumoPrintWindow({
 
       <div
         className="resumo-print-scroll"
-        style={{ flex: 1, overflowY: 'auto', padding: '32px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}
+        style={{ flex: 1, overflowY: 'auto', padding: '32px 20px' }}
       >
         <article
           className="resumo-print-page"
           style={{
+            display: 'block',
+            margin: '0 auto',
             width: '100%',
             maxWidth: '900px',
             background: 'var(--surface,#111420)',
