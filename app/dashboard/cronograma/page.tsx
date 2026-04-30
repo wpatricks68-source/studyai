@@ -31,7 +31,7 @@ const INITIAL_SUBJECT_FORM = { name: '', code: '', description: '', target_sessi
 type RevisionRow = {
   id: string
   selected: boolean
-  revisionType: 'partial' | 'general'
+  revisionType: '' | 'partial' | 'general'
   subjectIds: string[]
   date: string
 }
@@ -39,7 +39,7 @@ type RevisionRow = {
 const createRevisionRow = (): RevisionRow => ({
   id: `revision-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   selected: false,
-  revisionType: 'partial',
+  revisionType: '',
   subjectIds: [],
   date: ''
 })
@@ -372,8 +372,8 @@ export default function CronogramaPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', minHeight: '100vh', padding: '24px', background: 'var(--bg,#0a0c12)', overflowY: 'auto', overflowX: 'hidden', color: 'var(--text,#e8eaf6)' }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch', gap: '16px' }}>
-        <div style={{ flex: '1 1 680px', minWidth: 'min(100%, 560px)', minHeight: '360px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ width: '100%', minHeight: '360px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px', borderBottom: '1px solid var(--border,#1f2640)' }}>
             <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text,#fff)', letterSpacing: '0.5px' }}>PAINEL DE CRONOGRAMA</h2>
             <button onClick={() => setShowScheduleModal(true)} style={{ background: 'transparent', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '6px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', transition: 'all .2s', whiteSpace: 'nowrap' }}>+ Alocar Horário</button>
@@ -399,13 +399,13 @@ export default function CronogramaPage() {
                     {DAYS.map((_, dayIndex) => {
                       const blocks = sortedSchedules.filter(schedule => getDayIndexFromDb(schedule.day_of_week) === dayIndex && getScheduleRowKey(schedule) === row.key)
                       return (
-                        <div key={`${row.key}-${dayIndex}`} style={{ minHeight: '76px', padding: '6px', borderLeft: '1px solid var(--border,#1f2640)', borderBottom: '1px solid var(--border,#1f2640)', background: blocks.length ? 'rgba(255,255,255,0.015)' : 'transparent' }}>
+                        <div key={`${row.key}-${dayIndex}`} style={{ minHeight: '76px', padding: '6px', borderLeft: '1px solid var(--border,#1f2640)', borderBottom: '1px solid var(--border,#1f2640)', background: blocks.length ? 'linear-gradient(135deg, rgba(255,255,255,0.055), rgba(255,255,255,0.015))' : 'transparent' }}>
                           {blocks.map(schedule => (
                             <button
                               key={schedule.id}
                               onClick={() => removeSchedule(schedule.id)}
                               title="Clique para remover este horário"
-                              style={{ width: '100%', minHeight: '58px', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '9px', padding: '8px', background: schedule.color, color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '4px', textAlign: 'left', cursor: 'pointer', boxShadow: `0 8px 18px ${schedule.color}25` }}
+                              style={{ width: '100%', minHeight: '58px', border: '1px solid rgba(255,255,255,0.22)', borderRadius: '10px', padding: '8px', background: `linear-gradient(135deg, ${schedule.color}e6, ${schedule.color}aa)`, color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '4px', textAlign: 'left', cursor: 'pointer', boxShadow: `0 10px 24px ${schedule.color}30`, backdropFilter: 'blur(12px)' }}
                             >
                               <span style={{ fontSize: '10px', fontWeight: 900, lineHeight: 1.25, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{schedule.subject}</span>
                               {schedule.materia && (
@@ -423,7 +423,7 @@ export default function CronogramaPage() {
           </div>
         </div>
 
-        <div style={{ flex: '1 1 500px', minWidth: 'min(100%, 500px)', minHeight: '360px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+        <div style={{ width: '100%', minHeight: '260px', display: 'flex', flexDirection: 'column', background: 'linear-gradient(135deg, rgba(255,255,255,0.055), rgba(255,255,255,0.018))', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden', boxShadow: '0 18px 44px rgba(0,0,0,0.22)', backdropFilter: 'blur(16px)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '20px', borderBottom: '1px solid var(--border,#1f2640)' }}>
             <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text,#fff)', letterSpacing: '0.5px' }}>PAINEL DE REVISAO</h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -434,26 +434,28 @@ export default function CronogramaPage() {
               <button onClick={addRevisionRow} title="Adicionar revisao" style={{ background: 'var(--accent,#6c63ff)', color: 'var(--text,#fff)', border: 'none', width: '34px', height: '34px', borderRadius: '10px', fontSize: '18px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>+</button>
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '24px minmax(100px, .9fr) minmax(0, 1.35fr) minmax(112px, .8fr)', gap: '8px', padding: '12px', fontSize: '10px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '1px', borderBottom: '1px solid var(--border,#1f2640)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '24px minmax(140px, .9fr) minmax(180px, 1.2fr) minmax(140px, .8fr)', gap: '10px', padding: '12px 16px', fontSize: '10px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '1px', borderBottom: '1px solid var(--border,#1f2640)' }}>
             <span />
             <span>REVISAO</span>
             <span>DISCIPLINAS</span>
             <span>DATA</span>
           </div>
-          <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '14px 16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {revisionRows.map(row => (
-              <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '24px minmax(100px, .9fr) minmax(0, 1.35fr) minmax(112px, .8fr)', gap: '8px', alignItems: 'center' }}>
+              <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '24px minmax(140px, .9fr) minmax(180px, 1.2fr) minmax(140px, .8fr)', gap: '10px', alignItems: 'center', padding: '12px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.12)', background: 'linear-gradient(135deg, rgba(255,255,255,0.075), rgba(255,255,255,0.025))', boxShadow: '0 12px 26px rgba(0,0,0,0.18)', backdropFilter: 'blur(14px)' }}>
                 <input type="checkbox" checked={row.selected} onChange={e => updateRevisionRow(row.id, 'selected', e.target.checked)} title="Selecionar linha" style={{ width: '18px', height: '18px', accentColor: 'var(--accent,#6c63ff)', cursor: 'pointer' }} />
-                <select value={row.revisionType} onChange={e => updateRevisionRow(row.id, 'revisionType', e.target.value as RevisionRow['revisionType'])} style={{ minWidth: 0, width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '10px', padding: '10px 8px', color: 'var(--text,#fff)', outline: 'none', fontSize: '12px' }}>
+                <select value={row.revisionType} onChange={e => updateRevisionRow(row.id, 'revisionType', e.target.value as RevisionRow['revisionType'])} style={{ minWidth: 0, width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '10px', padding: '10px 8px', color: row.revisionType ? 'var(--text,#fff)' : 'var(--muted,#6b7194)', outline: 'none', fontSize: '12px' }}>
+                  <option value="">Tipo de revisão</option>
                   <option value="partial">Revisao parcial</option>
                   <option value="general">Revisao geral</option>
                 </select>
-                <select multiple value={row.subjectIds} onChange={e => updateRevisionRow(row.id, 'subjectIds', Array.from(e.currentTarget.selectedOptions, option => option.value))} style={{ minWidth: 0, width: '100%', minHeight: '74px', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '10px', padding: '8px', color: 'var(--text,#fff)', outline: 'none', fontSize: '12px' }}>
+                <select value={row.subjectIds[0] ?? ''} onChange={e => updateRevisionRow(row.id, 'subjectIds', e.target.value ? [e.target.value] : [])} style={{ minWidth: 0, width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '10px', padding: '10px 8px', color: row.subjectIds.length ? 'var(--text,#fff)' : 'var(--muted,#6b7194)', outline: 'none', fontSize: '12px' }}>
+                  <option value="">Selecionar disciplina</option>
                   {subjects.map(subject => (
                     <option key={subject.id} value={subject.id}>{subject.name}</option>
                   ))}
                 </select>
-                <input type="date" value={row.date} onChange={e => updateRevisionRow(row.id, 'date', e.target.value)} style={{ minWidth: 0, width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '10px', padding: '9px 8px', color: 'var(--text,#fff)', outline: 'none', fontSize: '12px' }} />
+                <input type="date" value={row.date} onChange={e => updateRevisionRow(row.id, 'date', e.target.value)} style={{ minWidth: 0, width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '10px', padding: '9px 8px', color: row.date ? 'var(--text,#fff)' : 'var(--muted,#6b7194)', outline: 'none', fontSize: '12px' }} />
               </div>
             ))}
           </div>
