@@ -76,6 +76,7 @@ export default function CronogramaPage() {
   const [showScheduleModal, setShowScheduleModal] = useState(false)
   const [showCycleModal, setShowCycleModal] = useState(false)
   const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null)
+  const [openRevisionDropdown, setOpenRevisionDropdown] = useState<string | null>(null)
   
   // Forms
   const [subForm, setSubForm] = useState(INITIAL_SUBJECT_FORM)
@@ -371,6 +372,11 @@ export default function CronogramaPage() {
   const totalSessions = chartData.reduce((acc, curr) => acc + curr.sessions, 0)
   const hasSelectedRevisionRows = revisionRows.some(row => row.selected)
   const allRevisionRowsSelected = revisionRows.length > 0 && revisionRows.every(row => row.selected)
+
+  // Painel de Cronograma: apenas slots com pelo menos um bloco preenchido
+  const filledSlots = SCHEDULE_SLOTS.filter(slot =>
+    DAYS.some((_, dayIndex) => getBlocksForTimeSlot(dayIndex, slot.start, slot.end).length > 0)
+  )
   const sortedSchedules = [...schedules].sort((a, b) => (
     getDayIndexFromDb(a.day_of_week) - getDayIndexFromDb(b.day_of_week)
     || a.start_time.localeCompare(b.start_time)
@@ -407,7 +413,7 @@ export default function CronogramaPage() {
                 {DAYS.map(day => (
                   <div key={day} style={{ padding: '10px 8px', background: 'var(--surface2,#181d2e)', color: 'var(--text,#e8eaf6)', fontSize: '10px', fontWeight: 900, textAlign: 'center', textTransform: 'uppercase', borderLeft: '1px solid var(--border,#1f2640)', borderBottom: '1px solid var(--border,#1f2640)' }}>{day}</div>
                 ))}
-                {SCHEDULE_SLOTS.map(row => (
+                {filledSlots.map(row => (
                   <React.Fragment key={row.label}>
                     <div style={{ padding: '10px 8px', color: 'var(--accent,#6c63ff)', fontSize: '10px', fontWeight: 600, borderBottom: '1px solid var(--border,#1f2640)', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
                       {row.label}
@@ -466,15 +472,37 @@ export default function CronogramaPage() {
                   <option value="partial">Revisao parcial</option>
                   <option value="general">Revisao geral</option>
                 </select>
-                <div style={{ minWidth: 0, width: '100%', maxHeight: '112px', overflowY: 'auto', background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)', borderRadius: '10px', padding: '8px', color: row.subjectIds.length ? 'var(--text,#fff)' : 'var(--muted,#6b7194)', fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {subjects.length === 0 ? (
-                    <span>Nenhuma disciplina</span>
-                  ) : subjects.map(subject => (
-                    <label key={subject.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text,#fff)', cursor: 'pointer', minWidth: 0 }}>
-                      <input type="checkbox" checked={row.subjectIds.includes(subject.id)} onChange={e => toggleRevisionSubject(row.id, subject.id, e.target.checked)} style={{ width: '14px', height: '14px', accentColor: 'var(--accent,#6c63ff)', cursor: 'pointer', flex: '0 0 auto' }} />
-                      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subject.name}</span>
-                    </label>
-                  ))}
+                <div style={{ position: 'relative', minWidth: 0, width: '100%' }}>
+                  {/* Trigger box */}
+                  <div
+                    onClick={() => setOpenRevisionDropdown(openRevisionDropdown === row.id ? null : row.id)}
+                    style={{ minWidth: 0, width: '100%', background: 'var(--surface,#111420)', border: `1px solid ${openRevisionDropdown === row.id ? 'var(--accent,#6c63ff)' : 'var(--border,#1f2640)'}`, borderRadius: '10px', padding: '7px 10px', cursor: 'pointer', display: 'flex', flexWrap: 'wrap', gap: '4px', minHeight: '38px', alignItems: 'center', boxSizing: 'border-box', transition: 'border-color .2s' }}
+                  >
+                    {row.subjectIds.length === 0 ? (
+                      <span style={{ color: 'var(--muted,#6b7194)', fontSize: '12px', pointerEvents: 'none' }}>Disciplinas...</span>
+                    ) : row.subjectIds.map(subjectId => {
+                      const subject = subjects.find(s => s.id === subjectId)
+                      if (!subject) return null
+                      return (
+                        <span key={subjectId} style={{ background: `${subject.color}22`, border: `1px solid ${subject.color}55`, color: subject.color, padding: '2px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+                          {subject.name}
+                        </span>
+                      )
+                    })}
+                  </div>
+                  {/* Dropdown list */}
+                  {openRevisionDropdown === row.id && (
+                    <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 60, background: 'var(--surface,#111420)', border: '1px solid var(--accent,#6c63ff)', borderRadius: '10px', padding: '6px', maxHeight: '180px', overflowY: 'auto', boxShadow: '0 12px 32px rgba(0,0,0,0.5)' }}>
+                      {subjects.length === 0 ? (
+                        <span style={{ color: 'var(--muted,#6b7194)', fontSize: '12px', padding: '4px 8px', display: 'block' }}>Nenhuma disciplina cadastrada</span>
+                      ) : subjects.map(subject => (
+                        <label key={subject.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text,#fff)', cursor: 'pointer', padding: '6px 8px', borderRadius: '8px', background: row.subjectIds.includes(subject.id) ? `${subject.color}18` : 'transparent', transition: 'background .15s' }}>
+                          <input type="checkbox" checked={row.subjectIds.includes(subject.id)} onChange={e => toggleRevisionSubject(row.id, subject.id, e.target.checked)} style={{ width: '14px', height: '14px', accentColor: 'var(--accent,#6c63ff)', cursor: 'pointer', flex: '0 0 auto' }} />
+                          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '12px' }}>{subject.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <input type="date" value={row.date} onChange={e => updateRevisionRow(row.id, 'date', e.target.value)} style={{ minWidth: 0, width: '100%', background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)', borderRadius: '10px', padding: '9px 8px', color: row.date ? 'var(--text,#fff)' : 'var(--muted,#6b7194)', outline: 'none', fontSize: '12px' }} />
               </div>

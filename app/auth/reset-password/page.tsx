@@ -1,4 +1,4 @@
-'use client'
+AR'use client'
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -33,7 +33,7 @@ function ResetPasswordForm() {
       // 2. Se nao tiver sessao mas tiver o codigo na URL, faz o exchange manual
       if (code) {
         const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
-        
+
         if (exchangeError) {
           setError(`Erro de seguranca local: ${exchangeError.message} (${exchangeError.name}). Tente um novo link.`)
         }
@@ -68,7 +68,7 @@ function ResetPasswordForm() {
     setError('')
 
     const supabase = createClient()
-    
+
     // Tenta atualizar a senha
     const { error: updateError } = await supabase.auth.updateUser({ password })
 
