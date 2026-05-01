@@ -62,6 +62,11 @@ interface ImportPayload {
   tipoQuestoes: ImportQuestionType
 }
 
+interface ParsedFlashcard {
+  front: string
+  back: string
+}
+
 // ─── Helpers ─────────────────────────────────────────────────
 
 function groupData(flashcards: Flashcard[], questions: Question[]): DisciplinaGroup[] {
@@ -97,6 +102,132 @@ function groupData(flashcards: Flashcard[], questions: Question[]): DisciplinaGr
       totalQuestions:  topics.reduce((s, t) => s + t.questions.length, 0),
     }
   }).sort((a, b) => a.disciplina.localeCompare(b.disciplina))
+}
+
+function cleanCell(value: string) {
+  return value.replace(/^["']|["']$/g, '').replace(/\s+/g, ' ').trim()
+}
+
+function parseCsvLine(line: string) {
+  const cells: string[] = []
+  let current = ''
+  let inQuotes = false
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]
+    const next = line[i + 1]
+
+    if (char === '"' && next === '"') {
+      current += '"'
+      i++
+      continue
+    }
+
+    if (char === '"') {
+      inQuotes = !inQuotes
+      continue
+    }
+
+    if ((char === ',' || char === ';' || char === '\t') && !inQuotes) {
+      cells.push(cleanCell(current))
+      current = ''
+      continue
+    }
+
+    current += char
+  }
+
+  cells.push(cleanCell(current))
+  return cells
+}
+
+function findColumnIndex(headers: string[], names: string[]) {
+  return headers.findIndex(header => {
+    const normalized = header
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+
+    return names.some(name => normalized === name || normalized.includes(name))
+  })
+}
+
+function parseCsvFlashcards(content: string) {
+  const rows = content
+    .split(/\r?\n/)
+    .map(line => parseCsvLine(line))
+    .filter(row => row.some(cell => cell.trim()))
+
+  if (rows.length === 0) return []
+
+  const headers = rows[0].map(cell => cell.toLowerCase())
+  let frontIndex = findColumnIndex(headers, ['front', 'frente', 'pergunta', 'questao', 'question'])
+  let backIndex = findColumnIndex(headers, ['back', 'verso', 'resposta', 'answer', 'gabarito'])
+  let dataRows = rows
+
+  if (frontIndex >= 0 && backIndex >= 0) {
+    dataRows = rows.slice(1)
+  } else {
+    frontIndex = 0
+    backIndex = 1
+  }
+
+  return dataRows
+    .map(row => ({
+      front: cleanCell(row[frontIndex] ?? ''),
+      back: cleanCell(row[backIndex] ?? ''),
+    }))
+    .filter(card => card.front && card.back)
+}
+
+function parseTxtFlashcards(content: string) {
+  const cards: ParsedFlashcard[] = []
+
+  const blocks = content
+    .split(/\n\s*\n/)
+    .map(block => block.trim())
+    .filter(Boolean)
+
+  for (const block of blocks) {
+    const labelled = block.match(/(?:pergunta|frente|front)\s*:\s*([\s\S]+?)(?:\n|\s)+(?:resposta|verso|back)\s*:\s*([\s\S]+)/i)
+    if (labelled?.[1] && labelled?.[2]) {
+      cards.push({ front: cleanCell(labelled[1]), back: cleanCell(labelled[2]) })
+      continue
+    }
+
+    const lines = block.split(/\r?\n/).map(line => line.trim()).filter(Boolean)
+    if (lines.length === 2) {
+      cards.push({ front: cleanCell(lines[0]), back: cleanCell(lines[1]) })
+    }
+  }
+
+  const lineCards = content
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(line => {
+      const delimiter = ['=>', '\t', '|', ';'].find(item => line.includes(item))
+      if (!delimiter) return null
+
+      const [front, ...rest] = line.split(delimiter)
+      return {
+        front: cleanCell(front ?? ''),
+        back: cleanCell(rest.join(delimiter)),
+      }
+    })
+    .filter((card): card is ParsedFlashcard => Boolean(card?.front && card?.back))
+
+  const unique = new Map<string, ParsedFlashcard>()
+  for (const card of [...cards, ...lineCards]) {
+    unique.set(`${card.front}\n${card.back}`, card)
+  }
+
+  return Array.from(unique.values())
+}
+
+function parseFlashcardsFromFile(content: string, fileName: string) {
+  const isCsv = fileName.toLowerCase().endsWith('.csv')
+  return isCsv ? parseCsvFlashcards(content) : parseTxtFlashcards(content)
 }
 
 // ─── Main Component ──────────────────────────────────────────
@@ -366,10 +497,19 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
       const disc = payload.disciplina.trim()
       const topic = payload.tema.trim()
       const title = disc ? `${disc}: ${topic}` : topic
+      const shouldUseLocalFlashcardImport = payload.target === 'flashcards'
 
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Sessao expirada. Faca login novamente.')
+
+      const parsedFlashcards = shouldUseLocalFlashcardImport
+        ? parseFlashcardsFromFile(rawContent, payload.file.name).slice(0, payload.quantidade)
+        : []
+
+      if (shouldUseLocalFlashcardImport && parsedFlashcards.length === 0) {
+        throw new Error('Nenhum par pergunta/resposta encontrado. Use CSV com colunas pergunta/resposta ou TXT com linhas no formato "pergunta;resposta".')
+      }
 
       const { data: session, error: sessionError } = await supabase
         .from('study_sessions')
@@ -385,6 +525,28 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
         .single()
 
       if (sessionError) throw sessionError
+
+      if (shouldUseLocalFlashcardImport) {
+        const { error: cardsError } = await supabase
+          .from('flashcards')
+          .insert(parsedFlashcards.map(card => ({
+            user_id: user.id,
+            session_id: session?.id,
+            front: card.front,
+            back: card.back,
+            topic,
+            materia: disc || null,
+          })))
+
+        if (cardsError) throw cardsError
+
+        setShowImportModal(false)
+        setSelectedDisc(disc || 'Sem disciplina')
+        setSelectedTopic(topic)
+        setActiveTab('flashcards')
+        router.refresh()
+        return
+      }
 
       const genRes = await fetch('/api/ai/generate', {
         method: 'POST',
@@ -934,7 +1096,7 @@ function ImportContentModal({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '16px 18px', borderBottom: '1px solid var(--border,#1f2640)' }}>
           <div>
             <div style={{ fontSize: '16px', fontWeight: 800 }}>Importar TXT/CSV</div>
-            <div style={{ color: 'var(--muted,#6b7194)', fontSize: '12px', marginTop: '3px' }}>Converter arquivo em flashcards ou questoes.</div>
+            <div style={{ color: 'var(--muted,#6b7194)', fontSize: '12px', marginTop: '3px' }}>Converter arquivo em flashcards sem IA.</div>
           </div>
           <button type="button" onClick={onClose} disabled={busy} style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)', background: 'var(--surface2,#181d2e)', color: 'var(--text,#e8eaf6)', cursor: busy ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <X size={16} />
@@ -951,6 +1113,9 @@ function ImportContentModal({
               onChange={event => setFile(event.target.files?.[0] ?? null)}
               style={{ width: '100%', border: '1px dashed var(--border,#1f2640)', borderRadius: '8px', padding: '12px', background: 'var(--surface2,#181d2e)', color: 'var(--text,#e8eaf6)', fontSize: '13px' }}
             />
+            <span style={{ color: 'var(--muted,#6b7194)', fontSize: '11px', lineHeight: 1.5, fontWeight: 500 }}>
+              CSV: colunas pergunta/resposta. TXT: uma linha por card no formato pergunta;resposta, pergunta|resposta ou pergunta=&gt;resposta.
+            </span>
           </label>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
@@ -977,13 +1142,12 @@ function ImportContentModal({
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
-            <label style={{ display: 'grid', gap: '7px', fontSize: '12px', fontWeight: 700 }}>
-              Converter para
-              <select value={target} disabled={busy} onChange={event => setTarget(event.target.value as ImportTarget)} style={{ minHeight: '40px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)', background: 'var(--surface2,#181d2e)', color: 'var(--text,#e8eaf6)', padding: '0 12px', fontSize: '13px' }}>
-                <option value="flashcards">Flashcards</option>
-                <option value="questions">Questoes</option>
-              </select>
-            </label>
+            <div style={{ display: 'grid', gap: '7px', fontSize: '12px', fontWeight: 700 }}>
+              Destino
+              <div style={{ minHeight: '40px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)', background: 'var(--surface2,#181d2e)', color: 'var(--text,#e8eaf6)', padding: '0 12px', fontSize: '13px', display: 'flex', alignItems: 'center' }}>
+                Flashcards sem IA
+              </div>
+            </div>
             <label style={{ display: 'grid', gap: '7px', fontSize: '12px', fontWeight: 700 }}>
               Quantidade
               <select value={quantidade} disabled={busy} onChange={event => setQuantidade(Number(event.target.value) as ImportQuantity)} style={{ minHeight: '40px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)', background: 'var(--surface2,#181d2e)', color: 'var(--text,#e8eaf6)', padding: '0 12px', fontSize: '13px' }}>
