@@ -4,7 +4,20 @@ export const SUPPORTED_DOCUMENT_TYPES = [
   'application/pdf',
   'text/plain',
   'text/markdown',
+  'text/csv',
+  'application/csv',
+  'application/vnd.ms-excel',
 ] as const
+
+const SUPPORTED_DOCUMENT_EXTENSIONS = ['.pdf', '.txt', '.md', '.csv'] as const
+
+export function isSupportedDocumentFile(file: File) {
+  const lowerName = file.name.toLowerCase()
+  return (
+    SUPPORTED_DOCUMENT_TYPES.includes(file.type as (typeof SUPPORTED_DOCUMENT_TYPES)[number]) ||
+    SUPPORTED_DOCUMENT_EXTENSIONS.some(ext => lowerName.endsWith(ext))
+  )
+}
 
 export async function extractTextWithOcrSpace(file: File) {
   const apiKey = process.env.OCR_SPACE_API_KEY
@@ -50,17 +63,27 @@ export async function extractTextWithOcrSpace(file: File) {
 }
 
 export async function extractTextFromFile(file: File): Promise<{ content: string; extractionMode: ExtractionMode }> {
-  if (!SUPPORTED_DOCUMENT_TYPES.includes(file.type as (typeof SUPPORTED_DOCUMENT_TYPES)[number])) {
-    throw new Error('Tipo nao suportado. Use PDF, TXT ou MD')
+  if (!isSupportedDocumentFile(file)) {
+    throw new Error('Tipo nao suportado. Use PDF, TXT, MD ou CSV')
   }
 
   let content = ''
   let extractionMode: ExtractionMode = 'plain'
+  const lowerName = file.name.toLowerCase()
 
-  if (file.type === 'text/plain' || file.type === 'text/markdown') {
+  if (
+    file.type === 'text/plain' ||
+    file.type === 'text/markdown' ||
+    file.type === 'text/csv' ||
+    file.type === 'application/csv' ||
+    file.type === 'application/vnd.ms-excel' ||
+    lowerName.endsWith('.txt') ||
+    lowerName.endsWith('.md') ||
+    lowerName.endsWith('.csv')
+  ) {
     content = await file.text()
     extractionMode = 'plain'
-  } else if (file.type === 'application/pdf') {
+  } else if (file.type === 'application/pdf' || lowerName.endsWith('.pdf')) {
     try {
       const pdfParseModule = await import('pdf-parse')
       const pdfParse = (pdfParseModule as { default?: unknown }).default ?? pdfParseModule

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { extractTextFromFile, SUPPORTED_DOCUMENT_TYPES } from '@/lib/document-text'
+import { extractTextFromFile, isSupportedDocumentFile } from '@/lib/document-text'
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,9 +29,9 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (!SUPPORTED_DOCUMENT_TYPES.includes(file.type as (typeof SUPPORTED_DOCUMENT_TYPES)[number])) {
+    if (!isSupportedDocumentFile(file)) {
       return NextResponse.json(
-        { error: 'Tipo nao suportado. Use PDF, TXT ou MD' },
+        { error: 'Tipo nao suportado. Use PDF, TXT, MD ou CSV' },
         { status: 400 }
       )
     }

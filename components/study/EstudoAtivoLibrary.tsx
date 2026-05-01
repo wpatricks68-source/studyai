@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { Play, Square, Timer, Clock, ChevronRight, RotateCcw, AlertCircle, Maximize2, LayoutGrid, Smartphone, X, ChevronLeft } from 'lucide-react'
+import { Play, Square, Timer, Clock, ChevronRight, RotateCcw, AlertCircle, Maximize2, LayoutGrid, Smartphone, X, ChevronLeft, UploadCloud, Loader2 } from 'lucide-react'
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -47,6 +47,19 @@ interface DisciplinaGroup {
 interface Props {
   flashcards: Flashcard[]
   questions: Question[]
+}
+
+type ImportTarget = 'flashcards' | 'questions'
+type ImportQuestionType = 'cv' | 'mc' | 'misto'
+type ImportQuantity = 5 | 10 | 15 | 20
+
+interface ImportPayload {
+  file: File
+  disciplina: string
+  tema: string
+  target: ImportTarget
+  quantidade: ImportQuantity
+  tipoQuestoes: ImportQuestionType
 }
 
 // ─── Helpers ─────────────────────────────────────────────────
@@ -115,9 +128,14 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
   const [liveDifficulties, setLiveDifficulties] = useState<Record<string, number>>({})
 
   const router = useRouter()
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importBusy, setImportBusy] = useState(false)
+  const [importError, setImportError] = useState('')
 
   const discGroup   = groups.find(g => g.disciplina === selectedDisc) ?? null
   const topicGroup  = discGroup?.topics.find(t => t.topic === selectedTopic) ?? null
+  const importInitialDisc = selectedDisc && selectedDisc !== 'Sem disciplina' ? selectedDisc : ''
+  const importInitialTema = selectedTopic && selectedTopic !== 'Sem tema' ? selectedTopic : ''
 
   // Lógica do Timer
   useEffect(() => {
@@ -328,12 +346,99 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
     }
   }
 
+  const handleImportFromFile = async (payload: ImportPayload) => {
+    setImportBusy(true)
+    setImportError('')
+
+    try {
+      const fd = new FormData()
+      fd.append('file', payload.file)
+
+      const uploadRes = await fetch('/api/upload', { method: 'POST', body: fd })
+      const uploadData = await uploadRes.json().catch(() => ({}))
+      if (!uploadRes.ok || uploadData.error) {
+        throw new Error(uploadData.error || 'Nao foi possivel ler o arquivo.')
+      }
+
+      const rawContent = String(uploadData.content ?? '').trim()
+      if (!rawContent) throw new Error('O arquivo esta vazio ou sem texto legivel.')
+
+      const disc = payload.disciplina.trim()
+      const topic = payload.tema.trim()
+      const title = disc ? `${disc}: ${topic}` : topic
+
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Sessao expirada. Faca login novamente.')
+
+      const { data: session, error: sessionError } = await supabase
+        .from('study_sessions')
+        .insert({
+          user_id: user.id,
+          title,
+          topic,
+          materia: disc || null,
+          content: `## ${title}\n\nConteudo importado de ${payload.file.name}.\n\n${rawContent.slice(0, 12000)}`,
+          source_type: 'upload',
+        })
+        .select('id')
+        .single()
+
+      if (sessionError) throw sessionError
+
+      const genRes = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: rawContent,
+          topic: title,
+          type: payload.target,
+          sessionId: session?.id,
+          quantidade: payload.quantidade,
+          tipoQuestoes: payload.tipoQuestoes,
+          searchMode: 'alto',
+          provider: 'auto',
+        }),
+      })
+
+      const genData = await genRes.json().catch(() => ({}))
+      if (!genRes.ok || genData.error) {
+        throw new Error(genData.error || 'Nao foi possivel converter o arquivo.')
+      }
+
+      setShowImportModal(false)
+      setSelectedDisc(disc || 'Sem disciplina')
+      setSelectedTopic(topic)
+      setActiveTab(payload.target === 'flashcards' ? 'flashcards' : 'questoes')
+      router.refresh()
+    } catch (error) {
+      setImportError((error as Error).message || 'Erro ao importar arquivo.')
+    } finally {
+      setImportBusy(false)
+    }
+  }
+
   if (groups.length === 0) {
     return (
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '14px', color: 'var(--muted,#6b7194)', padding: '40px', background: 'var(--bg,#0a0c12)' }}>
+        <ImportContentModal
+          open={showImportModal}
+          busy={importBusy}
+          error={importError}
+          initialDisciplina=""
+          initialTema=""
+          onClose={() => !importBusy && setShowImportModal(false)}
+          onSubmit={handleImportFromFile}
+        />
         <div style={{ fontSize: '40px', opacity: .25 }}>🎓</div>
         <div style={{ fontSize: '16px', fontWeight: 500, color: 'var(--text,#e8eaf6)' }}>Nenhum conteúdo salvo ainda</div>
-        <div style={{ fontSize: '13px', textAlign: 'center', maxWidth: '360px', lineHeight: 1.7 }}>
+        <button
+          onClick={() => { setImportError(''); setShowImportModal(true) }}
+          style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: 'var(--accent,#6c63ff)', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+        >
+          <UploadCloud size={16} /> Importar arquivo
+        </button>
+        <div style={{ fontSize: '13px', textAlign: 'center', maxWidth: '390px', lineHeight: 1.7 }}>
           Gere flashcards e questões na página <strong>Busca + IA</strong> e eles aparecerão aqui organizados por disciplina e tema.
         </div>
       </div>
@@ -342,6 +447,15 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
 
   return (
     <div style={{ display: 'flex', height: '100%', width: '100%', overflow: 'hidden', background: 'var(--bg,#0a0c12)', opacity: isDeleting ? 0.6 : 1, pointerEvents: isDeleting ? 'none' : 'auto' }}>
+      <ImportContentModal
+        open={showImportModal}
+        busy={importBusy}
+        error={importError}
+        initialDisciplina={importInitialDisc}
+        initialTema={importInitialTema}
+        onClose={() => !importBusy && setShowImportModal(false)}
+        onSubmit={handleImportFromFile}
+      />
 
       {/* ── Painel esquerdo: disciplinas e temas ── */}
       <div style={{
@@ -360,6 +474,12 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
           <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1.4px', color: 'var(--muted,#6b7194)', fontWeight: 600 }}>
             Estudo Ativo
           </div>
+          <button
+            onClick={() => { setImportError(''); setShowImportModal(true) }}
+            style={{ width: '100%', marginBottom: '8px', minHeight: '34px', borderRadius: '8px', border: '1px solid rgba(108,99,255,.35)', background: 'rgba(108,99,255,.12)', color: 'var(--accent,#6c63ff)', fontSize: '12px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px' }}
+          >
+            <UploadCloud size={15} /> Importar TXT/CSV
+          </button>
           <div style={{ fontSize: '12px', color: 'var(--muted,#6b7194)', marginTop: '4px' }}>
             {flashcards.length} flashcard{flashcards.length !== 1 ? 's' : ''} · {questions.length} questão(ões)
           </div>
@@ -744,6 +864,165 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
 }
 
 // ─── Flashcards Panel ────────────────────────────────────────
+
+function ImportContentModal({
+  open,
+  busy,
+  error,
+  initialDisciplina,
+  initialTema,
+  onClose,
+  onSubmit,
+}: {
+  open: boolean
+  busy: boolean
+  error: string
+  initialDisciplina: string
+  initialTema: string
+  onClose: () => void
+  onSubmit: (payload: ImportPayload) => void
+}) {
+  const [file, setFile] = useState<File | null>(null)
+  const [disciplina, setDisciplina] = useState(initialDisciplina)
+  const [tema, setTema] = useState(initialTema)
+  const [target, setTarget] = useState<ImportTarget>('flashcards')
+  const [quantidade, setQuantidade] = useState<ImportQuantity>(10)
+  const [tipoQuestoes, setTipoQuestoes] = useState<ImportQuestionType>('misto')
+  const [localError, setLocalError] = useState('')
+
+  useEffect(() => {
+    if (!open) return
+    setFile(null)
+    setDisciplina(initialDisciplina)
+    setTema(initialTema)
+    setTarget('flashcards')
+    setQuantidade(10)
+    setTipoQuestoes('misto')
+    setLocalError('')
+  }, [open, initialDisciplina, initialTema])
+
+  if (!open) return null
+
+  function handleSubmit(event: React.FormEvent) {
+    event.preventDefault()
+    const topic = tema.trim()
+
+    if (!file) {
+      setLocalError('Selecione um arquivo TXT ou CSV.')
+      return
+    }
+
+    if (!topic) {
+      setLocalError('Informe o tema para organizar o conteudo no banco.')
+      return
+    }
+
+    setLocalError('')
+    onSubmit({
+      file,
+      disciplina,
+      tema: topic,
+      target,
+      quantidade,
+      tipoQuestoes,
+    })
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(3,5,12,.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '18px' }}>
+      <form onSubmit={handleSubmit} style={{ width: '100%', maxWidth: '560px', background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)', borderRadius: '12px', color: 'var(--text,#e8eaf6)', boxShadow: '0 24px 70px rgba(0,0,0,.45)', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '16px 18px', borderBottom: '1px solid var(--border,#1f2640)' }}>
+          <div>
+            <div style={{ fontSize: '16px', fontWeight: 800 }}>Importar TXT/CSV</div>
+            <div style={{ color: 'var(--muted,#6b7194)', fontSize: '12px', marginTop: '3px' }}>Converter arquivo em flashcards ou questoes.</div>
+          </div>
+          <button type="button" onClick={onClose} disabled={busy} style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)', background: 'var(--surface2,#181d2e)', color: 'var(--text,#e8eaf6)', cursor: busy ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <X size={16} />
+          </button>
+        </div>
+
+        <div style={{ padding: '18px', display: 'grid', gap: '14px' }}>
+          <label style={{ display: 'grid', gap: '7px', fontSize: '12px', fontWeight: 700 }}>
+            Arquivo
+            <input
+              type="file"
+              accept=".txt,.csv,text/plain,text/csv"
+              disabled={busy}
+              onChange={event => setFile(event.target.files?.[0] ?? null)}
+              style={{ width: '100%', border: '1px dashed var(--border,#1f2640)', borderRadius: '8px', padding: '12px', background: 'var(--surface2,#181d2e)', color: 'var(--text,#e8eaf6)', fontSize: '13px' }}
+            />
+          </label>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+            <label style={{ display: 'grid', gap: '7px', fontSize: '12px', fontWeight: 700 }}>
+              Disciplina
+              <input
+                value={disciplina}
+                disabled={busy}
+                onChange={event => setDisciplina(event.target.value)}
+                placeholder="Ex: Direito Administrativo"
+                style={{ minHeight: '40px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)', background: 'var(--surface2,#181d2e)', color: 'var(--text,#e8eaf6)', padding: '0 12px', fontSize: '13px' }}
+              />
+            </label>
+            <label style={{ display: 'grid', gap: '7px', fontSize: '12px', fontWeight: 700 }}>
+              Tema
+              <input
+                value={tema}
+                disabled={busy}
+                onChange={event => setTema(event.target.value)}
+                placeholder="Ex: Atos administrativos"
+                style={{ minHeight: '40px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)', background: 'var(--surface2,#181d2e)', color: 'var(--text,#e8eaf6)', padding: '0 12px', fontSize: '13px' }}
+              />
+            </label>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+            <label style={{ display: 'grid', gap: '7px', fontSize: '12px', fontWeight: 700 }}>
+              Converter para
+              <select value={target} disabled={busy} onChange={event => setTarget(event.target.value as ImportTarget)} style={{ minHeight: '40px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)', background: 'var(--surface2,#181d2e)', color: 'var(--text,#e8eaf6)', padding: '0 12px', fontSize: '13px' }}>
+                <option value="flashcards">Flashcards</option>
+                <option value="questions">Questoes</option>
+              </select>
+            </label>
+            <label style={{ display: 'grid', gap: '7px', fontSize: '12px', fontWeight: 700 }}>
+              Quantidade
+              <select value={quantidade} disabled={busy} onChange={event => setQuantidade(Number(event.target.value) as ImportQuantity)} style={{ minHeight: '40px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)', background: 'var(--surface2,#181d2e)', color: 'var(--text,#e8eaf6)', padding: '0 12px', fontSize: '13px' }}>
+                {[5, 10, 15, 20].map(value => <option key={value} value={value}>{value}</option>)}
+              </select>
+            </label>
+          </div>
+
+          {target === 'questions' && (
+            <label style={{ display: 'grid', gap: '7px', fontSize: '12px', fontWeight: 700 }}>
+              Tipo de questao
+              <select value={tipoQuestoes} disabled={busy} onChange={event => setTipoQuestoes(event.target.value as ImportQuestionType)} style={{ minHeight: '40px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)', background: 'var(--surface2,#181d2e)', color: 'var(--text,#e8eaf6)', padding: '0 12px', fontSize: '13px' }}>
+                <option value="misto">Misto</option>
+                <option value="cv">Certo / Errado</option>
+                <option value="mc">Multipla escolha</option>
+              </select>
+            </label>
+          )}
+
+          {(localError || error) && (
+            <div style={{ border: '1px solid rgba(239,68,68,.35)', background: 'rgba(239,68,68,.10)', color: '#fca5a5', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', lineHeight: 1.5 }}>
+              {localError || error}
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: '14px 18px', borderTop: '1px solid var(--border,#1f2640)', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+          <button type="button" onClick={onClose} disabled={busy} style={{ minHeight: '38px', padding: '0 14px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)', background: 'transparent', color: 'var(--muted,#6b7194)', fontSize: '13px', fontWeight: 700, cursor: busy ? 'default' : 'pointer' }}>
+            Cancelar
+          </button>
+          <button type="submit" disabled={busy} style={{ minHeight: '38px', padding: '0 16px', borderRadius: '8px', border: 'none', background: busy ? 'var(--surface2,#181d2e)' : 'var(--accent,#6c63ff)', color: busy ? 'var(--muted,#6b7194)' : '#fff', fontSize: '13px', fontWeight: 800, cursor: busy ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {busy ? <Loader2 size={15} /> : <UploadCloud size={15} />}
+            {busy ? 'Convertendo...' : 'Converter e salvar'}
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
 
 function FlashcardsPanel({ cards, isLarge = false, onRate, externalDifficulties }: { cards: Flashcard[], isLarge?: boolean, onRate?: (id: string, level: number) => void, externalDifficulties?: Record<string, number> }) {
   const [flipped, setFlipped] = useState<Record<string, boolean>>({})
