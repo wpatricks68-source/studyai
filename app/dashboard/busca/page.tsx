@@ -1567,6 +1567,95 @@ export default function BuscaPage() {
                   loading={genTarget === 'summary'} 
                   sessionId={session.sessionId} 
                 />
+
+                {/* Área de Flashcards - abaixo do resumo */}
+                <div style={{ maxWidth: '820px', margin: '24px auto 0' }}>
+                  <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text,#e8eaf6)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4aa" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M12 8v8M8 12h8"/></svg>
+                      Flashcards
+                      {session.flashcards.length > 0 && (
+                        <span style={{ fontSize: '11px', color: '#00d4aa', background: 'rgba(0,212,170,.12)', padding: '2px 8px', borderRadius: '10px' }}>
+                          {session.flashcards.length}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        onClick={handleFlashcards}
+                        disabled={!session.resumo || genTarget === 'flashcards'}
+                        style={{
+                          padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 600,
+                          border: '1px solid #00d4aa', background: 'transparent', color: '#00d4aa',
+                          cursor: !session.resumo || genTarget === 'flashcards' ? 'not-allowed' : 'pointer',
+                          opacity: !session.resumo || genTarget === 'flashcards' ? 0.5 : 1,
+                          display: 'flex', alignItems: 'center', gap: '4px'
+                        }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v18M3 12h18"/></svg>
+                        {genTarget === 'flashcards' ? 'Gerando...' : 'Gerar com IA'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (!session.sessionId) {
+                            alert('Salve o resumo primeiro para criar flashcards.')
+                            return
+                          }
+                          setEditingFcId(null)
+                          setManualFcFront('')
+                          setManualFcBack('')
+                          setShowManualFcModal(true)
+                        }}
+                        disabled={!session.resumo}
+                        style={{
+                          padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 600,
+                          border: '1px solid var(--border,#1f2640)', background: 'transparent',
+                          color: 'var(--muted,#6b7194)', cursor: !session.resumo ? 'not-allowed' : 'pointer',
+                          opacity: !session.resumo ? 0.5 : 1,
+                          display: 'flex', alignItems: 'center', gap: '4px'
+                        }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        Criar manualmente
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Lista de flashcards existentes */}
+                  {session.flashcards.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {session.flashcards.map((fc, i) => (
+                        <div key={fc.id || i} style={{ background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)', borderRadius: '10px', overflow: 'hidden' }}>
+                          <div style={{ display: 'flex', alignItems: 'stretch' }}>
+                            <div style={{ flex: 1, padding: '10px 12px', borderRight: '1px solid var(--border,#1f2640)' }}>
+                              <div style={{ fontSize: '9px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Frente</div>
+                              <div style={{ fontSize: '12px', color: 'var(--text,#e8eaf6)', lineHeight: 1.5 }}>{fc.front}</div>
+                            </div>
+                            <div style={{ flex: 1, padding: '10px 12px', background: 'rgba(0,212,170,.05)' }}>
+                              <div style={{ fontSize: '9px', color: '#00d4aa', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Verso</div>
+                              <div style={{ fontSize: '12px', color: 'var(--text,#e8eaf6)', lineHeight: 1.5 }}>{fc.back}</div>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '2px', padding: '4px' }}>
+                              <button onClick={() => handleOpenEditFc(fc)} title="Editar" style={{ background: 'transparent', border: 'none', color: 'var(--muted,#6b7194)', cursor: 'pointer', padding: '4px', borderRadius: '4px' }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                              </button>
+                              <button onClick={() => handleDeleteFc(fc.id!)} title="Excluir" style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px', borderRadius: '4px' }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ padding: '20px', textAlign: 'center', background: 'var(--surface2,#181d2e)', borderRadius: '10px', border: '1px dashed var(--border,#1f2640)' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--muted,#6b7194)' }}>
+                        Nenhum flashcard ainda. Use os botões acima para criar.
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <div style={{ maxWidth: '820px', margin: '24px auto 0', paddingBottom: '24px' }}>
                   <InteractiveQuestionsPanel
                     questions={session.questions}
