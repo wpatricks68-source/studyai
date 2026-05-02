@@ -354,6 +354,16 @@ export default function CronogramaPage() {
     }))
   }
 
+  function selectAllSubjectsInRevision(id: string, select: boolean) {
+    setRevisionRows(rows => rows.map(row => {
+      if (row.id !== id) return row
+      return {
+        ...row,
+        subjectIds: select ? subjects.map(s => s.id) : []
+      }
+    }))
+  }
+
   function getDayIndexFromDb(dayOfWeek: number) {
     return dayOfWeek === 0 ? 6 : Math.max(0, dayOfWeek - 1)
   }
@@ -368,6 +378,18 @@ export default function CronogramaPage() {
     color: s.color,
     sessions: s.target_sessions || 0
   }))
+
+  const cycleChartData = cycles.map(cyc => {
+    const subj = subjects.find(s => s.id === cyc.subject_id)
+    if (!subj) return null
+    return {
+      name: subj.code ? `${subj.code}` : subj.name.substring(0, 4).toUpperCase(),
+      fullName: subj.name,
+      value: cyc.duration_minutes,
+      color: subj.color,
+      duration: cyc.duration_minutes
+    }
+  }).filter(Boolean) as { name: string; fullName: string; value: number; color: string; duration: number }[]
 
   const totalSessions = chartData.reduce((acc, curr) => acc + curr.sessions, 0)
   const hasSelectedRevisionRows = revisionRows.some(row => row.selected)
@@ -463,7 +485,7 @@ export default function CronogramaPage() {
             <span>DISCIPLINAS</span>
             <span>DATA</span>
           </div>
-          <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '14px 16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ flex: 1, minHeight: 0, overflow: 'visible', padding: '14px 16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {revisionRows.map(row => (
               <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '24px minmax(140px, .9fr) minmax(180px, 1.2fr) minmax(140px, .8fr)', gap: '10px', alignItems: 'center', padding: '12px', borderRadius: '14px', border: '1px solid var(--border,#1f2640)', background: 'var(--surface2,#181d2e)' }}>
                 <input type="checkbox" checked={row.selected} onChange={e => updateRevisionRow(row.id, 'selected', e.target.checked)} title="Selecionar linha" style={{ width: '18px', height: '18px', accentColor: 'var(--accent,#6c63ff)', cursor: 'pointer' }} />
@@ -494,9 +516,22 @@ export default function CronogramaPage() {
                   {openRevisionDropdown === row.id && (
                     <div
                       onClick={e => e.stopPropagation()}
-                      style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 60, background: 'var(--surface,#111420)', border: '1px solid var(--accent,#6c63ff)', borderRadius: '10px', padding: '6px', boxShadow: '0 12px 32px rgba(0,0,0,0.5)' }}
+                      style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 999, background: 'var(--surface,#111420)', border: '1px solid var(--accent,#6c63ff)', borderRadius: '10px', padding: '6px', boxShadow: '0 12px 32px rgba(0,0,0,0.5)' }}
                     >
                       <div style={{ maxHeight: '160px', overflowY: 'auto' }}>
+                        {subjects.length > 0 && (
+                          <div style={{ padding: '4px 8px', marginBottom: '4px', borderBottom: '1px solid var(--border,#1f2640)' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent,#6c63ff)', cursor: 'pointer', padding: '6px 8px', borderRadius: '8px', background: row.subjectIds.length === subjects.length ? 'var(--accent)15' : 'transparent', transition: 'background .15s' }}>
+                              <input 
+                                type="checkbox" 
+                                checked={row.subjectIds.length === subjects.length && subjects.length > 0} 
+                                onChange={e => selectAllSubjectsInRevision(row.id, e.target.checked)} 
+                                style={{ width: '14px', height: '14px', accentColor: 'var(--accent,#6c63ff)', cursor: 'pointer', flex: '0 0 auto' }} 
+                              />
+                              <span style={{ fontSize: '12px', fontWeight: 700 }}>Todas</span>
+                            </label>
+                          </div>
+                        )}
                         {subjects.length === 0 ? (
                           <span style={{ color: 'var(--muted,#6b7194)', fontSize: '12px', padding: '4px 8px', display: 'block' }}>Nenhuma disciplina cadastrada</span>
                         ) : subjects.map(subject => (
@@ -631,35 +666,55 @@ export default function CronogramaPage() {
           <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text,#fff)', letterSpacing: '0.5px' }}>CICLO DE ESTUDO</h2>
           <button onClick={() => setShowCycleModal(true)} style={{ background: 'transparent', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>+ Adicionar</button>
         </div>
-        <div style={{ flex: 1, minHeight: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', background: 'radial-gradient(circle at center, rgba(108,99,255,0.05) 0%, transparent 70%)' }}>
+        <div style={{ flex: 1, minHeight: 0, position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', overflow: 'auto' }}>
           {cycles.length === 0 ? (
             <div style={{ textAlign: 'center', color: 'var(--muted)' }}>
               <div style={{ fontSize: '34px', marginBottom: '10px', opacity: 0.15 }}><RotateCw size={34} /></div>
               <div style={{ fontSize: '13px' }}>Ciclo vazio</div>
             </div>
           ) : (
-            <div style={{ position: 'relative', width: '270px', height: '230px', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto' }}>
-              <div style={{ position: 'absolute', width: '168px', height: '168px', borderRadius: '50%', border: '16px solid var(--surface2,#181d2e)', opacity: 0.5 }} />
-              <div style={{ textAlign: 'center', zIndex: 10, background: 'var(--surface,#0a0c12)', padding: '18px', borderRadius: '50%', border: '2px dashed var(--border)', boxShadow: '0 0 30px rgba(0,0,0,0.3)' }}>
-                <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text,#fff)' }}>CICLO</div>
-                <div style={{ fontSize: '9px', color: 'var(--muted)', marginTop: '5px', fontWeight: 700 }}>{cycles.length} blocos</div>
+            <>
+              <div style={{ height: '160px', width: '100%', position: 'relative', marginBottom: '16px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={cycleChartData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={45}
+                      outerRadius={70}
+                      paddingAngle={3}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      {cycleChartData.map((entry, index) => (
+                        <Cell key={`cycle-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip 
+                      contentStyle={{ background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)', borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}
+                      itemStyle={{ color: 'var(--text,#fff)', fontSize: '12px', fontWeight: 600 }}
+                      formatter={(value: number) => [`${value} min`, '']}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
+                  <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text,#fff)', lineHeight: 1 }}>{cycles.length}</div>
+                  <div style={{ fontSize: '8px', color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px' }}>Blocos</div>
+                </div>
               </div>
-              {cycles.map((cyc, i) => {
-                const subj = subjects.find(s => s.id === cyc.subject_id)
-                if (!subj) return null
-                const radiusX = 112
-                const radiusY = 88
-                const angle = (i / cycles.length) * 2 * Math.PI - Math.PI / 2
-                const x = radiusX * Math.cos(angle)
-                const y = radiusY * Math.sin(angle)
-                return (
-                  <div key={cyc.id} onClick={() => removeCycle(cyc.id)} style={{ position: 'absolute', left: `calc(50% + ${x}px)`, top: `calc(50% + ${y}px)`, transform: 'translate(-50%, -50%)', background: subj.color, color: 'var(--text,#fff)', padding: '8px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 700, boxShadow: `0 8px 20px ${subj.color}40`, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', zIndex: 11, border: '2px solid rgba(255,255,255,0.2)', maxWidth: '126px' }}>
-                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{subj.name}</span>
-                    <span style={{ padding: '2px 6px', background: 'rgba(0,0,0,0.15)', borderRadius: '6px', fontSize: '9px', flex: '0 0 auto' }}>{cyc.duration_minutes >= 60 ? `${Math.floor(cyc.duration_minutes/60)}h${cyc.duration_minutes%60>0?cyc.duration_minutes%60:''}` : `${cyc.duration_minutes}m`}</span>
+              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {cycleChartData.map((d, i) => (
+                  <div key={i} onClick={() => removeCycle(cycles[i]?.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', padding: '8px 10px', borderRadius: '8px', background: `${d.color}15`, border: `1px solid ${d.color}30`, cursor: 'pointer', transition: 'all .2s' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                      <div style={{ minWidth: '8px', height: '8px', borderRadius: '50%', background: d.color }} />
+                      <span style={{ color: 'var(--text,#fff)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.name}</span>
+                    </div>
+                    <span style={{ color: 'var(--muted)', fontSize: '10px' }}>{d.duration >= 60 ? `${Math.floor(d.duration/60)}h${d.duration%60>0?d.duration%60+'m':''}` : `${d.duration}m`}</span>
                   </div>
-                )
-              })}
-            </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -882,7 +937,14 @@ export default function CronogramaPage() {
             <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '6px', fontWeight: 700 }}>ESCOLHER DISCIPLINA</div>
             <select value={schedForm.subject_id} onChange={e => setSchedForm({...schedForm, subject_id: e.target.value})} style={{ width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', color: 'var(--text,#fff)', outline: 'none', fontSize: '14px' }}>
               <option value="">-- Selecionar --</option>
-              {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {cycles.length > 0 
+                ? [...cycles].sort((a, b) => a.order_index - b.order_index).map(cyc => {
+                    const subj = subjects.find(s => s.id === cyc.subject_id)
+                    if (!subj) return null
+                    return <option key={subj.id} value={subj.id}>{subj.name} {subj.code || ''}</option>
+                  })
+                : subjects.map(s => <option key={s.id} value={s.id}>{s.name} {s.code || ''}</option>)
+              }
             </select>
           </div>
           <div>
