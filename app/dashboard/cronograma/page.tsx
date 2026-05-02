@@ -708,7 +708,9 @@ export default function CronogramaPage() {
                   <div key={i} onClick={() => removeCycle(cycles[i]?.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', padding: '8px 10px', borderRadius: '8px', background: `${d.color}15`, border: `1px solid ${d.color}30`, cursor: 'pointer', transition: 'all .2s' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
                       <div style={{ minWidth: '8px', height: '8px', borderRadius: '50%', background: d.color }} />
-                      <span style={{ color: 'var(--text,#fff)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.name}</span>
+                      <span style={{ color: 'var(--text,#fff)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {String(i + 1).padStart(2, '0')} - {d.name}
+                      </span>
                     </div>
                     <span style={{ color: 'var(--muted)', fontSize: '10px' }}>{d.duration >= 60 ? `${Math.floor(d.duration/60)}h${d.duration%60>0?d.duration%60+'m':''}` : `${d.duration}m`}</span>
                   </div>
@@ -938,12 +940,16 @@ export default function CronogramaPage() {
             <select value={schedForm.subject_id} onChange={e => setSchedForm({...schedForm, subject_id: e.target.value})} style={{ width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', color: 'var(--text,#fff)', outline: 'none', fontSize: '14px' }}>
               <option value="">-- Selecionar --</option>
               {cycles.length > 0 
-                ? [...cycles].sort((a, b) => a.order_index - b.order_index).map(cyc => {
+                ? [...cycles].sort((a, b) => a.order_index - b.order_index).map((cyc, i) => {
                     const subj = subjects.find(s => s.id === cyc.subject_id)
                     if (!subj) return null
-                    return <option key={subj.id} value={subj.id}>{subj.name} {subj.code || ''}</option>
+                    const num = String(i + 1).padStart(2, '0')
+                    return <option key={subj.id} value={subj.id}>{num} - {subj.name} {subj.code ? `- ${subj.code}` : ''}</option>
                   })
-                : subjects.map(s => <option key={s.id} value={s.id}>{s.name} {s.code || ''}</option>)
+                : subjects.map((s, i) => {
+                    const num = String(i + 1).padStart(2, '0')
+                    return <option key={s.id} value={s.id}>{num} - {s.name} {s.code ? `- ${s.code}` : ''}</option>
+                  })
               }
             </select>
           </div>
