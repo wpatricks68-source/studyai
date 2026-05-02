@@ -601,7 +601,7 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
           <UploadCloud size={16} /> Importar arquivo
         </button>
         <div style={{ fontSize: '13px', textAlign: 'center', maxWidth: '390px', lineHeight: 1.7 }}>
-          Gere flashcards e questões na página <strong>Busca + IA</strong> e eles aparecerão aqui organizados por disciplina e tema.
+          Gere flashcards e questões na página <strong>Edição + IA</strong> e eles aparecerão aqui organizados por disciplina e tema.
         </div>
       </div>
     )
