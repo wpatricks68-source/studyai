@@ -708,14 +708,19 @@ export default function CronogramaPage() {
               </div>
               <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {cycleChartData.map((d, i) => (
-                  <div key={i} onClick={() => removeCycle(cycles[i]?.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', padding: '8px 10px', borderRadius: '8px', background: `${d.color}15`, border: `1px solid ${d.color}30`, cursor: 'pointer', transition: 'all .2s' }}>
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', padding: '8px 10px', borderRadius: '8px', background: `${d.color}15`, border: `1px solid ${d.color}30`, transition: 'all .2s' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
                       <div style={{ minWidth: '8px', height: '8px', borderRadius: '50%', background: d.color }} />
                       <span style={{ color: 'var(--text,#fff)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {String(i + 1).padStart(2, '0')} - {d.name}
                       </span>
                     </div>
-                    <span style={{ color: 'var(--muted)', fontSize: '10px' }}>{d.duration >= 60 ? `${Math.floor(d.duration/60)}h${d.duration%60>0?d.duration%60+'m':''}` : `${d.duration}m`}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ color: 'var(--muted)', fontSize: '10px' }}>{d.duration >= 60 ? `${Math.floor(d.duration/60)}h${d.duration%60>0?d.duration%60+'m':''}` : `${d.duration}m`}</span>
+                      <button onClick={() => removeCycle(cycles[i]?.id)} title="Remover do ciclo" style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', transition: 'all .2s' }}>
+                        <X size={14} />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
