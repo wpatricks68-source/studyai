@@ -444,20 +444,23 @@ export default function CronogramaPage() {
                       const blocks = getBlocksForTimeSlot(dayIndex, row.start, row.end)
                       return (
                         <div key={`${row.label}-${dayIndex}`} style={{ minHeight: '76px', padding: '6px', borderLeft: '1px solid var(--border,#1f2640)', borderBottom: '1px solid var(--border,#1f2640)', background: blocks.length ? 'linear-gradient(135deg, rgba(255,255,255,0.055), rgba(255,255,255,0.015))' : 'transparent' }}>
-                          {blocks.map(schedule => (
+                          {blocks.map(schedule => {
+                            const subjIndex = cycles.findIndex(c => c.subject_id === subjects.find(s => s.name === schedule.subject)?.id)
+                            const num = subjIndex >= 0 ? String(subjIndex + 1).padStart(2, '0') : String(subjects.findIndex(s => s.name === schedule.subject) + 1).padStart(2, '0')
+                            return (
                             <button
                               key={schedule.id}
                               onClick={() => removeSchedule(schedule.id)}
                               title="Clique para remover este horário"
                               style={{ width: '100%', minHeight: '58px', border: '1px solid rgba(255,255,255,0.22)', borderRadius: '10px', padding: '8px', background: `linear-gradient(135deg, ${schedule.color}e6, ${schedule.color}aa)`, color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', textAlign: 'center', cursor: 'pointer', boxShadow: `0 10px 24px ${schedule.color}30`, backdropFilter: 'blur(12px)' }}
                             >
-                              <span style={{ fontSize: '10px', fontWeight: 400, lineHeight: 1.25, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{schedule.subject}</span>
+                              <span style={{ fontSize: '10px', fontWeight: 400, lineHeight: 1.25, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{num} - {schedule.subject}</span>
                               <span style={{ fontSize: '9px', fontWeight: 400, opacity: 0.95, lineHeight: 1.2 }}>{formatScheduleTime(schedule.start_time)} - {formatScheduleTime(schedule.end_time)}</span>
                               {schedule.materia && (
                                 <span style={{ maxWidth: '100%', fontSize: '9px', fontWeight: 400, opacity: 0.9, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{schedule.materia}</span>
                               )}
                             </button>
-                          ))}
+                          )})}
                         </div>
                       )
                     })}
