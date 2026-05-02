@@ -16,7 +16,7 @@ const baseNavItems = [
     section: 'Principal',
     items: [
       { href: '/dashboard', label: 'Dashboard', icon: IconGrid },
-      { href: '/dashboard/busca', label: 'Busca + IA', icon: IconSearch },
+      { href: '/dashboard/busca', label: 'Edição + IA', icon: IconSearch },
       { href: '/dashboard/resumos', label: 'Resumos', icon: IconBook },
       { href: '/dashboard/flashcards', label: 'Estudo Ativo', icon: IconCards },
     ],
