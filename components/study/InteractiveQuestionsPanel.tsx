@@ -103,6 +103,11 @@ export default function InteractiveQuestionsPanel({
           <div className="iq-empty-title">Nenhuma questão gerada ainda</div>
           <div className="iq-empty-copy">Crie questões para praticar sem sair do resumo.</div>
           <div className="iq-empty-actions">
+            {onImport && (
+              <button className="iq-secondary-action" onClick={onImport}>
+                <Upload size={15} /> Importar
+              </button>
+            )}
             {onGenerateAI && (
               <button className="iq-primary-action" onClick={onGenerateAI}>
                 <Sparkles size={15} /> Gerar com IA
