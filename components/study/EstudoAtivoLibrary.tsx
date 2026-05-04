@@ -230,6 +230,42 @@ function parseFlashcardsFromFile(content: string, fileName: string) {
   return isCsv ? parseCsvFlashcards(content) : parseTxtFlashcards(content)
 }
 
+function parseQuestionsFromFile(content: string) {
+  const questions: { question: string; tipo: 'cv' | 'mc'; options: string[] | null; correct: number | null; gabarito: string | null }[] = []
+  
+  const lines = content.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+  
+  for (const line of lines) {
+    const parts = line.split(';').map(p => p.trim())
+    
+    if (parts.length < 2) continue
+    
+    const tipo = parts[0].toLowerCase()
+    
+    if (tipo === 'cv' || tipo === 'c/e' || tipo === 'ce') {
+      if (parts.length < 3) continue
+      const cmd = parts[1]
+      const gab = parts[2].toUpperCase()
+      if (cmd && (gab === 'C' || gab === 'E')) {
+        questions.push({ question: cmd, tipo: 'cv', options: null, correct: null, gabarito: gab })
+      }
+    } else if (tipo === 'mc' || tipo === 'multipla') {
+      if (parts.length < 8) continue
+      const cmd = parts[1]
+      const opts = parts.slice(2, 7)
+      const gab = parts[7].toLowerCase()
+      const correctIdx = ['a', 'b', 'c', 'd', 'e'].indexOf(gab)
+      
+      if (cmd && opts.every(o => o) && correctIdx >= 0) {
+        const labeledOpts = opts.map((o, i) => `${['A','B','C','D','E'][i]}) ${o}`)
+        questions.push({ question: cmd, tipo: 'mc', options: labeledOpts, correct: correctIdx, gabarito: null })
+      }
+    }
+  }
+  
+  return questions
+}
+
 // ─── Main Component ──────────────────────────────────────────
 
 export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
@@ -498,6 +534,7 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
       const topic = payload.tema.trim()
       const title = disc ? `${disc}: ${topic}` : topic
       const shouldUseLocalFlashcardImport = payload.target === 'flashcards'
+      const shouldUseLocalQuestionImport = payload.target === 'questions'
 
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
@@ -509,6 +546,14 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
 
       if (shouldUseLocalFlashcardImport && parsedFlashcards.length === 0) {
         throw new Error('Nenhum par pergunta/resposta encontrado. Use CSV com colunas pergunta/resposta ou TXT com linhas no formato "pergunta;resposta".')
+      }
+
+      const parsedQuestions = shouldUseLocalQuestionImport
+        ? parseQuestionsFromFile(rawContent)
+        : []
+
+      if (shouldUseLocalQuestionImport && parsedQuestions.length === 0) {
+        throw new Error('Nenhuma questão encontrada. Use o formato: cv;comando;C ou mc;comando;a;b;c;d;e;gabarito')
       }
 
       const { data: session, error: sessionError } = await supabase
@@ -544,6 +589,31 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
         setSelectedDisc(disc || 'Sem disciplina')
         setSelectedTopic(topic)
         setActiveTab('flashcards')
+        router.refresh()
+        return
+      }
+
+      if (shouldUseLocalQuestionImport) {
+        const { error: questionsError } = await supabase
+          .from('questions')
+          .insert(parsedQuestions.map(q => ({
+            user_id: user.id,
+            session_id: session?.id,
+            question: q.question,
+            tipo: q.tipo,
+            options: q.options,
+            correct: q.correct,
+            gabarito: q.gabarito,
+            topic,
+            materia: disc || null,
+          })))
+
+        if (questionsError) throw questionsError
+
+        setShowImportModal(false)
+        setSelectedDisc(disc || 'Sem disciplina')
+        setSelectedTopic(topic)
+        setActiveTab('questoes')
         router.refresh()
         return
       }
