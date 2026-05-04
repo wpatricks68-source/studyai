@@ -244,11 +244,13 @@ export default function BuscaPage() {
 
   // ─── Estados de Importação de Arquivo ────────────────────────
   const [showImportModal, setShowImportModal] = useState(false)
+  const [showImportQModal, setShowImportQModal] = useState(false)
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importDisciplina, setImportDisciplina] = useState('')
   const [importTema, setImportTema] = useState('')
   const [importBusy, setImportBusy] = useState(false)
   const [importError, setImportError] = useState('')
+  const [importTarget, setImportTarget] = useState<'flashcards' | 'questions'>('flashcards')
 
   // ─── Estados de Gestão de Questões ──────────────────────────
   const [isQSelectionMode, setIsQSelectionMode] = useState(false)
@@ -706,7 +708,7 @@ export default function BuscaPage() {
     }
   }, [selectedFcIds, session.flashcards])
 
-  // ─── IMPORTAR FLASHCARDS DE ARQUIVO ────────────────────────
+  // ─── IMPORTAR FLASHCARDS/QUESTÕES DE ARQUIVO ────────────────
   const handleImportFile = useCallback(async () => {
     if (!importFile) {
       setImportError('Selecione um arquivo TXT ou CSV.')
@@ -737,11 +739,6 @@ export default function BuscaPage() {
       const disc = importDisciplina.trim()
       const title = disc ? `${disc}: ${topic}` : topic
       const isCsv = importFile.name.toLowerCase().endsWith('.csv')
-      const parsedCards = parseFlashcardsFromText(rawContent, isCsv)
-
-      if (parsedCards.length === 0) {
-        throw new Error('Nenhum par pergunta/resposta encontrado. Use CSV com colunas pergunta/resposta ou TXT com linhas no formato "pergunta;resposta".')
-      }
 
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
@@ -766,43 +763,83 @@ export default function BuscaPage() {
         sessionId = newSession?.id ?? null
       }
 
-      const { error: cardsError } = await supabase
-        .from('flashcards')
-        .insert(parsedCards.map(card => ({
-          user_id: user.id,
-          session_id: sessionId,
-          front: card.front,
-          back: card.back,
-          topic,
-          materia: disc || null,
-        })))
+      if (importTarget === 'flashcards') {
+        const parsedCards = parseFlashcardsFromText(rawContent, isCsv)
+        if (parsedCards.length === 0) {
+          throw new Error('Nenhum par pergunta/resposta encontrado. Use CSV com colunas pergunta/resposta ou TXT com linhas no formato "pergunta;resposta".')
+        }
 
-      if (cardsError) throw cardsError
+        const { error: cardsError } = await supabase
+          .from('flashcards')
+          .insert(parsedCards.map(card => ({
+            user_id: user.id,
+            session_id: sessionId,
+            front: card.front,
+            back: card.back,
+            topic,
+            materia: disc || null,
+          })))
 
-      setShowImportModal(false)
+        if (cardsError) throw cardsError
+
+        const { data: updatedCards } = await supabase
+          .from('flashcards')
+          .select('*')
+          .eq('session_id', sessionId)
+        
+        if (updatedCards) {
+          setSession(prev => ({ ...prev, flashcards: [...prev.flashcards, ...updatedCards] }))
+        }
+        
+        alert(`Importados ${parsedCards.length} flashcards com sucesso!`)
+      } else {
+        const parsedQuestions = parseQuestionsFromText(rawContent, isCsv)
+        if (parsedQuestions.length === 0) {
+          throw new Error('Nenhuma questão encontrada. Use o formato: cv;comando;C ou mc;comando;a;b;c;d;e;gabarito')
+        }
+
+        const { error: questionsError } = await supabase
+          .from('questions')
+          .insert(parsedQuestions.map(q => ({
+            user_id: user.id,
+            session_id: sessionId,
+            question: q.question,
+            tipo: q.tipo,
+            options: q.options,
+            correct: q.correct,
+            gabarito: q.gabarito,
+            topic,
+            materia: disc || null,
+          })))
+
+        if (questionsError) throw questionsError
+
+        const { data: updatedQuestions } = await supabase
+          .from('questions')
+          .select('*')
+          .eq('session_id', sessionId)
+        
+        if (updatedQuestions) {
+          setSession(prev => ({ ...prev, questions: [...prev.questions, ...updatedQuestions] }))
+        }
+        
+        alert(`Importadas ${parsedQuestions.length} questões com sucesso!`)
+      }
+
+      if (importTarget === 'flashcards') {
+        setShowImportModal(false)
+      } else {
+        setShowImportQModal(false)
+      }
       setImportFile(null)
       setImportDisciplina('')
       setImportTema('')
-      
-      const { data: updatedCards } = await supabase
-        .from('flashcards')
-        .select('*')
-        .eq('session_id', sessionId)
-      
-      if (updatedCards) {
-        setSession(prev => ({
-          ...prev,
-          flashcards: [...prev.flashcards, ...updatedCards]
-        }))
-      }
-      
-      alert(`Importados ${parsedCards.length} flashcards com sucesso!`)
     } catch (error) {
       setImportError((error as Error).message || 'Erro ao importar arquivo.')
     } finally {
       setImportBusy(false)
     }
-  }, [importFile, importDisciplina, importTema, session.sessionId])
+  }, [importFile, importDisciplina, importTema, session.sessionId, importTarget, setShowImportQModal])
 
   function parseFlashcardsFromText(content: string, isCsv: boolean) {
     const cards: { front: string; back: string }[] = []
@@ -842,6 +879,42 @@ export default function BuscaPage() {
     }
     
     return cards
+  }
+
+  function parseQuestionsFromText(content: string, isCsv: boolean) {
+    const questions: { question: string; tipo: 'cv' | 'mc'; options: string[] | null; correct: number | null; gabarito: string | null }[] = []
+    
+    const lines = content.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+    
+    for (const line of lines) {
+      const parts = line.split(';').map(p => p.trim())
+      
+      if (parts.length < 2) continue
+      
+      const tipo = parts[0].toLowerCase()
+      
+      if (tipo === 'cv' || tipo === 'c/e' || tipo === 'ce') {
+        if (parts.length < 3) continue
+        const cmd = parts[1]
+        const gab = parts[2].toUpperCase()
+        if (cmd && (gab === 'C' || gab === 'E')) {
+          questions.push({ question: cmd, tipo: 'cv', options: null, correct: null, gabarito: gab })
+        }
+      } else if (tipo === 'mc' || tipo === 'multipla') {
+        if (parts.length < 8) continue
+        const cmd = parts[1]
+        const opts = parts.slice(2, 7)
+        const gab = parts[7].toLowerCase()
+        const correctIdx = ['a', 'b', 'c', 'd', 'e'].indexOf(gab)
+        
+        if (cmd && opts.every(o => o) && correctIdx >= 0) {
+          const labeledOpts = opts.map((o, i) => `${['A','B','C','D','E'][i]}) ${o}`)
+          questions.push({ question: cmd, tipo: 'mc', options: labeledOpts, correct: correctIdx, gabarito: null })
+        }
+      }
+    }
+    
+    return questions
   }
 
   // ─── GESTÃO DE QUESTÕES ──────────────────────────────────
@@ -1836,6 +1909,10 @@ export default function BuscaPage() {
                       setManualQExpl('')
                       setShowManualQModal(true)
                     }}
+                    onImport={() => {
+                      setImportTarget('questions')
+                      setShowImportQModal(true)
+                    }}
                   />
                 </div>
               </div>
@@ -2203,6 +2280,83 @@ export default function BuscaPage() {
                     <>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
                       Importar Flashcards
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL IMPORTAR QUESTÕES */}
+      {showImportQModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(3,5,12,.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '18px' }}>
+          <div style={{ width: '100%', maxWidth: '560px', background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)', borderRadius: '12px', color: 'var(--text,#e8eaf6)', boxShadow: '0 24px 70px rgba(0,0,0,.45)', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '16px 18px', borderBottom: '1px solid var(--border,#1f2640)' }}>
+              <div>
+                <div style={{ fontSize: '16px', fontWeight: 800 }}>Importar Questões</div>
+                <div style={{ color: 'var(--muted,#6b7194)', fontSize: '12px', marginTop: '3px' }}>Converter arquivo em questões sem IA.</div>
+              </div>
+              <button onClick={() => { setShowImportQModal(false); setImportError(''); setImportFile(null); }} disabled={importBusy} style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)', background: 'var(--surface2,#181d2e)', color: 'var(--text,#e8eaf6)', cursor: importBusy ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+
+            <div style={{ padding: '18px', display: 'grid', gap: '14px' }}>
+              <label style={{ display: 'grid', gap: '7px', fontSize: '12px', fontWeight: 700 }}>
+                Arquivo
+                <input
+                  type="file"
+                  accept=".txt,.csv,text/plain,text/csv"
+                  disabled={importBusy}
+                  onChange={event => setImportFile(event.target.files?.[0] ?? null)}
+                  style={{ width: '100%', border: '1px dashed var(--border,#1f2640)', borderRadius: '8px', padding: '12px', background: 'var(--surface2,#181d2e)', color: 'var(--text,#e8eaf6)', fontSize: '13px' }}
+                />
+                <span style={{ color: 'var(--muted,#6b7194)', fontSize: '11px', lineHeight: 1.5, fontWeight: 500 }}>
+                  <b>Certo/Errado:</b> cv;comando;C ou cv;comando;E<br/>
+                  <b>Múltipla:</b> mc;comando;a;b;c;d;e;gabarito (a-e)
+                </span>
+              </label>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                <label style={{ display: 'grid', gap: '7px', fontSize: '12px', fontWeight: 700 }}>
+                  Disciplina
+                  <input
+                    value={importDisciplina}
+                    disabled={importBusy}
+                    onChange={event => setImportDisciplina(event.target.value)}
+                    placeholder="Ex: Direito Administrativo"
+                    style={{ minHeight: '40px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)', background: 'var(--surface2,#181d2e)', color: 'var(--text,#e8eaf6)', padding: '0 12px', fontSize: '13px' }}
+                  />
+                </label>
+                <label style={{ display: 'grid', gap: '7px', fontSize: '12px', fontWeight: 700 }}>
+                  Tema
+                  <input
+                    value={importTema}
+                    disabled={importBusy}
+                    onChange={event => setImportTema(event.target.value)}
+                    placeholder="Ex: Atos administrativos"
+                    style={{ minHeight: '40px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)', background: 'var(--surface2,#181d2e)', color: 'var(--text,#e8eaf6)', padding: '0 12px', fontSize: '13px' }}
+                  />
+                </label>
+              </div>
+
+              {importError && (
+                <div style={{ padding: '10px', borderRadius: '8px', background: '#ef444420', border: '1px solid #ef4444', color: '#ef4444', fontSize: '12px' }}>
+                  {importError}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }}>
+                <button onClick={() => { setShowImportQModal(false); setImportError(''); setImportFile(null); }} disabled={importBusy} style={{ padding: '10px 18px', borderRadius: '8px', background: 'transparent', border: '1px solid var(--border,#1f2640)', color: 'var(--muted,#6b7194)', fontSize: '13px', cursor: importBusy ? 'default' : 'pointer' }}>Cancelar</button>
+                <button onClick={handleImportFile} disabled={importBusy || !importFile || !importTema.trim()} style={{ padding: '10px 18px', borderRadius: '8px', background: importBusy || !importFile || !importTema.trim() ? 'var(--surface2,#181d2e)' : 'var(--accent,#6c63ff)', border: 'none', color: importBusy || !importFile || !importTema.trim() ? 'var(--muted,#6b7194)' : '#fff', fontSize: '13px', fontWeight: 600, cursor: importBusy || !importFile || !importTema.trim() ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {importBusy ? (
+                    <>Processando...</>
+                  ) : (
+                    <>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                      Importar Questões
                     </>
                   )}
                 </button>

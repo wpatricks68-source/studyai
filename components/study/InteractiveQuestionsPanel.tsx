@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { HelpCircle, Plus, Sparkles } from 'lucide-react'
+import { HelpCircle, Plus, Sparkles, Upload } from 'lucide-react'
 
 export interface InteractiveQuestion {
   id?: string
@@ -22,6 +22,7 @@ interface Props {
   showEmptyState?: boolean
   onOpenManual?: () => void
   onGenerateAI?: () => void
+  onImport?: () => void
 }
 
 function getCorrectAnswer(question: InteractiveQuestion) {
@@ -58,6 +59,7 @@ export default function InteractiveQuestionsPanel({
   showEmptyState,
   onOpenManual,
   onGenerateAI,
+  onImport,
 }: Props) {
   const [answers, setAnswers] = useState<Record<number, string | number>>({})
   const [revealed, setRevealed] = useState<Record<number, boolean>>({})
@@ -138,6 +140,11 @@ export default function InteractiveQuestionsPanel({
         </div>
 
         <div className="iq-header-actions iq-screen-control">
+          {onImport && (
+            <button className="iq-secondary-action iq-compact-action" onClick={onImport} title="Importar de arquivo TXT/CSV">
+              <Upload size={14} /> Importar
+            </button>
+          )}
           {onOpenManual && (
             <button className="iq-secondary-action iq-compact-action" onClick={onOpenManual}>
               <Plus size={14} /> Nova questão
