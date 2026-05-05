@@ -949,9 +949,9 @@ export default function BuscaPage() {
     }
   }, [])
 
-  const handleOpenEditQ = useCallback((q: Question) => {
+  const handleOpenEditQ = useCallback((q: import('@/components/study/InteractiveQuestionsPanel').InteractiveQuestion) => {
     setEditingQId(q.id || null)
-    setManualQTipo(q.tipo)
+    setManualQTipo(q.tipo as 'cv'|'mc')
     setManualQQuestion(q.question)
     setManualQOptions(q.options || ['', '', '', '', ''])
     setManualQCorrect(q.correct || 0)
@@ -1916,6 +1916,8 @@ export default function BuscaPage() {
                     loading={genTarget === 'questions'}
                     title="Questões do Tema"
                     maxWidth="100%"
+                    onDelete={handleDeleteQ}
+                    onEdit={handleOpenEditQ}
                     onGenerateAI={handleQuestions}
                     onOpenManual={() => {
                       setEditingQId(null)
@@ -2383,58 +2385,89 @@ export default function BuscaPage() {
         </div>
       )}
 
-      {/* MODAL QUESTÃO MANUAL */}
+{/* MODAL QUESTÃO MANUAL — Janela Flutuante */}
       {showManualQModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <div style={{ background: 'var(--surface,#111420)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border,#1f2640)', width: '500px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text,#e8eaf6)' }}>
-              {editingQId ? 'Editar Questão' : 'Nova Questão'}
-            </div>
-            
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text,#e8eaf6)' }}>
-                <input type="radio" checked={manualQTipo === 'cv'} onChange={() => setManualQTipo('cv')} /> Certo/Errado
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text,#e8eaf6)' }}>
-                <input type="radio" checked={manualQTipo === 'mc'} onChange={() => setManualQTipo('mc')} /> Múltipla Escolha
-              </label>
-            </div>
-
-            <div>
-              <div style={{ fontSize: '12px', color: 'var(--muted,#6b7194)', marginBottom: '6px' }}>Enunciado da Questão</div>
-              <textarea value={manualQQuestion} onChange={e => setManualQQuestion(e.target.value)} style={{ width: '100%', height: '80px', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)', borderRadius: '8px', padding: '10px', color: 'var(--text,#e8eaf6)', fontSize: '13px', outline: 'none', resize: 'none' }} placeholder="Digite a pergunta aqui..." />
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }} onClick={() => { setShowManualQModal(false); setEditingQId(null) }} />
+          <div style={{ position: 'relative', background: 'var(--surface,#111420)', borderRadius: '16px', border: '1px solid var(--border,#1f2640)', width: '100%', maxWidth: '520px', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
+            {/* Header da janela */}
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border,#1f2640)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface2,#181d2e)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(245,158,11,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                </div>
+                <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text,#e8eaf6)' }}>
+                  {editingQId ? 'Editar Questão' : 'Nova Questão'}
+                </div>
+              </div>
+              <button onClick={() => { setShowManualQModal(false); setEditingQId(null) }} style={{ background: 'transparent', border: 'none', color: 'var(--muted,#6b7194)', cursor: 'pointer', padding: '4px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseOver={e => e.currentTarget.style.background = 'var(--surface,#111420)'} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
             </div>
 
-            {manualQTipo === 'cv' ? (
+            {/* Corpo do formulário */}
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '70vh', overflowY: 'auto' }}>
+              {/* Tipo de questão */}
               <div>
-                <div style={{ fontSize: '12px', color: 'var(--muted,#6b7194)', marginBottom: '6px' }}>Gabarito</div>
-                <select value={manualQGabarito} onChange={e => setManualQGabarito(e.target.value as 'C'|'E')} style={{ width: '100%', padding: '10px', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)', borderRadius: '8px', color: 'var(--text,#e8eaf6)', fontSize: '13px', outline: 'none' }}>
-                  <option value="C">Certo</option>
-                  <option value="E">Errado</option>
-                </select>
+                <div style={{ fontSize: '11px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Tipo de Questão</div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <label style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', borderRadius: '10px', border: `2px solid ${manualQTipo === 'cv' ? '#f59e0b' : 'var(--border,#1f2640)'}`, background: manualQTipo === 'cv' ? 'rgba(245,158,11,.1)' : 'var(--surface2,#181d2e)', cursor: 'pointer', transition: 'all .15s' }}>
+                    <input type="radio" checked={manualQTipo === 'cv'} onChange={() => setManualQTipo('cv')} style={{ display: 'none' }} />
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={manualQTipo === 'cv' ? '#f59e0b' : 'var(--muted,#6b7194)'} strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: manualQTipo === 'cv' ? '#f59e0b' : 'var(--muted,#6b7194)' }}>Certo / Errado</span>
+                  </label>
+                  <label style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', borderRadius: '10px', border: `2px solid ${manualQTipo === 'mc' ? '#f59e0b' : 'var(--border,#1f2640)'}`, background: manualQTipo === 'mc' ? 'rgba(245,158,11,.1)' : 'var(--surface2,#181d2e)', cursor: 'pointer', transition: 'all .15s' }}>
+                    <input type="radio" checked={manualQTipo === 'mc'} onChange={() => setManualQTipo('mc')} style={{ display: 'none' }} />
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={manualQTipo === 'mc' ? '#f59e0b' : 'var(--muted,#6b7194)'} strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: manualQTipo === 'mc' ? '#f59e0b' : 'var(--muted,#6b7194)' }}>Múltipla Escolha</span>
+                  </label>
+                </div>
               </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ fontSize: '12px', color: 'var(--muted,#6b7194)' }}>Opções (A, B, C, D, E)</div>
-                {manualQOptions.map((opt, idx) => (
-                  <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <input type="radio" checked={manualQCorrect === idx} onChange={() => setManualQCorrect(idx)} title="Marcar como correta" />
-                    <input value={opt} onChange={e => {
-                      const newOpts = [...manualQOptions]; newOpts[idx] = e.target.value; setManualQOptions(newOpts)
-                    }} style={{ flex: 1, padding: '8px 10px', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)', borderRadius: '8px', color: 'var(--text,#e8eaf6)', fontSize: '13px', outline: 'none' }} placeholder={`Opção ${['A','B','C','D','E'][idx]}`} />
-                  </div>
-                ))}
-              </div>
-            )}
 
-            <div>
-              <div style={{ fontSize: '12px', color: 'var(--muted,#6b7194)', marginBottom: '6px' }}>Explicação / Resolução (Opcional)</div>
-              <textarea value={manualQExpl} onChange={e => setManualQExpl(e.target.value)} style={{ width: '100%', height: '60px', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)', borderRadius: '8px', padding: '10px', color: 'var(--text,#e8eaf6)', fontSize: '13px', outline: 'none', resize: 'none' }} placeholder="Por que esta é a resposta correta?" />
+              {/* Enunciado */}
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Enunciado da Questão</div>
+                <textarea value={manualQQuestion} onChange={e => setManualQQuestion(e.target.value)} style={{ width: '100%', height: '100px', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)', borderRadius: '10px', padding: '12px', color: 'var(--text,#e8eaf6)', fontSize: '13px', outline: 'none', resize: 'vertical', fontFamily: 'inherit' }} placeholder="Digite a pergunta aqui..." />
+              </div>
+
+              {/* Gabarito ou Opções */}
+              {manualQTipo === 'cv' ? (
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Gabarito</div>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button onClick={() => setManualQGabarito('C')} style={{ flex: 1, padding: '14px', borderRadius: '10px', border: `2px solid ${manualQGabarito === 'C' ? '#10b981' : 'var(--border,#1f2640)'}`, background: manualQGabarito === 'C' ? 'rgba(16,185,129,.15)' : 'var(--surface2,#181d2e)', color: manualQGabarito === 'C' ? '#10b981' : 'var(--muted,#6b7194)', fontSize: '14px', fontWeight: 700, cursor: 'pointer', transition: 'all .15s' }}>✓ CERTO</button>
+                    <button onClick={() => setManualQGabarito('E')} style={{ flex: 1, padding: '14px', borderRadius: '10px', border: `2px solid ${manualQGabarito === 'E' ? '#ef4444' : 'var(--border,#1f2640)'}`, background: manualQGabarito === 'E' ? 'rgba(239,68,68,.15)' : 'var(--surface2,#181d2e)', color: manualQGabarito === 'E' ? '#ef4444' : 'var(--muted,#6b7194)', fontSize: '14px', fontWeight: 700, cursor: 'pointer', transition: 'all .15s' }}>✕ ERRADO</button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Opções — Marque a correta</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {manualQOptions.map((opt, idx) => (
+                      <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <button onClick={() => setManualQCorrect(idx)} style={{ width: '32px', height: '32px', borderRadius: '8px', border: `2px solid ${manualQCorrect === idx ? '#10b981' : 'var(--border,#1f2640)'}`, background: manualQCorrect === idx ? '#10b981' : 'var(--surface2,#181d2e)', color: manualQCorrect === idx ? '#fff' : 'var(--muted,#6b7194)', fontSize: '13px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }}>
+                          {['A','B','C','D','E'][idx]}
+                        </button>
+                        <input value={opt} onChange={e => {
+                          const newOpts = [...manualQOptions]; newOpts[idx] = e.target.value; setManualQOptions(newOpts)
+                        }} style={{ flex: 1, padding: '10px 12px', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)', borderRadius: '8px', color: 'var(--text,#e8eaf6)', fontSize: '13px', outline: 'none' }} placeholder={`Opção ${['A','B','C','D','E'][idx]}`} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Explicação */}
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Explicação / Resolução (Opcional)</div>
+                <textarea value={manualQExpl} onChange={e => setManualQExpl(e.target.value)} style={{ width: '100%', height: '80px', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)', borderRadius: '10px', padding: '12px', color: 'var(--text,#e8eaf6)', fontSize: '13px', outline: 'none', resize: 'vertical', fontFamily: 'inherit' }} placeholder="Por que esta é a resposta correta?" />
+              </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }}>
-              <button onClick={() => { setShowManualQModal(false); setEditingQId(null) }} style={{ padding: '8px 16px', borderRadius: '8px', background: 'transparent', border: '1px solid var(--border,#1f2640)', color: 'var(--muted,#6b7194)', fontSize: '13px', cursor: 'pointer' }}>Cancelar</button>
-              <button onClick={handleSaveManualQ} disabled={isSavingManual || !manualQQuestion.trim()} style={{ padding: '8px 16px', borderRadius: '8px', background: 'var(--accent,#6c63ff)', border: 'none', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: isSavingManual ? 'default' : 'pointer', opacity: (isSavingManual || !manualQQuestion.trim()) ? 0.6 : 1 }}>{editingQId ? 'Atualizar' : 'Salvar Questão'}</button>
+            {/* Rodapé */}
+            <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border,#1f2640)', display: 'flex', gap: '10px', justifyContent: 'flex-end', background: 'var(--surface2,#181d2e)' }}>
+              <button onClick={() => { setShowManualQModal(false); setEditingQId(null) }} style={{ padding: '10px 18px', borderRadius: '10px', background: 'transparent', border: '1px solid var(--border,#1f2640)', color: 'var(--muted,#6b7194)', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>Cancelar</button>
+              <button onClick={handleSaveManualQ} disabled={isSavingManual || !manualQQuestion.trim()} style={{ padding: '10px 24px', borderRadius: '10px', background: 'var(--accent,#6c63ff)', border: 'none', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: isSavingManual ? 'default' : 'pointer', opacity: (isSavingManual || !manualQQuestion.trim()) ? 0.6 : 1, boxShadow: '0 4px 12px rgba(108,99,255,.3)' }}>{editingQId ? 'Atualizar' : 'Salvar Questão'}</button>
             </div>
           </div>
         </div>

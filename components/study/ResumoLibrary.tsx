@@ -6,7 +6,7 @@ import type { StudySession, Flashcard, Question } from '@/types/database'
 import { formatDate } from '@/lib/utils'
 import { CreditCard, HelpCircle, PencilLine, Maximize2 } from 'lucide-react'
 import ResumoPrintWindow from '@/components/study/ResumoPrintWindow'
-import InteractiveQuestionsPanel, { InteractiveQuestion } from '@/components/study/InteractiveQuestionsPanel'
+import InteractiveQuestionsPanel from '@/components/study/InteractiveQuestionsPanel'
 
 export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }) {
   const [list, setList]             = useState(sessions)
@@ -81,17 +81,6 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
     await supabase.from('study_sessions').delete().eq('id', id)
     setList(prev => prev.filter(s => s.id !== id))
     if (selected?.id === id) setSelected(null)
-  }
-
-  async function deleteQuestion(id: string) {
-    const supabase = createClient()
-    await supabase.from('questions').delete().eq('id', id)
-    setSessionQuestions(prev => prev.filter(q => q.id !== id))
-  }
-
-  async function editQuestion(q: InteractiveQuestion) {
-    // Por agora apenas alerta - pode implementar modal de edição depois
-    alert('Editar questão: ' + q.question.slice(0, 50) + '...')
   }
 
   const acertoCor = (v: number) => v >= 80 ? '#10b981' : v >= 65 ? '#f59e0b' : '#ef4444'
@@ -371,8 +360,6 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
                         title="Questões do Tema"
                         maxWidth="100%"
                         showEmptyState={false}
-                        onDelete={deleteQuestion}
-                        onEdit={editQuestion}
                       />
                     </div>
                   )}
