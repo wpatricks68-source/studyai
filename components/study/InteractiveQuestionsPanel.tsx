@@ -20,6 +20,7 @@ interface Props {
   title?: string
   maxWidth?: number | string
   showEmptyState?: boolean
+  genTarget?: string | null
   onOpenManual?: () => void
   onGenerateAI?: () => void
   onImport?: () => void
@@ -59,6 +60,7 @@ export default function InteractiveQuestionsPanel({
   title = 'Questões do tema',
   maxWidth = 820,
   showEmptyState,
+  genTarget = null,
   onOpenManual,
   onGenerateAI,
   onImport,
@@ -106,20 +108,23 @@ export default function InteractiveQuestionsPanel({
           </div>
           <div className="iq-empty-title">Nenhuma questão gerada ainda</div>
           <div className="iq-empty-copy">Crie questões para praticar sem sair do resumo.</div>
-          <div className="iq-empty-actions">
+          <div className="iq-empty-actions" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
             {onImport && (
-              <button className="iq-secondary-action" onClick={onImport}>
-                <Upload size={15} /> Importar
+              <button onClick={onImport} style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 600, border: '1px solid var(--border,#1f2640)', background: 'transparent', color: 'var(--muted,#6b7194)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                Importar
               </button>
             )}
             {onGenerateAI && (
-              <button className="iq-primary-action" onClick={onGenerateAI}>
-                <Sparkles size={15} /> Gerar com IA
+              <button onClick={onGenerateAI} style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 600, border: '1px solid #f59e0b', background: 'transparent', color: '#f59e0b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Sparkles size={12} />
+                {genTarget === 'questions' ? 'Gerando...' : 'Gerar com IA'}
               </button>
             )}
             {onOpenManual && (
-              <button className="iq-secondary-action" onClick={onOpenManual}>
-                <Plus size={15} /> Criar manualmente
+              <button onClick={onOpenManual} style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 600, border: '1px solid var(--border,#1f2640)', background: 'transparent', color: 'var(--muted,#6b7194)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Plus size={12} />
+                Criar manualmente
               </button>
             )}
           </div>
@@ -148,20 +153,23 @@ export default function InteractiveQuestionsPanel({
           </div>
         </div>
 
-        <div className="iq-header-actions iq-screen-control">
+        <div className="iq-header-actions iq-screen-control" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           {onImport && (
-            <button className="iq-secondary-action iq-compact-action" onClick={onImport} title="Importar de arquivo TXT/CSV">
-              <Upload size={14} /> Importar
+            <button onClick={onImport} title="Importar de arquivo TXT/CSV" style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 600, border: '1px solid var(--border,#1f2640)', background: 'transparent', color: 'var(--muted,#6b7194)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              Importar
             </button>
           )}
           {onOpenManual && (
-            <button className="iq-secondary-action iq-compact-action" onClick={onOpenManual}>
-              <Plus size={14} /> Nova questão
+            <button onClick={onOpenManual} style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 600, border: '1px solid var(--border,#1f2640)', background: 'transparent', color: 'var(--muted,#6b7194)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Plus size={12} />
+              Nova questão
             </button>
           )}
           {onGenerateAI && (
-            <button className="iq-primary-action iq-compact-action" onClick={onGenerateAI}>
-              <Sparkles size={14} /> Gerar
+            <button onClick={onGenerateAI} style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 600, border: '1px solid #f59e0b', background: 'transparent', color: '#f59e0b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Sparkles size={12} />
+              {genTarget === 'questions' ? 'Gerando...' : 'Gerar'}
             </button>
           )}
         </div>
