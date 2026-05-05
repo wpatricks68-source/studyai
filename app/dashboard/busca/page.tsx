@@ -795,7 +795,7 @@ export default function BuscaPage() {
       } else {
         const parsedQuestions = parseQuestionsFromText(rawContent, isCsv)
         if (parsedQuestions.length === 0) {
-          throw new Error('Nenhuma questão encontrada. Use o formato: cv;comando;C ou mc;comando;a;b;c;d;e;gabarito')
+          throw new Error('Nenhuma questão encontrada. Use o formato: cv;comando;C "explicação" ou mc;comando;a;b;c;d;e;gabarito "explicação"')
         }
 
         const { error: questionsError } = await supabase
@@ -808,6 +808,7 @@ export default function BuscaPage() {
             options: q.options,
             correct: q.correct,
             gabarito: q.gabarito,
+            explanation: q.explanation,
             topic,
             materia: disc || null,
           })))
@@ -882,7 +883,7 @@ export default function BuscaPage() {
   }
 
   function parseQuestionsFromText(content: string, isCsv: boolean) {
-    const questions: { question: string; tipo: 'cv' | 'mc'; options: string[] | null; correct: number | null; gabarito: string | null }[] = []
+    const questions: { question: string; tipo: 'cv' | 'mc'; options: string[] | null; correct: number | null; gabarito: string | null; explanation: string | null }[] = []
     
     const lines = content.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
     
@@ -896,20 +897,36 @@ export default function BuscaPage() {
       if (tipo === 'cv' || tipo === 'c/e' || tipo === 'ce') {
         if (parts.length < 3) continue
         const cmd = parts[1]
-        const gab = parts[2].toUpperCase()
+        let gab = parts[2].toUpperCase()
+        let explanation: string | null = null
+        
+        const expMatch = gab.match(/^(C|E)\s*"(.+)"$/)
+        if (expMatch) {
+          gab = expMatch[1]
+          explanation = expMatch[2]
+        }
+        
         if (cmd && (gab === 'C' || gab === 'E')) {
-          questions.push({ question: cmd, tipo: 'cv', options: null, correct: null, gabarito: gab })
+          questions.push({ question: cmd, tipo: 'cv', options: null, correct: null, gabarito: gab, explanation })
         }
       } else if (tipo === 'mc' || tipo === 'multipla') {
         if (parts.length < 8) continue
         const cmd = parts[1]
         const opts = parts.slice(2, 7)
-        const gab = parts[7].toLowerCase()
+        let gab = parts[7].toLowerCase()
+        let explanation: string | null = null
+        
+        const expMatch = gab.match(/^([a-e])\s*"(.+)"$/)
+        if (expMatch) {
+          gab = expMatch[1]
+          explanation = expMatch[2]
+        }
+        
         const correctIdx = ['a', 'b', 'c', 'd', 'e'].indexOf(gab)
         
         if (cmd && opts.every(o => o) && correctIdx >= 0) {
           const labeledOpts = opts.map((o, i) => `${['A','B','C','D','E'][i]}) ${o}`)
-          questions.push({ question: cmd, tipo: 'mc', options: labeledOpts, correct: correctIdx, gabarito: null })
+          questions.push({ question: cmd, tipo: 'mc', options: labeledOpts, correct: correctIdx, gabarito: null, explanation })
         }
       }
     }
@@ -2314,8 +2331,8 @@ export default function BuscaPage() {
                   style={{ width: '100%', border: '1px dashed var(--border,#1f2640)', borderRadius: '8px', padding: '12px', background: 'var(--surface2,#181d2e)', color: 'var(--text,#e8eaf6)', fontSize: '13px' }}
                 />
                 <span style={{ color: 'var(--muted,#6b7194)', fontSize: '11px', lineHeight: 1.5, fontWeight: 500 }}>
-                  <b>Certo/Errado:</b> cv;comando;C ou cv;comando;E<br/>
-                  <b>Múltipla:</b> mc;comando;a;b;c;d;e;gabarito (a-e)
+                  <b>Certo/Errado:</b> cv;comando;C ou cv;comando;E "explicação"<br/>
+                  <b>Múltipla:</b> mc;comando;a;b;c;d;e;gabarito "explicação" (gabarito: a-e)
                 </span>
               </label>
 
