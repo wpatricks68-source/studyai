@@ -23,6 +23,8 @@ interface Props {
   onOpenManual?: () => void
   onGenerateAI?: () => void
   onImport?: () => void
+  onDelete?: (id: string) => void
+  onEdit?: (q: InteractiveQuestion) => void
 }
 
 function getCorrectAnswer(question: InteractiveQuestion) {
@@ -60,6 +62,8 @@ export default function InteractiveQuestionsPanel({
   onOpenManual,
   onGenerateAI,
   onImport,
+  onDelete,
+  onEdit,
 }: Props) {
   const [answers, setAnswers] = useState<Record<number, string | number>>({})
   const [revealed, setRevealed] = useState<Record<number, boolean>>({})
@@ -419,6 +423,33 @@ function PanelStyles() {
       .iq-card-header {
         justify-content: space-between;
         margin-bottom: 12px;
+      }
+
+      .iq-card-actions {
+        display: flex;
+        gap: 4px;
+      }
+
+      .iq-action-btn {
+        background: var(--surface2,#181d2e);
+        border: 1px solid var(--border,#1f2640);
+        border-radius: 6px;
+        width: 26px;
+        height: 26px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--muted,#6b7194);
+        transition: all .15s;
+      }
+
+      .iq-action-btn:hover {
+        color: var(--accent,#6c63ff);
+      }
+
+      .iq-action-btn:last-child:hover {
+        color: #ef4444;
       }
 
       .iq-number {
