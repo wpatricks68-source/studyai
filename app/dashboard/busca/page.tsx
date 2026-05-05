@@ -2615,7 +2615,7 @@ function FlashcardsView({
               )}
 
               {/* Ações individuais (X e Editar) */}
-              {!isSelectionMode && card.id && (
+              {!isSelectionMode && (
                 <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '6px', zIndex: 10 }}>
                   <button 
                     onClick={(e) => { e.stopPropagation(); onEdit(card) }}
@@ -2629,8 +2629,9 @@ function FlashcardsView({
                   <button 
                     onClick={(e) => { e.stopPropagation(); if(confirm('Excluir este flashcard?')) onDelete(card.id!) }}
                     title="Excluir"
-                    style={{ background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)', borderRadius: '6px', width: '26px', height: '26px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted,#6b7194)', transition: 'all .15s' }}
-                    onMouseOver={e => e.currentTarget.style.color = '#ef4444'}
+                    disabled={!card.id}
+                    style={{ background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)', borderRadius: '6px', width: '26px', height: '26px', cursor: !card.id ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: !card.id ? 'var(--border,#1f2640)' : 'var(--muted,#6b7194)', transition: 'all .15s', opacity: !card.id ? 0.4 : 1 }}
+                    onMouseOver={e => card.id && (e.currentTarget.style.color = '#ef4444')}
                     onMouseOut={e => e.currentTarget.style.color = 'var(--muted,#6b7194)'}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -2827,7 +2828,7 @@ function QuestoesView({
             )}
 
             {/* Ações individuais (X e Editar) */}
-            {!isSelectionMode && q.id && (
+            {!isSelectionMode && (
               <div style={{ position: 'absolute', top: '14px', right: '14px', display: 'flex', gap: '6px', zIndex: 10 }}>
                 <button 
                   onClick={(e) => { e.stopPropagation(); onEdit(q) }}
@@ -2839,10 +2840,11 @@ function QuestoesView({
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                 </button>
                 <button 
-                  onClick={(e) => { e.stopPropagation(); if(confirm('Excluir esta questão permanentemente?')) onDelete(q.id!) }}
+                  onClick={(e) => { e.stopPropagation(); if(confirm('Excluir esta questão?')) onDelete(q.id!) }}
                   title="Excluir Questão"
-                  style={{ background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)', borderRadius: '6px', width: '28px', height: '28px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted,#6b7194)', transition: 'all .15s' }}
-                  onMouseOver={e => e.currentTarget.style.color = '#ef4444'}
+                  disabled={!q.id}
+                  style={{ background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)', borderRadius: '6px', width: '28px', height: '28px', cursor: !q.id ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: !q.id ? 'var(--border,#1f2640)' : 'var(--muted,#6b7194)', transition: 'all .15s', opacity: !q.id ? 0.4 : 1 }}
+                  onMouseOver={e => q.id && (e.currentTarget.style.color = '#ef4444')}
                   onMouseOut={e => e.currentTarget.style.color = 'var(--muted,#6b7194)'}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
