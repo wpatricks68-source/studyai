@@ -1916,6 +1916,7 @@ export default function BuscaPage() {
                     loading={genTarget === 'questions'}
                     title="Questões do Tema"
                     maxWidth="100%"
+                    genTarget={genTarget}
                     onDelete={handleDeleteQ}
                     onEdit={handleOpenEditQ}
                     onGenerateAI={handleQuestions}
