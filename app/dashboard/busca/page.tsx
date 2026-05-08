@@ -9,7 +9,7 @@ import { getSearchLimits, isProviderAllowed, normalizePlanTier, type PlanTier, t
 
 type GenType   = 'summary' | 'flashcards' | 'questions'
 type ViewMode  = 'resumo' | 'flashcards' | 'questoes'
-type AIProvider = 'auto' | 'gpt' | 'gemini' | 'claude'
+type AIProvider = 'auto' | 'gpt' | 'gemini' | 'claude' | 'deepseek'
 type PaidAIProvider = Exclude<AIProvider, 'auto'>
 
 // ─── Modelos por provider ────────────────────────────────────
