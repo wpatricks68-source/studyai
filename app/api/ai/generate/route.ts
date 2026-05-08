@@ -24,10 +24,10 @@ const PROVIDER_MODELS: Record<Exclude<Provider, 'auto'>, { id: string; label: st
     { id: 'gpt-3.5-turbo',      label: 'GPT-3.5 Turbo',      tier: 'free' },
   ],
   gemini: [
+    { id: 'gemini-2.5-flash',          label: 'Gemini 2.5 Flash',        tier: 'free' },
     { id: 'gemini-1.5-flash',          label: 'Gemini 1.5 Flash',        tier: 'free' },
     { id: 'gemini-1.5-pro',            label: 'Gemini 1.5 Pro',          tier: 'paid' },
     { id: 'gemini-1.5-flash-8b',       label: 'Gemini 1.5 Flash 8B',     tier: 'free' },
-    { id: 'gemini-2.0-flash-exp',      label: 'Gemini 2.0 Flash Exp',   tier: 'free' },
   ],
   deepseek: [
     { id: 'deepseek-chat',         label: 'DeepSeek Chat',        tier: 'free' },
@@ -37,7 +37,7 @@ const PROVIDER_MODELS: Record<Exclude<Provider, 'auto'>, { id: string; label: st
 
 // ─── Cascade automático (gratuito) ───────────────────────────
 const AUTO_CASCADE: { provider: Exclude<Provider,'auto'>; model: string }[] = [
-  { provider: 'gemini', model: 'gemini-1.5-flash' },
+  { provider: 'gemini', model: 'gemini-2.5-flash' },
   { provider: 'deepseek', model: 'deepseek-chat' },
   { provider: 'gpt',    model: 'gpt-4o-mini' },
   { provider: 'claude', model: 'claude-3-haiku-20240307' },
