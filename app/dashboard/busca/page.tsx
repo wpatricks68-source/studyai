@@ -1593,7 +1593,7 @@ export default function BuscaPage() {
                 </div>
 
                 {searchMode === 'advanced' && (
-                  <div style={{ marginTop: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div style={{ marginTop: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', overflow: 'visible' }}>
                     {availableProviders.map(provider => {
                       const meta = PROVIDER_META[provider]
                       const active = selectedProvider === provider
@@ -1634,7 +1634,7 @@ export default function BuscaPage() {
                           <div style={{
                             position: 'absolute', top: '100%', left: 0, marginTop: '4px',
                             background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)',
-                            borderRadius: '10px', padding: '6px', minWidth: '180px', zIndex: 100,
+                            borderRadius: '10px', padding: '6px', minWidth: '180px', zIndex: 9999,
                             boxShadow: '0 8px 24px rgba(0,0,0,0.4)'
                           }}>
                             {availableModels.map(model => (

@@ -1,0 +1,10 @@
+{
+  "profile": "gemini",
+  "env": {
+    "GEMINI_AUTH_MODE": "api-key",
+    "GEMINI_MODEL": "gemini-3-flash-preview",
+    "GEMINI_API_KEY": "AIzaSyCGsCgt8lQjC-jnma711FYpKor1eFOoTp8",
+    "GEMINI_BASE_URL": "https://generativelanguage.googleapis.com/v1beta/openai"
+  },
+  "createdAt": "2026-05-08T12:50:31.781Z"
+}
