@@ -7,7 +7,7 @@ import { getSearchLimits, isProviderAllowed, normalizePlanTier, type SearchMode 
 
 type GenType      = 'summary' | 'flashcards' | 'questions'
 type TipoQuestoes = 'cv' | 'mc' | 'misto'
-type Provider     = 'claude' | 'gpt' | 'gemini' | 'auto'
+type Provider     = 'claude' | 'gpt' | 'gemini' | 'deepseek' | 'auto'
 
 // ─── Modelos disponíveis por provider ─────────────────────────
 const PROVIDER_MODELS: Record<Exclude<Provider, 'auto'>, { id: string; label: string; tier: 'paid' | 'free' }[]> = {
@@ -20,7 +20,7 @@ const PROVIDER_MODELS: Record<Exclude<Provider, 'auto'>, { id: string; label: st
   gpt: [
     { id: 'gpt-4o',             label: 'GPT-4o',             tier: 'paid' },
     { id: 'gpt-4o-mini',        label: 'GPT-4o Mini',        tier: 'free' },
-    { id: 'gpt-4-turbo',        label: 'GPT-4 Turbo',        tier: 'paid' },
+    { id: 'gpt-4-turbo',         label: 'GPT-4 Turbo',        tier: 'paid' },
     { id: 'gpt-3.5-turbo',      label: 'GPT-3.5 Turbo',      tier: 'free' },
   ],
   gemini: [
@@ -29,11 +29,16 @@ const PROVIDER_MODELS: Record<Exclude<Provider, 'auto'>, { id: string; label: st
     { id: 'gemini-1.5-flash',          label: 'Gemini 1.5 Flash',        tier: 'free' },
     { id: 'gemini-1.5-flash-8b',       label: 'Gemini 1.5 Flash 8B',     tier: 'free' },
   ],
+  deepseek: [
+    { id: 'deepseek-chat',         label: 'DeepSeek Chat',        tier: 'free' },
+    { id: 'deepseek-coder',       label: 'DeepSeek Coder',       tier: 'free' },
+  ],
 }
 
 // ─── Cascade automático (gratuito) ───────────────────────────
 const AUTO_CASCADE: { provider: Exclude<Provider,'auto'>; model: string }[] = [
   { provider: 'gemini', model: 'gemini-2.0-flash' },
+  { provider: 'deepseek', model: 'deepseek-chat' },
   { provider: 'gpt',    model: 'gpt-4o-mini' },
   { provider: 'claude', model: 'claude-3-haiku-20240307' },
 ]
@@ -155,6 +160,24 @@ async function callGemini(prompt: string, model: string): Promise<string> {
   return result.response.text()
 }
 
+// ─── Chamada Deepseek ─────────────────────────────────────────
+async function callDeepseek(prompt: string, model: string, type: GenType, qtd: number): Promise<string> {
+  const apiKey = process.env.DEEPSEEK_API_KEY
+  if (!apiKey) throw new Error('DEEPSEEK_API_KEY não configurada')
+  
+  const openai = new OpenAI({ 
+    apiKey, 
+    baseURL: 'https://api.deepseek.com/v1' 
+  })
+  
+  const completion = await openai.chat.completions.create({
+    model: model || 'deepseek-chat',
+    max_tokens: type === 'summary' ? 3000 : type === 'questions' ? Math.max(2000, qtd * 200) : 2000,
+    messages: [{ role: 'user', content: prompt }],
+  })
+  return completion.choices[0]?.message?.content ?? ''
+}
+
 // ─── Dispatcher ───────────────────────────────────────────────
 async function callProvider(
   provider: Exclude<Provider, 'auto'>,
@@ -166,6 +189,7 @@ async function callProvider(
   if (provider === 'claude') return callClaude(prompt, model, type, qtd)
   if (provider === 'gpt')    return callGPT(prompt, model, type, qtd)
   if (provider === 'gemini') return callGemini(prompt, model)
+  if (provider === 'deepseek') return callDeepseek(prompt, model, type, qtd)
   throw new Error(`Provider desconhecido: ${provider}`)
 }
 

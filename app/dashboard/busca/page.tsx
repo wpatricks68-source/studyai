@@ -33,6 +33,10 @@ const PROVIDER_MODELS: Record<Exclude<AIProvider,'auto'>, { id: string; label: s
     { id: 'gemini-1.5-flash',      label: 'Gemini 1.5 Flash (Free)',  tier: 'free' },
     { id: 'gemini-1.5-flash-8b',   label: 'Gemini 1.5 Flash 8B',      tier: 'free' },
   ],
+  deepseek: [
+    { id: 'deepseek-chat',         label: 'DeepSeek Chat (Free)',      tier: 'free' },
+    { id: 'deepseek-coder',       label: 'DeepSeek Coder',           tier: 'free' },
+  ],
 }
 
 const PROVIDER_META: Record<AIProvider, { label: string; color: string; bg: string; icon: string }> = {
@@ -40,9 +44,10 @@ const PROVIDER_META: Record<AIProvider, { label: string; color: string; bg: stri
   gpt:    { label: 'GPT',          color: '#10a37f', bg: 'rgba(16,163,127,.15)', icon: '⬡' },
   gemini: { label: 'Gemini',       color: '#4285f4', bg: 'rgba(66,133,244,.15)', icon: '◈' },
   claude: { label: 'Claude',       color: '#cc785c', bg: 'rgba(204,120,92,.15)', icon: '◆' },
+  deepseek:{ label: 'DeepSeek',    color: '#4f46e5', bg: 'rgba(79,70,229,.15)', icon: '◉' },
 }
 
-const ADVANCED_PROVIDERS: PaidAIProvider[] = ['gpt', 'gemini', 'claude']
+const ADVANCED_PROVIDERS: PaidAIProvider[] = ['gpt', 'gemini', 'claude', 'deepseek']
 
 function getPlanLabel(plan: PlanTier) {
   if (plan === 'premium') return 'Premium'
@@ -154,6 +159,7 @@ export default function BuscaPage() {
   const [usedProvider, setUsedProvider] = useState<string>('')
   const [usedModel,    setUsedModel]    = useState<string>('')
   const [aiNotice, setAiNotice] = useState('')
+  const [showModelSelect, setShowModelSelect] = useState(false)
 
   const loadPlanState = useCallback(async () => {
     const supabase = createClient()
@@ -1595,7 +1601,7 @@ export default function BuscaPage() {
                       return (
                         <button
                           key={provider}
-                          onClick={() => handleProviderChange(provider)}
+                          onClick={() => { handleProviderChange(provider); setShowModelSelect(false); }}
                           style={{
                             padding: '5px 12px', borderRadius: '10px', fontSize: '11px', fontWeight: 600,
                             border: `1px solid ${active ? meta.color : 'var(--border,#1f2640)'}`,
@@ -1609,6 +1615,49 @@ export default function BuscaPage() {
                         </button>
                       )
                     })}
+                    {selectedProvider !== 'auto' && availableModels.length > 0 && (
+                      <div style={{ position: 'relative' }}>
+                        <button
+                          onClick={() => setShowModelSelect(!showModelSelect)}
+                          style={{
+                            padding: '5px 12px', borderRadius: '10px', fontSize: '11px', fontWeight: 500,
+                            border: `1px solid ${showModelSelect ? '#8b5cf6' : 'var(--border,#1f2640)'}`,
+                            background: showModelSelect ? 'rgba(139,92,246,.15)' : 'var(--surface2,#181d2e)',
+                            color: showModelSelect ? '#a78bfa' : 'var(--muted,#6b7194)',
+                            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
+                          }}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                          {availableModels.find(m => m.id === aiModel)?.label || 'Selecionar Modelo'}
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        {showModelSelect && (
+                          <div style={{
+                            position: 'absolute', top: '100%', left: 0, marginTop: '4px',
+                            background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)',
+                            borderRadius: '10px', padding: '6px', minWidth: '180px', zIndex: 100,
+                            boxShadow: '0 8px 24px rgba(0,0,0,0.4)'
+                          }}>
+                            {availableModels.map(model => (
+                              <button
+                                key={model.id}
+                                onClick={() => { setAiModel(model.id); setShowModelSelect(false); }}
+                                style={{
+                                  width: '100%', padding: '8px 12px', borderRadius: '8px', fontSize: '11px',
+                                  border: 'none', background: aiModel === model.id ? 'rgba(139,92,246,.2)' : 'transparent',
+                                  color: aiModel === model.id ? '#a78bfa' : 'var(--text,#e8eaf6)',
+                                  cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                                }}
+                              >
+                                <span>{model.label}</span>
+                                {model.tier === 'free' && <span style={{ fontSize: '9px', color: '#10b981', background: 'rgba(16,185,129,.15)', padding: '2px 6px', borderRadius: '4px' }}>Free</span>}
+                                {model.tier === 'paid' && <span style={{ fontSize: '9px', color: '#f59e0b', background: 'rgba(245,158,11,.15)', padding: '2px 6px', borderRadius: '4px' }}>Paid</span>}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

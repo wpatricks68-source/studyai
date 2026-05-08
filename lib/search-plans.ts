@@ -1,6 +1,6 @@
 export type PlanTier = 'gratuito' | 'basico' | 'premium'
 export type SearchMode = 'alto' | 'advanced'
-export type SearchProvider = 'auto' | 'gpt' | 'gemini' | 'claude'
+export type SearchProvider = 'auto' | 'gpt' | 'gemini' | 'claude' | 'deepseek'
 
 type SearchLimits = {
   canUseAdvanced: boolean
@@ -48,7 +48,7 @@ const PLAN_RULES: Record<PlanTier, Record<SearchMode, SearchLimits>> = {
       maxResponseChars: 6000,
       dailySearchLimit: 40,
       dailyAdvancedLimit: 15,
-      allowedProviders: ['gpt', 'gemini', 'claude'],
+      allowedProviders: ['gpt', 'gemini', 'claude', 'deepseek'],
       allowPaidModels: false,
     },
     advanced: {
@@ -59,7 +59,7 @@ const PLAN_RULES: Record<PlanTier, Record<SearchMode, SearchLimits>> = {
       maxResponseChars: 8000,
       dailySearchLimit: 40,
       dailyAdvancedLimit: 15,
-      allowedProviders: ['gpt', 'gemini', 'claude'],
+      allowedProviders: ['gpt', 'gemini', 'claude', 'deepseek'],
       allowPaidModels: false,
     },
   },
@@ -72,7 +72,7 @@ const PLAN_RULES: Record<PlanTier, Record<SearchMode, SearchLimits>> = {
       maxResponseChars: 8000,
       dailySearchLimit: 100,
       dailyAdvancedLimit: 50,
-      allowedProviders: ['gpt', 'gemini', 'claude'],
+      allowedProviders: ['gpt', 'gemini', 'claude', 'deepseek'],
       allowPaidModels: true,
     },
     advanced: {
@@ -83,7 +83,7 @@ const PLAN_RULES: Record<PlanTier, Record<SearchMode, SearchLimits>> = {
       maxResponseChars: 15000,
       dailySearchLimit: 100,
       dailyAdvancedLimit: 50,
-      allowedProviders: ['gpt', 'gemini', 'claude'],
+      allowedProviders: ['gpt', 'gemini', 'claude', 'deepseek'],
       allowPaidModels: true,
     },
   },
