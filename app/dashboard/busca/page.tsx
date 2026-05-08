@@ -1448,7 +1448,7 @@ export default function BuscaPage() {
               background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)',
               borderRadius: '20px', width: '800px', maxWidth: '100%',
               boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
-              position: 'relative', overflow: 'hidden'
+              position: 'relative', overflow: 'visible'
             }}
           >
             {/* Header do Modal */}
@@ -1554,7 +1554,7 @@ export default function BuscaPage() {
                 </button>
               </div>
 
-              <div style={{ marginTop: '24px', padding: '16px', borderRadius: '14px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border,#1f2640)' }}>
+              <div style={{ marginTop: '24px', padding: '16px', borderRadius: '14px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border,#1f2640)', overflow: 'visible' }}>
                 <div style={{ fontSize: '11px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>Configurações de IA</div>
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                   <button
