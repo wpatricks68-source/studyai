@@ -27,7 +27,6 @@ const PROVIDER_MODELS: Record<Exclude<AIProvider,'auto'>, { id: string; label: s
     { id: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo (Free)',tier: 'free' },
   ],
   gemini: [
-    { id: 'gemini-3.0-flash',      label: 'Gemini 3 Flash (Free)',   tier: 'free' },
     { id: 'gemini-2.0-flash',      label: 'Gemini 2.0 Flash (Free)',  tier: 'free' },
     { id: 'gemini-1.5-pro',        label: 'Gemini 1.5 Pro',           tier: 'paid' },
     { id: 'gemini-1.5-flash',      label: 'Gemini 1.5 Flash (Free)',  tier: 'free' },
