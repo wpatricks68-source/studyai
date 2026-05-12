@@ -279,6 +279,15 @@ export default function CronogramaPage() {
     setSchedules(s => s.filter(sc => sc.id !== id))
   }
 
+  async function clearAllSchedules() {
+    if(schedules.length === 0) return
+    if(!confirm("Limpar todos os horários alocados no painel?")) return
+    const supabase = createClient()
+    const ids = schedules.map(s => s.id)
+    await supabase.from('schedules').update({ is_active: false }).in('id', ids)
+    setSchedules([])
+  }
+
   async function removeCycle(id: string) {
     if(!confirm("Remover deste ciclo?")) return
     const supabase = createClient()
@@ -420,7 +429,14 @@ export default function CronogramaPage() {
         <div style={{ width: '100%', minHeight: '360px', display: 'flex', flexDirection: 'column', background: 'var(--surface,#111420)', borderRadius: '20px', border: '1px solid var(--border,#1f2640)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px', borderBottom: '1px solid var(--border,#1f2640)' }}>
             <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text,#fff)', letterSpacing: '0.5px' }}>PAINEL DE CRONOGRAMA</h2>
-            <button onClick={() => setShowScheduleModal(true)} style={{ background: 'transparent', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '6px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', transition: 'all .2s', whiteSpace: 'nowrap' }}>+ Alocar Horário</button>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {schedules.length > 0 && (
+                <button onClick={clearAllSchedules} title="Limpar todos os horários" style={{ background: 'transparent', color: '#ef4444', border: '1px solid #ef444460', padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', transition: 'all .2s', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Trash2 size={13} /> Limpar Tudo
+                </button>
+              )}
+              <button onClick={() => setShowScheduleModal(true)} style={{ background: 'transparent', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '6px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', transition: 'all .2s', whiteSpace: 'nowrap' }}>+ Alocar Horário</button>
+            </div>
           </div>
           <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '16px' }}>
             {sortedSchedules.length === 0 ? (
