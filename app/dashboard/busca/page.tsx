@@ -285,12 +285,12 @@ export default function BuscaPage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      
+
       const { data: sessions } = await supabase
         .from('study_sessions')
         .select('materia')
         .eq('user_id', user.id)
-      
+
       if (sessions) {
         const disciplinas = Array.from(new Set(
           sessions.map((s: any) => s.materia).filter(Boolean)
@@ -300,6 +300,13 @@ export default function BuscaPage() {
     }
     loadDisciplinas()
   }, [])
+
+  // Atualizar lista de disciplinas quando disciplina muda
+  useEffect(() => {
+    if (disciplina && !savedDisciplinas.includes(disciplina)) {
+      setSavedDisciplinas(prev => [...prev, disciplina].sort())
+    }
+  }, [disciplina])
 
   useEffect(() => {
     loadPlanState()
