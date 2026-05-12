@@ -268,9 +268,37 @@ export default function BuscaPage() {
   const [showSearchModal, setShowSearchModal] = useState(false)
   const [showResumoWindow, setShowResumoWindow] = useState(false)
 
+  // ─── Estado de Disciplinas Salvas (Painel de Disciplina) ───
+  const [savedDisciplinas, setSavedDisciplinas] = useState<string[]>([])
+  const [showDiscDropdown, setShowDiscDropdown] = useState(false)
+  const [isCreatingDisc, setIsCreatingDisc] = useState(false)
+  const [newDiscName, setNewDiscName] = useState('')
+
   // Detect mobile and hide sources by default
   useEffect(() => {
     if (window.innerWidth < 1024) setShowSources(false)
+  }, [])
+
+  // Carregar disciplinas salvas do Painel de Disciplina
+  useEffect(() => {
+    const loadDisciplinas = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      
+      const { data: sessions } = await supabase
+        .from('study_sessions')
+        .select('materia')
+        .eq('user_id', user.id)
+      
+      if (sessions) {
+        const disciplinas = Array.from(new Set(
+          sessions.map((s: any) => s.materia).filter(Boolean)
+        )) as string[]
+        setSavedDisciplinas(disciplinas.sort())
+      }
+    }
+    loadDisciplinas()
   }, [])
 
   useEffect(() => {
@@ -1468,22 +1496,132 @@ export default function BuscaPage() {
             </div>
 
             <div style={{ padding: '24px' }}>
-              {/* Barra de busca interna */}
+              {/* Barra de busca interna - Disciplina com seletor */}
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '16px' }}>
-                <input
-                  value={disciplina}
-                  onChange={e => setDisciplina(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && (handleSearch(), setShowSearchModal(false))}
-                  placeholder="Disciplina (ex: Dir. Constitucional)"
-                  disabled={isLoading}
-                  autoFocus
-                  style={{
-                    width: '240px',
-                    background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)',
-                    borderRadius: '12px', padding: '12px 16px', color: 'var(--text,#e8eaf6)',
-                    fontSize: '14px', outline: 'none'
-                  }}
-                />
+                {/* Disciplina com dropdown */}
+                <div style={{ position: 'relative', width: '240px' }}>
+                  {isCreatingDisc ? (
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <input
+                        value={newDiscName}
+                        onChange={e => setNewDiscName(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            if (newDiscName.trim()) setDisciplina(newDiscName.trim())
+                            setIsCreatingDisc(false)
+                            setNewDiscName('')
+                          }
+                          if (e.key === 'Escape') {
+                            setIsCreatingDisc(false)
+                            setNewDiscName('')
+                          }
+                        }}
+                        autoFocus
+                        placeholder="Nome da disciplina"
+                        style={{
+                          flex: 1,
+                          background: 'var(--surface2,#181d2e)', border: '1px solid var(--accent,#6c63ff)',
+                          borderRadius: '12px', padding: '12px 16px', color: 'var(--text,#e8eaf6)',
+                          fontSize: '14px', outline: 'none'
+                        }}
+                      />
+                      <button
+                        onClick={() => {
+                          if (newDiscName.trim()) setDisciplina(newDiscName.trim())
+                          setIsCreatingDisc(false)
+                          setNewDiscName('')
+                        }}
+                        style={{
+                          padding: '8px 12px', borderRadius: '10px', border: 'none',
+                          background: 'var(--accent,#6c63ff)', color: '#fff', fontSize: '12px', cursor: 'pointer'
+                        }}
+                      >
+                        OK
+                      </button>
+                      <button
+                        onClick={() => { setIsCreatingDisc(false); setNewDiscName('') }}
+                        style={{
+                          padding: '8px 12px', borderRadius: '10px', border: '1px solid var(--border,#1f2640)',
+                          background: 'transparent', color: 'var(--muted,#6b7194)', fontSize: '12px', cursor: 'pointer'
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div
+                        onClick={() => { if (!isLoading) setShowDiscDropdown(!showDiscDropdown) }}
+                        style={{
+                          background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)',
+                          borderRadius: '12px', padding: '12px 16px', color: disciplina ? 'var(--text,#e8eaf6)' : 'var(--muted,#6b7194)',
+                          fontSize: '14px', cursor: isLoading ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          transition: 'all .15s'
+                        }}
+                      >
+                        <span>{disciplina || 'Selecionar / Nova'}</span>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          {disciplina && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setDisciplina(''); setShowDiscDropdown(false) }}
+                              style={{ background: 'transparent', border: 'none', color: 'var(--muted,#6b7194)', cursor: 'pointer', padding: '2px', fontSize: '12px', lineHeight: 1 }}
+                              title="Limpar disciplina"
+                            >
+                              ✕
+                            </button>
+                          )}
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </div>
+                      </div>
+                      {showDiscDropdown && (
+                        <div style={{
+                          position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px',
+                          background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)',
+                          borderRadius: '10px', zIndex: 9999, boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                          maxHeight: '200px', overflow: 'hidden', display: 'flex', flexDirection: 'column'
+                        }}>
+                          <div style={{ padding: '6px', borderBottom: '1px solid var(--border,#1f2640)', display: 'flex', gap: '4px' }}>
+                            <button
+                              onClick={() => { setIsCreatingDisc(true); setNewDiscName(''); setShowDiscDropdown(false) }}
+                              style={{
+                                flex: 1, padding: '8px', borderRadius: '8px', border: '1px dashed var(--accent,#6c63ff)',
+                                background: 'rgba(108,99,255,.08)', color: 'var(--accent,#6c63ff)',
+                                fontSize: '11px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
+                              }}
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>
+                              Nova Disciplina
+                            </button>
+                          </div>
+                          <div style={{ overflowY: 'auto', maxHeight: '160px' }}>
+                            {savedDisciplinas.length === 0 ? (
+                              <div style={{ padding: '16px', textAlign: 'center', fontSize: '12px', color: 'var(--muted,#6b7194)' }}>
+                                Nenhuma disciplina salva
+                              </div>
+                            ) : (
+                              savedDisciplinas.map(d => (
+                                <button
+                                  key={d}
+                                  onClick={() => { setDisciplina(d); setShowDiscDropdown(false) }}
+                                  style={{
+                                    width: '100%', padding: '10px 14px', border: 'none', textAlign: 'left',
+                                    background: disciplina === d ? 'rgba(108,99,255,.15)' : 'transparent',
+                                    color: disciplina === d ? 'var(--accent,#6c63ff)' : 'var(--text,#e8eaf6)',
+                                    fontSize: '13px', cursor: 'pointer', borderBottom: '1px solid rgba(31,38,64,.5)'
+                                  }}
+                                  onMouseOver={e => { if (disciplina !== d) e.currentTarget.style.background = 'rgba(255,255,255,.04)' }}
+                                  onMouseOut={e => { if (disciplina !== d) e.currentTarget.style.background = 'transparent' }}
+                                >
+                                  {d}
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
                 <span style={{ color: 'var(--muted,#6b7194)', fontSize: '20px' }}>›</span>
                 <input
                   value={tema}
