@@ -432,9 +432,9 @@ export default function BuscaPage() {
   }, [])
 
   // ─── BUSCA PRINCIPAL ──────────────────────────────────────
-  const handleSearch = useCallback(async () => {
+  const handleSearch = useCallback(async (overrideDisc?: string) => {
     const temaFinal = tema.trim()
-    const discFinal = disciplina.trim()
+    const discFinal = overrideDisc !== undefined ? overrideDisc.trim() : (isCreatingDisc ? newDiscName.trim() : disciplina.trim())
     const requestProvider = searchMode === 'alto' ? 'auto' : aiProvider
     const requestModel = searchMode === 'advanced' && requestProvider !== 'auto' ? aiModel : undefined
 
@@ -567,7 +567,7 @@ export default function BuscaPage() {
     } finally {
       setGenTarget(null)
     }
-  }, [tema, disciplina, phase, aiProvider, aiModel, searchMode, loadPlanState])
+  }, [tema, disciplina, phase, aiProvider, aiModel, searchMode, loadPlanState, isCreatingDisc, newDiscName])
 
   // ─── CRIAR MANUALMENTE ────────────────────────────────────
   const handleManualCreate = useCallback(async () => {
@@ -1633,7 +1633,15 @@ export default function BuscaPage() {
                 <input
                   value={tema}
                   onChange={e => setTema(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && (handleSearch(), setShowSearchModal(false))}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      if (isCreatingDisc && newDiscName.trim()) {
+                        setDisciplina(newDiscName.trim())
+                      }
+                      handleSearch(isCreatingDisc ? newDiscName.trim() : undefined);
+                      setShowSearchModal(false);
+                    }
+                  }}
                   placeholder="Tema (ex: Princípio da Legalidade)"
                   disabled={isLoading}
                   style={{
@@ -1685,7 +1693,13 @@ export default function BuscaPage() {
                 </button>
 
                 <button
-                  onClick={() => { handleSearch(); setShowSearchModal(false); }}
+                  onClick={() => { 
+                    if (isCreatingDisc && newDiscName.trim()) {
+                      setDisciplina(newDiscName.trim())
+                    }
+                    handleSearch(isCreatingDisc ? newDiscName.trim() : undefined); 
+                    setShowSearchModal(false); 
+                  }}
                   disabled={!tema.trim()}
                   style={{
                     padding: '10px 24px', borderRadius: '10px', border: 'none',
