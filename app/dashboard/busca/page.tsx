@@ -280,26 +280,27 @@ export default function BuscaPage() {
   }, [])
 
   // Carregar disciplinas salvas do Painel de Disciplina
-  useEffect(() => {
-    const loadDisciplinas = async () => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+  const loadDisciplinas = useCallback(async () => {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
 
-      const { data: sessions } = await supabase
-        .from('study_sessions')
-        .select('materia')
-        .eq('user_id', user.id)
+    const { data: sessions } = await supabase
+      .from('study_sessions')
+      .select('materia')
+      .eq('user_id', user.id)
 
-      if (sessions) {
-        const disciplinas = Array.from(new Set(
-          sessions.map((s: any) => s.materia).filter(Boolean)
-        )) as string[]
-        setSavedDisciplinas(disciplinas.sort())
-      }
+    if (sessions) {
+      const disciplinas = Array.from(new Set(
+        sessions.map((s: any) => s.materia).filter(Boolean)
+      )) as string[]
+      setSavedDisciplinas(disciplinas.sort())
     }
-    loadDisciplinas()
   }, [])
+
+  useEffect(() => {
+    loadDisciplinas()
+  }, [loadDisciplinas])
 
   // Atualizar lista de disciplinas quando disciplina muda
   useEffect(() => {
@@ -434,7 +435,7 @@ export default function BuscaPage() {
   // ─── BUSCA PRINCIPAL ──────────────────────────────────────
   const handleSearch = useCallback(async (overrideDisc?: string) => {
     const temaFinal = tema.trim()
-    const discFinal = overrideDisc !== undefined ? overrideDisc.trim() : (isCreatingDisc ? newDiscName.trim() : disciplina.trim())
+    const discFinal = isCreatingDisc ? newDiscName.trim() : (overrideDisc !== undefined ? overrideDisc.trim() : disciplina.trim())
     const requestProvider = searchMode === 'alto' ? 'auto' : aiProvider
     const requestModel = searchMode === 'advanced' && requestProvider !== 'auto' ? aiModel : undefined
 
@@ -545,6 +546,15 @@ export default function BuscaPage() {
           .single()
 
         sessionId = saved?.id ?? null
+
+        if (discFinal && discFinal !== disciplina) {
+          setSavedDisciplinas(prev => {
+            if (!prev.includes(discFinal)) {
+              return [...prev, discFinal].sort()
+            }
+            return prev
+          })
+        }
       }
 
       setSession(prev => ({
@@ -556,6 +566,10 @@ export default function BuscaPage() {
         sessionId,
         savedAt: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
       }))
+
+      if (isCreatingDisc && newDiscName.trim()) {
+        setDisciplina(newDiscName.trim())
+      }
 
       setPhase('done')
       setGenTarget(null)
@@ -572,7 +586,7 @@ export default function BuscaPage() {
   // ─── CRIAR MANUALMENTE ────────────────────────────────────
   const handleManualCreate = useCallback(async () => {
     const temaFinal = tema.trim()
-    const discFinal = disciplina.trim()
+    const discFinal = isCreatingDisc ? newDiscName.trim() : disciplina.trim()
     if (!temaFinal) {
       setError('Insira pelo menos o tema para criar uma sessão.')
       return
@@ -605,6 +619,15 @@ export default function BuscaPage() {
         
         if (insertError) throw insertError
         sessionId = saved?.id ?? null
+
+        if (discFinal && discFinal !== disciplina) {
+          setSavedDisciplinas(prev => {
+            if (!prev.includes(discFinal)) {
+              return [...prev, discFinal].sort()
+            }
+            return prev
+          })
+        }
       }
 
       setSession({
@@ -624,7 +647,7 @@ export default function BuscaPage() {
       setError((e as Error).message || 'Erro ao inicializar sessão manual.')
       setPhase('idle')
     }
-  }, [tema, disciplina])
+  }, [tema, disciplina, isCreatingDisc, newDiscName])
 
   // ─── GERAR FLASHCARDS ─────────────────────────────────────
   async function handleFlashcards() {
@@ -1558,7 +1581,14 @@ export default function BuscaPage() {
                   ) : (
                     <>
                       <div
-                        onClick={() => { if (!isLoading) setShowDiscDropdown(!showDiscDropdown) }}
+                        onClick={() => { 
+                          if (!isLoading) {
+                            if (!showDiscDropdown) {
+                              loadDisciplinas()
+                            }
+                            setShowDiscDropdown(!showDiscDropdown)
+                          }
+                        }}
                         style={{
                           background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)',
                           borderRadius: '12px', padding: '12px 16px', color: disciplina ? 'var(--text,#e8eaf6)' : 'var(--muted,#6b7194)',
