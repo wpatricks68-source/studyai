@@ -20,6 +20,7 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
   const [showResumoWindow, setShowResumoWindow] = useState(false)
   const [sessionFlashcards, setSessionFlashcards] = useState<Flashcard[]>([])
   const [sessionQuestions, setSessionQuestions] = useState<Question[]>([])
+  const [expandedDisc, setExpandedDisc] = useState<string | null>(null)
 
   // Auto-hide on mobile
   useEffect(() => {
@@ -37,6 +38,18 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
     const matchMat = filterMat === 'all' || s.materia === filterMat
     return matchQ && matchMat
   })
+
+  // Agrupar sessões por disciplina > tema
+  const groupedByDisciplina = filtered.reduce((acc, s) => {
+    const disc = s.materia || 'Sem Disciplina'
+    if (!acc[disc]) acc[disc] = {}
+    const tema = s.topic || 'Geral'
+    if (!acc[disc][tema]) acc[disc][tema] = []
+    acc[disc][tema].push(s)
+    return acc
+  }, {} as Record<string, Record<string, StudySession[]>>)
+
+  const sortedDisciplinas = Object.keys(groupedByDisciplina).sort((a, b) => a.localeCompare(b))
 
   async function openSession(s: StudySession) {
     setSelected(s)
@@ -93,6 +106,10 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
     }, 100)
   }
 
+  function toggleDisc(disc: string) {
+    setExpandedDisc(prev => prev === disc ? null : disc)
+  }
+
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
       {/* Library sidebar */}
@@ -142,7 +159,7 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
         </div>
 
         <div style={{ fontSize: '11px', color: 'var(--muted)', padding: '7px 14px', borderBottom: '1px solid var(--border)' }}>
-          {filtered.length} sessão(ões)
+          {filtered.length} sessão(ões) em {sortedDisciplinas.length} disciplina(s)
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
@@ -150,52 +167,109 @@ export default function ResumoLibrary({ sessions }: { sessions: StudySession[] }
             <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--muted)', fontSize: '13px' }}>
               Nenhuma sessão encontrada
             </div>
-          ) : filtered.map(s => (
-            <div
-              key={s.id}
-              onClick={() => openSession(s)}
-              style={{
-                position: 'relative',
-                borderRadius: '10px', border: `1px solid ${selected?.id === s.id ? 'var(--accent)' : 'var(--border)'}`,
-                padding: '12px 13px', marginBottom: '7px', cursor: 'pointer',
-                background: selected?.id === s.id ? 'rgba(108,99,255,.1)' : 'var(--surface2)',
-                transition: 'all .12s',
-              }}
-            >
-              <button
-                onClick={(e) => deleteSession(e, s.id)}
-                style={{
-                  position: 'absolute', top: '8px', right: '8px',
-                  background: 'transparent', border: 'none', color: 'var(--muted)',
-                  cursor: 'pointer', padding: '4px', fontSize: '14px', lineHeight: 1
-                }}
-                title="Excluir sessão"
-              >
-                ✕
-              </button>
-              <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)', marginBottom: '5px', lineHeight: 1.4, paddingRight: '16px' }}>
-                {s.title}
-              </div>
-              <div style={{ display: 'flex', gap: '8px', fontSize: '11px', color: 'var(--muted)', flexWrap: 'wrap' }}>
-                <span>{s.materia?.replace('Direito ', 'Dir. ')}</span>
-                <span>•</span>
-                <span>{formatDate(s.created_at)}</span>
-                <span>•</span>
-                <span>{s.revisoes} rev.</span>
-              </div>
-              {(s.tags ?? []).length > 0 && (
-                <div style={{ display: 'flex', gap: '4px', marginTop: '6px', flexWrap: 'wrap' }}>
-                  {(s.tags ?? []).slice(0, 3).map(t => (
-                    <span key={t} style={{
-                      padding: '1px 7px', borderRadius: '10px', fontSize: '10px',
-                      background: 'rgba(108,99,255,.1)', color: '#a09cf7',
-                      border: '1px solid rgba(108,99,255,.2)',
-                    }}>{t}</span>
-                  ))}
+          ) : sortedDisciplinas.map(disc => {
+            const temas = groupedByDisciplina[disc]
+            const isExpanded = expandedDisc === disc
+            const totalSessions = Object.values(temas).flat().length
+
+            return (
+              <div key={disc} style={{ marginBottom: '4px' }}>
+                {/* Disciplina Header */}
+                <div
+                  onClick={() => toggleDisc(disc)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '10px 12px', borderRadius: '10px', cursor: 'pointer',
+                    background: isExpanded ? 'rgba(108,99,255,.12)' : 'var(--surface2)',
+                    border: `1px solid ${isExpanded ? 'var(--accent)' : 'var(--border)'}`,
+                    borderLeft: isExpanded ? '3px solid var(--accent)' : '3px solid transparent',
+                    transition: 'all .15s'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+                    <svg
+                      width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={isExpanded ? 'var(--accent)' : 'var(--muted)'}
+                      strokeWidth="2" style={{ flexShrink: 0, transition: 'transform .2s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
+                    >
+                      <path d="M9 18l6-6-6-6"/>
+                    </svg>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: isExpanded ? 'var(--accent)' : 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {disc}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '10px', color: 'var(--muted)', background: 'var(--surface)', padding: '2px 6px', borderRadius: '8px', flexShrink: 0 }}>
+                    {totalSessions}
+                  </span>
                 </div>
-              )}
-            </div>
-          ))}
+
+                {/* Temas da disciplina (cascata) */}
+                {isExpanded && Object.keys(temas).sort().map(tema => {
+                  const sessionsInTema = temas[tema]
+                  return (
+                    <div key={tema} style={{ marginLeft: '16px', marginTop: '4px' }}>
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: '6px',
+                        padding: '6px 10px', fontSize: '11px', fontWeight: 500,
+                        color: 'var(--muted)', borderLeft: '2px solid var(--border)'
+                      }}>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M4 6h16M4 12h16M4 18h10"/>
+                        </svg>
+                        {tema}
+                        <span style={{ marginLeft: 'auto', fontSize: '9px', color: 'var(--muted)', opacity: 0.7 }}>
+                          {sessionsInTema.length}
+                        </span>
+                      </div>
+                      {sessionsInTema.map(s => (
+                        <div
+                          key={s.id}
+                          onClick={() => openSession(s)}
+                          style={{
+                            position: 'relative',
+                            borderRadius: '8px', border: `1px solid ${selected?.id === s.id ? 'var(--accent)' : 'var(--border)'}`,
+                            padding: '9px 11px', marginLeft: '8px', marginBottom: '4px', cursor: 'pointer',
+                            background: selected?.id === s.id ? 'rgba(108,99,255,.15)' : 'var(--surface2)',
+                            transition: 'all .12s',
+                          }}
+                        >
+                          <button
+                            onClick={(e) => deleteSession(e, s.id)}
+                            style={{
+                              position: 'absolute', top: '6px', right: '6px',
+                              background: 'transparent', border: 'none', color: 'var(--muted)',
+                              cursor: 'pointer', padding: '3px', fontSize: '12px', lineHeight: 1
+                            }}
+                            title="Excluir sessão"
+                          >
+                            ✕
+                          </button>
+                          <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text)', marginBottom: '4px', lineHeight: 1.4, paddingRight: '16px' }}>
+                            {s.topic || s.title}
+                          </div>
+                          <div style={{ display: 'flex', gap: '6px', fontSize: '10px', color: 'var(--muted)', flexWrap: 'wrap' }}>
+                            <span>{formatDate(s.created_at)}</span>
+                            <span>•</span>
+                            <span>{s.revisoes} rev.</span>
+                          </div>
+                          {(s.tags ?? []).length > 0 && (
+                            <div style={{ display: 'flex', gap: '3px', marginTop: '5px', flexWrap: 'wrap' }}>
+                              {(s.tags ?? []).slice(0, 2).map(t => (
+                                <span key={t} style={{
+                                  padding: '1px 6px', borderRadius: '8px', fontSize: '9px',
+                                  background: 'rgba(108,99,255,.1)', color: '#a09cf7',
+                                  border: '1px solid rgba(108,99,255,.2)',
+                                }}>{t}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })}
         </div>
       </div>
 
