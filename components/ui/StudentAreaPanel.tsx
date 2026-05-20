@@ -242,11 +242,18 @@ export default function StudentAreaPanel({
     setProfileNotice(null)
 
     const supabase = createClient()
-    const payload = {
+    const payload: {
+      name: string | null
+      target_exam: string | null
+      exam_date: string | null
+      daily_goal: number
+      avatar_url: string | null
+    } = {
       name: profileForm.name.trim() || null,
       target_exam: profileForm.target_exam.trim() || null,
       exam_date: profileForm.exam_date || null,
       daily_goal: Number(profileForm.daily_goal) > 0 ? Number(profileForm.daily_goal) : 0,
+      avatar_url: null,
     }
 
     if (avatarFile) {
@@ -264,11 +271,11 @@ export default function StudentAreaPanel({
         return setProfileNotice({ tone: 'error', text: `Erro ao enviar avatar: ${uploadError.message}` })
       }
 
-      const { data: publicUrlData, error: urlError } = await supabase.storage
+      const { data: publicUrlData } = supabase.storage
         .from('avatars')
         .getPublicUrl(filePath)
 
-      if (urlError || !publicUrlData?.publicUrl) {
+      if (!publicUrlData?.publicUrl) {
         setSavingProfile(false)
         setUploadingAvatar(false)
         return setProfileNotice({ tone: 'error', text: 'Erro ao obter URL do avatar.' })
