@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { normalizeUserRole } from '@/lib/auth/permissions'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const AVATAR_BUCKET_NAME = 'avatars'
@@ -13,26 +12,6 @@ export async function POST() {
     return NextResponse.json(
       { error: 'Usuario nao autenticado.' },
       { status: 401 },
-    )
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', userData.user.id)
-    .single()
-
-  if (profileError) {
-    return NextResponse.json(
-      { error: 'Nao foi possivel verificar o perfil do usuario.' },
-      { status: 500 },
-    )
-  }
-
-  if (normalizeUserRole(profile?.role) !== 'admin') {
-    return NextResponse.json(
-      { error: 'Apenas administradores podem executar esta acao.' },
-      { status: 403 },
     )
   }
 

@@ -194,6 +194,7 @@ export default function StudentAreaPanel({
     const response = await fetch('/api/admin/storage/avatars', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
     })
 
     if (response.ok) {
