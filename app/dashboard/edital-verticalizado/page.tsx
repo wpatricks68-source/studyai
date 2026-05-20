@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { normalizePlanTier, type PlanTier } from '@/lib/search-plans'
 import type { EditalBoard, EditalTopic } from '@/types/database'
 
 type StatusFilter = 'all' | 'pending' | 'in-progress' | 'done'
@@ -177,6 +178,7 @@ export default function EditalVerticalizadoPage() {
   const [expandedDisciplines, setExpandedDisciplines] = useState<Record<string, boolean>>({})
   const [titleDraft, setTitleDraft] = useState('')
   const [editingBoardId, setEditingBoardId] = useState<string | null>(null)
+  const [planTier, setPlanTier] = useState<PlanTier>('gratuito')
 
   const activeBoard = boards.find(board => board.id === activeBoardId) ?? null
   const activeTopics = activeBoard ? topicsByBoard[activeBoard.id] ?? [] : []
@@ -212,6 +214,10 @@ export default function EditalVerticalizadoPage() {
     }
 
     setUserId(user.id)
+
+    // Carregar plano do usuario
+    const profileRes = await supabase.from('profiles').select('plan_tier').eq('id', user.id).maybeSingle()
+    setPlanTier(normalizePlanTier(profileRes.data?.plan_tier))
 
     const boardsRes = await supabase
       .from('edital_boards')
@@ -267,6 +273,12 @@ export default function EditalVerticalizadoPage() {
 
     if (!resolvedUserId) {
       setDbError('Usuario nao autenticado.')
+      return null
+    }
+
+    // Bloquear criacao para usuarios nao-premium com 3 ou mais boards
+    if (planTier !== 'premium' && boards.length >= 3) {
+      setNotice('Voce atingiu o limite de 3 editais do seu plano. Exclua um edital existente ou faca upgrade para o Premium para criar mais.')
       return null
     }
 
