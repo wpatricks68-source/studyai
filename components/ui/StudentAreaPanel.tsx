@@ -190,6 +190,22 @@ export default function StudentAreaPanel({
     setAvatarPreviewUrl(preview)
   }
 
+  async function ensureAvatarBucket() {
+    const response = await fetch('/api/admin/storage/avatars', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    })
+
+    if (response.ok) {
+      return
+    }
+
+    const body = await response.json().catch(() => null)
+    const message = body?.error || body?.message || response.statusText || 'Nao foi possivel verificar o bucket de avatar.'
+
+    throw new Error(message)
+  }
+
   async function handlePasswordUpdate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     
@@ -258,6 +274,16 @@ export default function StudentAreaPanel({
 
     if (avatarFile) {
       setUploadingAvatar(true)
+      setProfileNotice(null)
+
+      try {
+        await ensureAvatarBucket()
+      } catch (error) {
+        setSavingProfile(false)
+        setUploadingAvatar(false)
+        return setProfileNotice({ tone: 'error', text: `${error instanceof Error ? error.message : 'Falha ao verificar o bucket de avatar.'}` })
+      }
+
       const extension = avatarFile.name.split('.').pop()?.toLowerCase() ?? 'jpg'
       const filePath = `user-profiles/${user.id}.${extension}`
 
@@ -268,7 +294,12 @@ export default function StudentAreaPanel({
       if (uploadError) {
         setSavingProfile(false)
         setUploadingAvatar(false)
-        return setProfileNotice({ tone: 'error', text: `Erro ao enviar avatar: ${uploadError.message}` })
+
+        const message = uploadError.message.includes('Bucket not found')
+          ? 'Bucket "avatars" nao encontrado no Supabase. Verifique se o bucket existe ou se o nome esta correto.'
+          : `Erro ao enviar avatar: ${uploadError.message}`
+
+        return setProfileNotice({ tone: 'error', text: message })
       }
 
       const { data: publicUrlData } = supabase.storage
