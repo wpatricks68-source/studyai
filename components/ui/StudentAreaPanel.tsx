@@ -287,7 +287,7 @@ export default function StudentAreaPanel({
 
     const query = profile
       ? supabase.from('profiles').update(payload).eq('id', user.id).select('*').single()
-      : supabase.from('profiles').insert({ id: user.id, avatar_url: null, plan_tier: effectivePlan, ...payload }).select('*').single()
+      : supabase.from('profiles').insert({ id: user.id, plan_tier: effectivePlan, ...payload }).select('*').single()
 
     const { data, error } = await query
     setSavingProfile(false)
