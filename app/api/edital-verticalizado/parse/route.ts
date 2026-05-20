@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { createClient } from '@/lib/supabase/server'
 import { extractTextFromFile } from '@/lib/document-text'
+import { normalizePlanTier } from '@/lib/search-plans'
 
 type ParsedEditalItem = {
   disciplina: string
@@ -311,6 +312,27 @@ export async function POST(req: NextRequest) {
 
     if (!user) {
       return NextResponse.json({ error: 'Nao autenticado' }, { status: 401 })
+    }
+
+    // Verificar plano e limite de boards para usuarios nao-premium
+    const profileRes = await supabase.from('profiles').select('plan_tier').eq('id', user.id).maybeSingle()
+    const planTier = normalizePlanTier(profileRes.data?.plan_tier)
+
+    if (planTier !== 'premium') {
+      const { count } = await supabase
+        .from('edital_boards')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+
+      if ((count ?? 0) >= 3) {
+        return NextResponse.json(
+          {
+            error:
+              'Voce atingiu o limite de 3 editais para o seu plano. Exclua um edital existente ou faca upgrade para o plano Premium para criar mais.',
+          },
+          { status: 403 }
+        )
+      }
     }
 
     const formData = await req.formData()

@@ -273,7 +273,7 @@ export default function Sidebar({ user, profile }: { user: User; profile: Profil
                 width: '32px',
                 height: '32px',
                 borderRadius: '10px',
-                background: 'linear-gradient(135deg, #7461ff, #00e5b0)',
+                background: profile?.avatar_url ? 'transparent' : 'linear-gradient(135deg, #7461ff, #00e5b0)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -281,9 +281,14 @@ export default function Sidebar({ user, profile }: { user: User; profile: Profil
                 fontWeight: 700,
                 color: '#fff',
                 flexShrink: 0,
-                boxShadow: '0 4px 12px rgba(116,97,255,0.35)',
+                boxShadow: profile?.avatar_url ? '0 4px 10px rgba(0,0,0,0.12)' : '0 4px 12px rgba(116,97,255,0.35)',
+                overflow: 'hidden',
               }}>
-                {initials}
+                {profile?.avatar_url ? (
+                  <img src={profile.avatar_url} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  initials
+                )}
               </div>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: '12px', color: 'var(--text)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
