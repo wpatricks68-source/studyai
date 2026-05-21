@@ -50,6 +50,16 @@ export async function middleware(request: NextRequest) {
   )
 
   if (!user && !isPublic) {
+    if (request.nextUrl.pathname.startsWith('/api')) {
+      return new NextResponse(
+        JSON.stringify({ error: 'Usuario nao autenticado.' }),
+        {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+    }
+
     const url = request.nextUrl.clone()
     url.pathname = '/auth/login'
     return NextResponse.redirect(url)
