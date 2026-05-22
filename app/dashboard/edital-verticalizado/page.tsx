@@ -1622,22 +1622,33 @@ export default function EditalVerticalizadoPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <button
                     type="button"
-                    onClick={() => setAddNewTema(prev => !prev)}
+                    onClick={() => {
+                      setAddNewTema(prev => {
+                        const next = !prev
+                        if (next) setManualForm(m => ({ ...m, tema: '' }))
+                        return next
+                      })
+                    }}
                     aria-pressed={addNewTema}
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: 10,
-                      padding: '8px 12px',
-                      borderRadius: 10,
-                      border: addNewTema ? '1px solid rgba(124,108,255,.96)' : '1px solid var(--border)',
-                      background: addNewTema ? 'linear-gradient(135deg, rgba(124,108,255,.12), rgba(124,108,255,.06))' : 'transparent',
+                      gap: 12,
+                      padding: '10px 14px',
+                      borderRadius: 12,
+                      border: addNewTema ? '1px solid rgba(124,108,255,0.9)' : '1px solid rgba(255,255,255,0.06)',
+                      background: addNewTema ? 'linear-gradient(135deg, rgba(124,108,255,0.12), rgba(124,108,255,0.06))' : 'rgba(255,255,255,0.02)',
+                      backdropFilter: 'blur(6px)',
+                      WebkitBackdropFilter: 'blur(6px)',
+                      boxShadow: addNewTema ? '0 6px 18px rgba(124,108,255,0.08)' : 'inset 0 1px 0 rgba(255,255,255,0.02)',
                       cursor: 'pointer',
                       color: 'var(--text)'
                     }}
                   >
-                    <span style={{ fontSize: 13, fontWeight: 700 }}>{addNewTema ? 'Novo tema: ativado' : 'Adicionar novo tema'}</span>
-                    <span style={{ fontSize: 12, color: 'var(--muted,#6b7194)' }}>{addNewTema ? 'O envio criará um novo tema nesta disciplina.' : 'Criar novo tema em vez de editar o atual'}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                      <span style={{ fontSize: 13, fontWeight: 800 }}>{addNewTema ? 'Novo tema: ativado' : 'Adicionar novo tema'}</span>
+                      <span style={{ fontSize: 12, color: 'var(--muted,#6b7194)' }}>{addNewTema ? 'O envio criará um novo tema nesta disciplina.' : 'Criar novo tema em vez de editar o atual'}</span>
+                    </div>
                   </button>
                 </div>
               )}
