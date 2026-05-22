@@ -62,6 +62,33 @@ export async function extractTextWithOcrSpace(file: File) {
   return text.trim()
 }
 
+async function ensurePdfPolyfills() {
+  // Try to provide minimal polyfills expected by pdfjs / pdf-parse in Node
+  try {
+    const canvas = await import('@napi-rs/canvas')
+    // @napi-rs/canvas exports ImageData and Path2D
+    if (typeof globalThis.ImageData === 'undefined' && (canvas as any).ImageData) {
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      globalThis.ImageData = (canvas as any).ImageData
+    }
+    if (typeof globalThis.Path2D === 'undefined' && (canvas as any).Path2D) {
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      globalThis.Path2D = (canvas as any).Path2D
+    }
+  } catch (err) {
+    // ignore - missing optional dependency
+  }
+
+  // Minimal DOMMatrix polyfill to silence pdfjs warnings when not available
+  if (typeof (globalThis as any).DOMMatrix === 'undefined') {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    globalThis.DOMMatrix = class DOMMatrix {}
+  }
+}
+
 export async function extractTextFromFile(file: File): Promise<{ content: string; extractionMode: ExtractionMode }> {
   if (!isSupportedDocumentFile(file)) {
     throw new Error('Tipo nao suportado. Use PDF, TXT, MD ou CSV')
@@ -85,6 +112,7 @@ export async function extractTextFromFile(file: File): Promise<{ content: string
     extractionMode = 'plain'
   } else if (file.type === 'application/pdf' || lowerName.endsWith('.pdf')) {
     try {
+      await ensurePdfPolyfills()
       const pdfParseModule = await import('pdf-parse')
       const pdfParse = (pdfParseModule as { default?: unknown }).default ?? pdfParseModule
       const buffer = Buffer.from(await file.arrayBuffer())
@@ -96,8 +124,28 @@ export async function extractTextFromFile(file: File): Promise<{ content: string
     }
 
     if (!content.trim()) {
-      content = await extractTextWithOcrSpace(file)
-      extractionMode = 'ocr'
+      // Retry OCR up to 3 times with exponential backoff for transient HTTP errors
+      const maxAttempts = 3
+      let attempt = 0
+      let lastError: unknown = null
+
+      while (attempt < maxAttempts) {
+        try {
+          content = await extractTextWithOcrSpace(file)
+          extractionMode = 'ocr'
+          break
+        } catch (err) {
+          lastError = err
+          attempt += 1
+          const waitMs = 500 * Math.pow(2, attempt - 1)
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise(r => setTimeout(r, waitMs))
+        }
+      }
+
+      if (!content.trim() && lastError) {
+        throw lastError as Error
+      }
     }
   }
 

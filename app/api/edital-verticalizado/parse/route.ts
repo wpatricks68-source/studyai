@@ -77,6 +77,10 @@ function buildPrompt(content: string) {
   return `Voce e um especialista em leitura de editais de concursos publicos brasileiros.
 Analise somente o trecho abaixo, foque no CONTEUDO PROGRAMATICO e retorne uma estrutura verticalizada.
 
+Leia o PDF, encontre o conteudo programatico, extraia: a disciplina esta em negrito e e separada por ":", o tema e separado por ":" e o subtema termina em ".".
+Complete, fielmente ao texto, para que fique assim por exemplo:
+Língua Portuguesa: | Elementos de construção do texto e seu sentido:| gênero do texto (literário e não literário, narrativo, descritivo e argumentativo); interpretação e organização interna. |Semântica: |sentido e emprego ....
+
 RETORNE APENAS UM JSON VALIDO, sem markdown, sem texto antes ou depois, no formato:
 {
   "boardTitle": "nome sugerido do edital",
@@ -306,15 +310,20 @@ async function parseWithProviders(prompt: string, fallbackTitle: string, content
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const allowUnauth = process.env.DEV_ALLOW_UNAUTH_PARSE === 'true'
 
-    if (!user) {
-      return NextResponse.json({ error: 'Nao autenticado' }, { status: 401 })
+    let user = null
+    if (!allowUnauth) {
+      const {
+        data: { user: fetchedUser },
+      } = await supabase.auth.getUser()
+      user = fetchedUser
+      if (!user) {
+        return NextResponse.json({ error: 'Nao autenticado' }, { status: 401 })
+      }
     }
 
-    // Verificar plano e limite de boards para usuarios nao-premium
+    // Em dev, com DEV_ALLOW_UNAUTH_PARSE=true, permitimos testes sem auth
 
     const formData = await req.formData()
     const file = formData.get('file') as File | null

@@ -51,6 +51,11 @@ export async function middleware(request: NextRequest) {
 
   if (!user && !isPublic) {
     if (request.nextUrl.pathname.startsWith('/api')) {
+      const allowUnauth = process.env.DEV_ALLOW_UNAUTH_PARSE === 'true'
+      // allow unauthenticated access to this specific parse route in dev for testing
+      if (allowUnauth && request.nextUrl.pathname === '/api/edital-verticalizado/parse') {
+        return response
+      }
       return new NextResponse(
         JSON.stringify({ error: 'Usuario nao autenticado.' }),
         {
