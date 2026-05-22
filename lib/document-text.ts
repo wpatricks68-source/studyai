@@ -100,10 +100,14 @@ async function extractTextWithPdfjs(file: File) {
   for (let i = 1; i <= doc.numPages; i += 1) {
     const page = await doc.getPage(i)
     const content = await page.getTextContent({ includeMarkedContent: false, disableNormalization: false })
-    const pageText = content.items
-      .filter((item: any): item is { str: string } => typeof item === 'object' && 'str' in item && typeof item.str === 'string')
-      .map(item => item.str)
-      .join(' ')
+    const textItems = content.items.filter(
+      (item): item is { str: string } =>
+        typeof item === 'object' &&
+        item !== null &&
+        'str' in item &&
+        typeof (item as any).str === 'string'
+    )
+    const pageText = textItems.map(item => item.str).join(' ')
 
     text += pageText.trim() ? `${pageText.trim()}
 
