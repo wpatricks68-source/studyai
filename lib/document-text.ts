@@ -63,22 +63,25 @@ export async function extractTextWithOcrSpace(file: File) {
 }
 
 async function ensurePdfPolyfills() {
-  // Try to provide minimal polyfills expected by pdfjs / pdf-parse in Node
+  // Try to provide minimal polyfills expected by pdfjs / pdf-parse in Node.
+  // This is intentionally loaded via eval so bundlers do not statically include
+  // @napi-rs/canvas and warn about missing platform-specific binaries.
   try {
-    const canvas = await import('@napi-rs/canvas')
-    // @napi-rs/canvas exports ImageData and Path2D
-    if (typeof globalThis.ImageData === 'undefined' && (canvas as any).ImageData) {
+    const moduleName = '@napi-rs/canvas'
+    // eslint-disable-next-line no-eval
+    const canvas = (await eval("import(moduleName)")) as any
+    if (typeof globalThis.ImageData === 'undefined' && canvas?.ImageData) {
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-ignore
-      globalThis.ImageData = (canvas as any).ImageData
+      globalThis.ImageData = canvas.ImageData
     }
-    if (typeof globalThis.Path2D === 'undefined' && (canvas as any).Path2D) {
+    if (typeof globalThis.Path2D === 'undefined' && canvas?.Path2D) {
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-ignore
-      globalThis.Path2D = (canvas as any).Path2D
+      globalThis.Path2D = canvas.Path2D
     }
   } catch (err) {
-    // ignore - missing optional dependency
+    // ignore - missing optional dependency or unsupported deployment platform
   }
 
   // Minimal DOMMatrix polyfill to silence pdfjs warnings when not available
@@ -101,13 +104,13 @@ async function extractTextWithPdfjs(file: File) {
     const page = await doc.getPage(i)
     const content = await page.getTextContent({ includeMarkedContent: false, disableNormalization: false })
     const textItems = content.items.filter(
-      (item): item is { str: string } =>
+      (item): item is any =>
         typeof item === 'object' &&
         item !== null &&
         'str' in item &&
         typeof (item as any).str === 'string'
     )
-    const pageText = textItems.map(item => item.str).join(' ')
+    const pageText = textItems.map((item: any) => item.str).join(' ')
 
     text += pageText.trim() ? `${pageText.trim()}
 
