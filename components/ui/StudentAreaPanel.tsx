@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Bot, CheckCircle2, Crown, LockKeyhole, Mail, MessageSquare, ShieldCheck, Sparkles, UserRound } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import AvatarUpload from '@/components/ui/AvatarUpload'
 import { getSearchLimits, normalizePlanTier, type PlanTier } from '@/lib/search-plans'
 import type { Profile } from '@/types/database'
 
@@ -91,7 +90,6 @@ export default function StudentAreaPanel({
   const [emailNotice, setEmailNotice] = useState<Notice>(null)
   const [passwordNotice, setPasswordNotice] = useState<Notice>(null)
   const [profileNotice, setProfileNotice] = useState<Notice>(null)
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(initialProfile?.avatar_url ?? null)
   const [updatingEmail, setUpdatingEmail] = useState(false)
   const [updatingPassword, setUpdatingPassword] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
@@ -220,13 +218,11 @@ export default function StudentAreaPanel({
       target_exam: string | null
       exam_date: string | null
       daily_goal: number
-      avatar_url: string | null
     } = {
       name: profileForm.name.trim() || null,
       target_exam: profileForm.target_exam.trim() || null,
       exam_date: profileForm.exam_date || null,
       daily_goal: Number(profileForm.daily_goal) > 0 ? Number(profileForm.daily_goal) : 0,
-      avatar_url: avatarUrl,
     }
 
     const query = profile
@@ -417,12 +413,6 @@ export default function StudentAreaPanel({
             <section className="student-card">
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px' }}><UserRound size={18} color="var(--accent)" /><div><div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)' }}>Editar perfil</div><div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '2px' }}>Dados que personalizam a jornada do aluno.</div></div></div>
               <form onSubmit={handleProfileSave} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' }}>
-                  <AvatarUpload
-                  userId={user.id}
-                  currentAvatarUrl={avatarUrl}
-                  onUploadComplete={url => setAvatarUrl(url)}
-                />
                 <div className="student-form-grid">
                   <input className="student-field" value={profileForm.name} onChange={event => setProfileForm(current => ({ ...current, name: event.target.value }))} placeholder="Nome do aluno" />
                   <input className="student-field" type="number" min={0} value={profileForm.daily_goal} onChange={event => setProfileForm(current => ({ ...current, daily_goal: event.target.value }))} placeholder="Meta diaria em minutos" />
