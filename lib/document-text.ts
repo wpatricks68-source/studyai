@@ -1,4 +1,4 @@
-type ExtractionMode = 'plain' | 'pdf-parse' | 'ocr'
+type ExtractionMode = 'plain' | 'pdfjs' | 'pdf-parse' | 'ocr'
 
 export const SUPPORTED_DOCUMENT_TYPES = [
   'application/pdf',
@@ -89,6 +89,32 @@ async function ensurePdfPolyfills() {
   }
 }
 
+async function extractTextWithPdfjs(file: File) {
+  await ensurePdfPolyfills()
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+  const buffer = Buffer.from(await file.arrayBuffer())
+  const loadingTask = pdfjs.getDocument({ data: buffer, verbosity: pdfjs.VerbosityLevel.ERRORS })
+  const doc = await loadingTask.promise
+
+  let text = ''
+  for (let i = 1; i <= doc.numPages; i += 1) {
+    const page = await doc.getPage(i)
+    const content = await page.getTextContent({ includeMarkedContent: false, disableNormalization: false })
+    const pageText = content.items
+      .filter((item: any): item is { str: string } => typeof item === 'object' && 'str' in item && typeof item.str === 'string')
+      .map(item => item.str)
+      .join(' ')
+
+    text += pageText.trim() ? `${pageText.trim()}
+
+` : ''
+    page.cleanup()
+  }
+
+  await doc.destroy()
+  return text.trim()
+}
+
 export async function extractTextFromFile(file: File): Promise<{ content: string; extractionMode: ExtractionMode }> {
   if (!isSupportedDocumentFile(file)) {
     throw new Error('Tipo nao suportado. Use PDF, TXT, MD ou CSV')
@@ -112,15 +138,26 @@ export async function extractTextFromFile(file: File): Promise<{ content: string
     extractionMode = 'plain'
   } else if (file.type === 'application/pdf' || lowerName.endsWith('.pdf')) {
     try {
-      await ensurePdfPolyfills()
-      const pdfParseModule = await import('pdf-parse')
-      const pdfParse = (pdfParseModule as { default?: unknown }).default ?? pdfParseModule
-      const buffer = Buffer.from(await file.arrayBuffer())
-      const parsed = await (pdfParse as (input: Buffer) => Promise<{ text?: string }>)(buffer)
-      content = (parsed?.text ?? '').trim()
-      extractionMode = 'pdf-parse'
+      const pdfText = await extractTextWithPdfjs(file)
+      if (pdfText.trim()) {
+        content = pdfText.trim()
+        extractionMode = 'pdfjs'
+      } else {
+        throw new Error('PDF vazio ou sem texto extraido pelo pdfjs.')
+      }
     } catch (error) {
-      console.warn('[document-text] pdf-parse falhou, tentando OCR:', (error as Error).message)
+      console.warn('[document-text] pdfjs falhou, tentando pdf-parse:', (error as Error).message)
+      try {
+        await ensurePdfPolyfills()
+        const pdfParseModule = await import('pdf-parse')
+        const pdfParse = (pdfParseModule as { default?: unknown }).default ?? pdfParseModule
+        const buffer = Buffer.from(await file.arrayBuffer())
+        const parsed = await (pdfParse as (input: Buffer) => Promise<{ text?: string }>)(buffer)
+        content = (parsed?.text ?? '').trim()
+        extractionMode = 'pdf-parse'
+      } catch (innerError) {
+        console.warn('[document-text] pdf-parse falhou, tentando OCR:', (innerError as Error).message)
+      }
     }
 
     if (!content.trim()) {
