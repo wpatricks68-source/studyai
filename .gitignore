@@ -1,3 +1,10 @@
 node_modules
 .env.local
 .openclaude-profile.json
+/.next/
+next-env.d.ts
+*.tsbuildinfo
+.next.d.ts
+next-dev*.log
+scratch/
+tsconfig.tsbuildinfo
