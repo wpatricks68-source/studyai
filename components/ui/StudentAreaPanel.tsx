@@ -90,31 +90,11 @@ export default function StudentAreaPanel({
   const [emailNotice, setEmailNotice] = useState<Notice>(null)
   const [passwordNotice, setPasswordNotice] = useState<Notice>(null)
   const [profileNotice, setProfileNotice] = useState<Notice>(null)
-<<<<<<< HEAD
   const [updatingEmail, setUpdatingEmail] = useState(false)
   const [updatingPassword, setUpdatingPassword] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
   const [sendingRecovery, setSendingRecovery] = useState(false)
   const [recoverySent, setRecoverySent] = useState(false)
-
-=======
-  const [avatarFile, setAvatarFile] = useState<File | null>(null)
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(initialProfile?.avatar_url ?? null)
-  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null)
-  const [updatingEmail, setUpdatingEmail] = useState(false)
-  const [updatingPassword, setUpdatingPassword] = useState(false)
-  const [savingProfile, setSavingProfile] = useState(false)
-  const [uploadingAvatar, setUploadingAvatar] = useState(false)
-  const [sendingRecovery, setSendingRecovery] = useState(false)
-  const [recoverySent, setRecoverySent] = useState(false)
-
-  useEffect(() => {
-    return () => {
-      if (avatarPreviewUrl) URL.revokeObjectURL(avatarPreviewUrl)
-    }
-  }, [avatarPreviewUrl])
-
->>>>>>> 3e60a1a5667bab6c906f14ba8aa2a80e3f2ba4f6
   const effectivePlan = normalizePlanTier(profile?.plan_tier ?? normalizedPlan)
   const altoLimits = getSearchLimits(effectivePlan, 'alto')
   const advancedLimits = getSearchLimits(effectivePlan, 'advanced')
@@ -180,45 +160,6 @@ export default function StudentAreaPanel({
     setRecoverySent(true)
   }
 
-<<<<<<< HEAD
-=======
-  function handleAvatarChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.currentTarget.files?.[0]
-    if (!file) return
-
-    if (!file.type.startsWith('image/')) {
-      setProfileNotice({ tone: 'error', text: 'Escolha um arquivo de imagem valido.' })
-      return
-    }
-
-    if (avatarPreviewUrl) {
-      URL.revokeObjectURL(avatarPreviewUrl)
-    }
-
-    const preview = URL.createObjectURL(file)
-    setAvatarFile(file)
-    setAvatarPreview(preview)
-    setAvatarPreviewUrl(preview)
-  }
-
-  async function ensureAvatarBucket() {
-    const response = await fetch('/api/admin/storage/avatars', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-    })
-
-    if (response.ok) {
-      return
-    }
-
-    const body = await response.json().catch(() => null)
-    const message = body?.error || body?.message || response.statusText || 'Nao foi possivel verificar o bucket de avatar.'
-
-    throw new Error(message)
-  }
-
->>>>>>> 3e60a1a5667bab6c906f14ba8aa2a80e3f2ba4f6
   async function handlePasswordUpdate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     
@@ -276,63 +217,11 @@ export default function StudentAreaPanel({
       target_exam: string | null
       exam_date: string | null
       daily_goal: number
-<<<<<<< HEAD
-=======
-      avatar_url: string | null
->>>>>>> 3e60a1a5667bab6c906f14ba8aa2a80e3f2ba4f6
     } = {
       name: profileForm.name.trim() || null,
       target_exam: profileForm.target_exam.trim() || null,
       exam_date: profileForm.exam_date || null,
       daily_goal: Number(profileForm.daily_goal) > 0 ? Number(profileForm.daily_goal) : 0,
-<<<<<<< HEAD
-=======
-      avatar_url: null,
-    }
-
-    if (avatarFile) {
-      setUploadingAvatar(true)
-      setProfileNotice(null)
-
-      try {
-        await ensureAvatarBucket()
-      } catch (error) {
-        setSavingProfile(false)
-        setUploadingAvatar(false)
-        return setProfileNotice({ tone: 'error', text: `${error instanceof Error ? error.message : 'Falha ao verificar o bucket de avatar.'}` })
-      }
-
-      const extension = avatarFile.name.split('.').pop()?.toLowerCase() ?? 'jpg'
-      const filePath = `user-profiles/${user.id}.${extension}`
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, avatarFile, { upsert: true })
-
-      if (uploadError) {
-        setSavingProfile(false)
-        setUploadingAvatar(false)
-
-        const message = uploadError.message.includes('Bucket not found')
-          ? 'Bucket "avatars" nao encontrado no Supabase. Verifique se o bucket existe ou se o nome esta correto.'
-          : `Erro ao enviar avatar: ${uploadError.message}`
-
-        return setProfileNotice({ tone: 'error', text: message })
-      }
-
-      const { data: publicUrlData } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath)
-
-      if (!publicUrlData?.publicUrl) {
-        setSavingProfile(false)
-        setUploadingAvatar(false)
-        return setProfileNotice({ tone: 'error', text: 'Erro ao obter URL do avatar.' })
-      }
-
-      payload.avatar_url = publicUrlData.publicUrl
-      setUploadingAvatar(false)
->>>>>>> 3e60a1a5667bab6c906f14ba8aa2a80e3f2ba4f6
     }
 
     const query = profile
@@ -523,38 +412,6 @@ export default function StudentAreaPanel({
             <section className="student-card">
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px' }}><UserRound size={18} color="var(--accent)" /><div><div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)' }}>Editar perfil</div><div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '2px' }}>Dados que personalizam a jornada do aluno.</div></div></div>
               <form onSubmit={handleProfileSave} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-<<<<<<< HEAD
-=======
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' }}>
-                  <div style={{ width: '90px', height: '90px', borderRadius: '24px', overflow: 'hidden', background: 'rgba(255,255,255,.06)', border: '1px solid var(--border)' }}>
-                    {avatarPreview ? (
-                      <img src={avatarPreview} alt="Avatar do aluno" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', color: 'var(--muted)', fontSize: '12px', textAlign: 'center', padding: '12px' }}>
-                        Sem avatar
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <label className="student-button" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', background: 'var(--accent)', color: '#fff' }}>
-                      Selecionar imagem
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleAvatarChange}
-                        style={{ display: 'none' }}
-                      />
-                    </label>
-                    {avatarFile ? (
-                      <span style={{ fontSize: '12px', color: 'var(--muted)' }}>{avatarFile.name}</span>
-                    ) : profile?.avatar_url ? (
-                      <span style={{ fontSize: '12px', color: 'var(--muted)' }}>Avatar atual carregado</span>
-                    ) : (
-                      <span style={{ fontSize: '12px', color: 'var(--muted)' }}>Envie uma foto para personalizar o perfil.</span>
-                    )}
-                  </div>
-                </div>
->>>>>>> 3e60a1a5667bab6c906f14ba8aa2a80e3f2ba4f6
                 <div className="student-form-grid">
                   <input className="student-field" value={profileForm.name} onChange={event => setProfileForm(current => ({ ...current, name: event.target.value }))} placeholder="Nome do aluno" />
                   <input className="student-field" type="number" min={0} value={profileForm.daily_goal} onChange={event => setProfileForm(current => ({ ...current, daily_goal: event.target.value }))} placeholder="Meta diaria em minutos" />
@@ -565,16 +422,9 @@ export default function StudentAreaPanel({
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
                   <div style={{ fontSize: '12px', color: 'var(--muted)' }}>Plano vinculado: <strong style={{ color: 'var(--text)' }}>{getPlanLabel(effectivePlan)}</strong></div>
-<<<<<<< HEAD
                   <button className="student-button" type="submit" disabled={savingProfile} style={{ background: 'var(--accent)', color: '#fff' }}>{savingProfile ? 'Salvando...' : 'Salvar perfil'}</button>
                 </div>
                 {profileNotice && <div style={{ ...noticeStyle(profileNotice.tone), borderRadius: '10px', padding: '11px 13px', fontSize: '13px', lineHeight: 1.6 }}>{profileNotice.text}</div>}
-              </div>
-=======
-                  <button className="student-button" type="submit" disabled={savingProfile || uploadingAvatar} style={{ background: 'var(--accent)', color: '#fff' }}>{savingProfile || uploadingAvatar ? 'Salvando...' : 'Salvar perfil'}</button>
-                </div>
-                {profileNotice && <div style={{ ...noticeStyle(profileNotice.tone), borderRadius: '10px', padding: '11px 13px', fontSize: '13px', lineHeight: 1.6 }}>{profileNotice.text}</div>}
->>>>>>> 3e60a1a5667bab6c906f14ba8aa2a80e3f2ba4f6
               </form>
             </section>
           </div>
