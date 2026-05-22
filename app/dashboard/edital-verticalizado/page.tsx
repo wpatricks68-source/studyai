@@ -174,6 +174,7 @@ export default function EditalVerticalizadoPage() {
   const [editorMode, setEditorMode] = useState<'create' | 'edit'>('create')
   const [editingGroupKey, setEditingGroupKey] = useState<string | null>(null)
   const [manualForm, setManualForm] = useState<ManualForm>(emptyForm)
+  const [addNewTema, setAddNewTema] = useState(false)
   const [savingManual, setSavingManual] = useState(false)
   const [expandedDisciplines, setExpandedDisciplines] = useState<Record<string, boolean>>({})
   const [titleDraft, setTitleDraft] = useState('')
@@ -533,6 +534,7 @@ export default function EditalVerticalizadoPage() {
       tema: group.tema,
       subtemas: group.topics.map(topic => topic.subtema).join('\n'),
     })
+    setAddNewTema(false)
     setEditorOpen(true)
   }
 
@@ -559,6 +561,46 @@ export default function EditalVerticalizadoPage() {
     setSavingManual(true)
     const supabase = createClient()
     const boardTopics = topicsByBoard[activeBoard.id] ?? []
+
+    // If editing but user chose to add a new tema within the same disciplina,
+    // treat this as a create action that appends new topics for that disciplina/tema.
+    if (editorMode === 'edit' && addNewTema) {
+      const baseOrder = boardTopics.length
+      const payload = subtemas.map((subtema, index) => ({
+        board_id: activeBoard.id,
+        user_id: userId,
+        disciplina,
+        tema,
+        subtema,
+        order_index: baseOrder + index,
+      }))
+
+      const { data, error } = await supabase
+        .from('edital_topics')
+        .insert(payload)
+        .select('*')
+
+      setSavingManual(false)
+
+      if (error) {
+        setDbError(error.message)
+        return
+      }
+
+      const savedTopics = (data ?? []) as EditalTopic[]
+      setTopicsByBoard(prev => ({
+        ...prev,
+        [activeBoard.id]: [...(prev[activeBoard.id] ?? []), ...savedTopics],
+      }))
+      setExpandedDisciplines(prev => ({ ...prev, [disciplina]: true }))
+      closeEditor()
+      setNotice(
+        savedTopics.length > 1
+          ? `${savedTopics.length} subtemas adicionados ao novo tema "${tema}".`
+          : 'Novo tema adicionado na disciplina.'
+      )
+      return
+    }
 
     if (editorMode === 'create') {
       const baseOrder = boardTopics.length
@@ -1575,6 +1617,30 @@ export default function EditalVerticalizadoPage() {
                   placeholder="Ex.: Controle de constitucionalidade"
                 />
               </div>
+
+              {editorMode === 'edit' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <button
+                    type="button"
+                    onClick={() => setAddNewTema(prev => !prev)}
+                    aria-pressed={addNewTema}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '8px 12px',
+                      borderRadius: 10,
+                      border: addNewTema ? '1px solid rgba(124,108,255,.96)' : '1px solid var(--border)',
+                      background: addNewTema ? 'linear-gradient(135deg, rgba(124,108,255,.12), rgba(124,108,255,.06))' : 'transparent',
+                      cursor: 'pointer',
+                      color: 'var(--text)'
+                    }}
+                  >
+                    <span style={{ fontSize: 13, fontWeight: 700 }}>{addNewTema ? 'Novo tema: ativado' : 'Adicionar novo tema'}</span>
+                    <span style={{ fontSize: 12, color: 'var(--muted,#6b7194)' }}>{addNewTema ? 'O envio criará um novo tema nesta disciplina.' : 'Criar novo tema em vez de editar o atual'}</span>
+                  </button>
+                </div>
+              )}
 
               <div>
                 <label style={labelStyle}>Subtemas</label>
