@@ -277,12 +277,6 @@ export default function EditalVerticalizadoPage() {
       return null
     }
 
-    // Bloquear criacao para usuarios nao-premium com 3 ou mais boards
-    if (planTier !== 'premium' && boards.length >= 3) {
-      setNotice('Voce atingiu o limite de 3 editais do seu plano. Exclua um edital existente ou faca upgrade para o Premium para criar mais.')
-      return null
-    }
-
     setSavingBoard(true)
 
     const { data, error } = await supabase
