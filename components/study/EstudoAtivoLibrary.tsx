@@ -940,6 +940,8 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
                   cards={topicGroup.flashcards} 
                   externalDifficulties={liveDifficulties}
                   onRate={(id, level) => handleRate(id, level)}
+                  onDelete={() => router.refresh()}
+                  onEdit={() => router.refresh()}
                 />
               ) : (
                 <QuestoesPanel questions={topicGroup.questions} />
@@ -1018,6 +1020,8 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
                     cards={topicGroup.flashcards} 
                     externalDifficulties={liveDifficulties}
                     onRate={(id, level) => handleRate(id, level)} 
+                    onDelete={() => router.refresh()}
+                    onEdit={() => router.refresh()}
                   />
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '30px', margin: '0 auto', maxWidth: '800px' }}>
@@ -1028,6 +1032,8 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
                           externalDifficulties={liveDifficulties}
                           isLarge={true} 
                           onRate={(id, level) => handleRate(id, level)}
+                          onDelete={() => router.refresh()}
+                          onEdit={() => router.refresh()}
                         />
                       ) : (
                         <div style={{ padding: '60px', textAlign: 'center', background: 'var(--surface,#111420)', borderRadius: '16px', border: '1px solid var(--border,#1f2640)' }}>
@@ -1258,9 +1264,48 @@ function ImportContentModal({
   )
 }
 
-function FlashcardsPanel({ cards, isLarge = false, onRate, externalDifficulties }: { cards: Flashcard[], isLarge?: boolean, onRate?: (id: string, level: number) => void, externalDifficulties?: Record<string, number> }) {
+function FlashcardsPanel({ cards, isLarge = false, onRate, externalDifficulties, onDelete, onEdit }: {
+  cards: Flashcard[],
+  isLarge?: boolean,
+  onRate?: (id: string, level: number) => void,
+  externalDifficulties?: Record<string, number>,
+  onDelete?: (id: string) => void,
+  onEdit?: () => void,
+}) {
   const [flipped, setFlipped] = useState<Record<string, boolean>>({})
   const [internalDifficulties, setInternalDifficulties] = useState<Record<string, number>>({})
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [editingCard, setEditingCard] = useState<Flashcard | null>(null)
+  const [editFront, setEditFront] = useState('')
+  const [editBack, setEditBack] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
+
+  useEffect(() => {
+    if (!openMenuId) return
+    const close = () => setOpenMenuId(null)
+    window.addEventListener('click', close)
+    return () => window.removeEventListener('click', close)
+  }, [openMenuId])
+
+  const handleDeleteCard = async (id: string) => {
+    if (!confirm('Excluir este flashcard?')) return
+    const supabase = createClient()
+    await supabase.from('flashcards').delete().eq('id', id)
+    setOpenMenuId(null)
+    if (onDelete) onDelete(id)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingCard) return
+    setEditSaving(true)
+    const supabase = createClient()
+    const { error } = await supabase.from('flashcards').update({ front: editFront, back: editBack }).eq('id', editingCard.id)
+    if (!error) {
+      setEditingCard(null)
+      if (onEdit) onEdit()
+    }
+    setEditSaving(false)
+  }
 
   // Merge internal and external difficulties
   const difficulties = externalDifficulties || internalDifficulties
@@ -1357,13 +1402,35 @@ function FlashcardsPanel({ cards, isLarge = false, onRate, externalDifficulties 
                 onClick={() => !isFlipped && setFlipped(f => ({ ...f, [card.id]: true }))}
               >
                 {/* FRONT */}
-                <div className="card-front" style={{ background: bg, borderColor: diff > 0 ? dotColor : 'var(--border,#1f2640)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                    <div style={{ fontSize: isLarge ? '13px' : '10px', color: dotColor, textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>
-                      Frente
+                  <div className="card-front" style={{ background: bg, borderColor: diff > 0 ? dotColor : 'var(--border,#1f2640)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                      <div style={{ fontSize: isLarge ? '13px' : '10px', color: dotColor, textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>
+                        Frente
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', position: 'relative' }}>
+                        {diff > 0 && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: dotColor }} />}
+                        <button
+                          onClick={e => { e.stopPropagation(); setOpenMenuId(openMenuId === card.id ? null : card.id) }}
+                          style={{ background: 'transparent', border: 'none', color: 'var(--muted,#6b7194)', cursor: 'pointer', padding: '2px 4px', borderRadius: '4px', fontSize: '16px', fontWeight: 700, lineHeight: 1, letterSpacing: '1px' }}
+                        >...</button>
+                        {openMenuId === card.id && (
+                          <div style={{ position: 'absolute', top: '26px', right: '0', zIndex: 50, background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,.4)', overflow: 'hidden', minWidth: '120px' }}>
+                            <button
+                              onClick={e => { e.stopPropagation(); setEditingCard(card); setEditFront(card.front); setEditBack(card.back); setOpenMenuId(null) }}
+                              style={{ width: '100%', padding: '8px 14px', border: 'none', background: 'transparent', color: 'var(--text,#e8eaf6)', fontSize: '12px', fontWeight: 500, cursor: 'pointer', textAlign: 'left', display: 'block' }}
+                              onMouseOver={e => e.currentTarget.style.background = 'var(--surface2,#181d2e)'}
+                              onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                            >Editar</button>
+                            <button
+                              onClick={e => { e.stopPropagation(); handleDeleteCard(card.id) }}
+                              style={{ width: '100%', padding: '8px 14px', border: 'none', background: 'transparent', color: '#ef4444', fontSize: '12px', fontWeight: 500, cursor: 'pointer', textAlign: 'left', display: 'block' }}
+                              onMouseOver={e => e.currentTarget.style.background = 'rgba(239,68,68,.1)'}
+                              onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                            >Excluir</button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    {diff > 0 && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: dotColor }} />}
-                  </div>
                   <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isLarge ? '0 30px' : '0' }}>
                     <div style={{ fontSize: isLarge ? '24px' : '14px', color: 'var(--text,#e8eaf6)', lineHeight: 1.6, fontWeight: 600 }}>
                       {card.front}
@@ -1414,6 +1481,39 @@ function FlashcardsPanel({ cards, isLarge = false, onRate, externalDifficulties 
           )
         })}
       </div>
+
+      {/* ── Edit Modal ── */}
+      {editingCard && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(3,5,12,.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '18px' }} onClick={() => !editSaving && setEditingCard(null)}>
+          <div style={{ width: '100%', maxWidth: '520px', background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)', borderRadius: '12px', color: 'var(--text,#e8eaf6)', boxShadow: '0 24px 70px rgba(0,0,0,.45)', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 18px', borderBottom: '1px solid var(--border,#1f2640)' }}>
+              <div style={{ fontSize: '16px', fontWeight: 800 }}>Editar Flashcard</div>
+              <button onClick={() => setEditingCard(null)} disabled={editSaving} style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)', background: 'var(--surface2,#181d2e)', color: 'var(--text,#e8eaf6)', cursor: editSaving ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={16} />
+              </button>
+            </div>
+            <div style={{ padding: '18px', display: 'grid', gap: '14px' }}>
+              <label style={{ display: 'grid', gap: '7px', fontSize: '12px', fontWeight: 700 }}>
+                Frente
+                <textarea value={editFront} onChange={e => setEditFront(e.target.value)} disabled={editSaving} style={{ minHeight: '80px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)', background: 'var(--surface2,#181d2e)', color: 'var(--text,#e8eaf6)', padding: '10px 12px', fontSize: '13px', lineHeight: 1.5, resize: 'vertical', fontFamily: 'inherit' }} />
+              </label>
+              <label style={{ display: 'grid', gap: '7px', fontSize: '12px', fontWeight: 700 }}>
+                Verso
+                <textarea value={editBack} onChange={e => setEditBack(e.target.value)} disabled={editSaving} style={{ minHeight: '80px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)', background: 'var(--surface2,#181d2e)', color: 'var(--text,#e8eaf6)', padding: '10px 12px', fontSize: '13px', lineHeight: 1.5, resize: 'vertical', fontFamily: 'inherit' }} />
+              </label>
+            </div>
+            <div style={{ padding: '14px 18px', borderTop: '1px solid var(--border,#1f2640)', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button onClick={() => setEditingCard(null)} disabled={editSaving} style={{ minHeight: '38px', padding: '0 14px', borderRadius: '8px', border: '1px solid var(--border,#1f2640)', background: 'transparent', color: 'var(--muted,#6b7194)', fontSize: '13px', fontWeight: 700, cursor: editSaving ? 'default' : 'pointer' }}>
+                Cancelar
+              </button>
+              <button onClick={handleSaveEdit} disabled={editSaving} style={{ minHeight: '38px', padding: '0 16px', borderRadius: '8px', border: 'none', background: editSaving ? 'var(--surface2,#181d2e)' : 'var(--accent,#6c63ff)', color: editSaving ? 'var(--muted,#6b7194)' : '#fff', fontSize: '13px', fontWeight: 800, cursor: editSaving ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {editSaving ? <Loader2 size={15} /> : null}
+                {editSaving ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
