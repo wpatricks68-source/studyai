@@ -1399,7 +1399,7 @@ function FlashcardsPanel({ cards, isLarge = false, onRate, externalDifficulties,
             <div key={card.id} className="scene" style={{ height: isLarge ? '380px' : '160px' }}>
               <div 
                 className={`card-inner ${isFlipped ? 'card-flipped' : ''}`}
-                onClick={() => !isFlipped && setFlipped(f => ({ ...f, [card.id]: true }))}
+                onClick={() => setFlipped(f => ({ ...f, [card.id]: !f[card.id] }))}
               >
                 {/* FRONT */}
                   <div className="card-front" style={{ background: bg, borderColor: diff > 0 ? dotColor : 'var(--border,#1f2640)' }}>
@@ -1408,11 +1408,11 @@ function FlashcardsPanel({ cards, isLarge = false, onRate, externalDifficulties,
                         Frente
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', position: 'relative' }}>
-                        {diff > 0 && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: dotColor }} />}
                         <button
                           onClick={e => { e.stopPropagation(); setOpenMenuId(openMenuId === card.id ? null : card.id) }}
                           style={{ background: 'transparent', border: 'none', color: 'var(--muted,#6b7194)', cursor: 'pointer', padding: '2px 4px', borderRadius: '4px', fontSize: '16px', fontWeight: 700, lineHeight: 1, letterSpacing: '1px' }}
                         >...</button>
+                        {diff > 0 && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: dotColor }} />}
                         {openMenuId === card.id && (
                           <div style={{ position: 'absolute', top: '26px', right: '0', zIndex: 50, background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,.4)', overflow: 'hidden', minWidth: '120px' }}>
                             <button
