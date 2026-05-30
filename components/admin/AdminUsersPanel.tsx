@@ -1,8 +1,8 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search } from 'lucide-react'
+import { Search, Pencil, X } from 'lucide-react'
 
 type AdminUserRow = {
   id: string
@@ -26,688 +26,917 @@ type Notice =
 
 const PLAN_OPTIONS = [
   { value: 'gratuito', label: 'Gratuito' },
-  { value: 'basico', label: 'Basico' },
-  { value: 'premium', label: 'Premium' },
+  { value: 'basico',   label: 'Básico'   },
+  { value: 'premium',  label: 'Premium'  },
 ] as const
 
 const ROLE_OPTIONS = [
-  { value: 'user', label: 'User' },
+  { value: 'user',  label: 'User'  },
   { value: 'admin', label: 'Admin' },
 ] as const
 
 function formatDate(value: string) {
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return 'Nao informado'
-
+  if (Number.isNaN(date.getTime())) return 'Não informado'
   return new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
+    day: '2-digit', month: '2-digit', year: 'numeric',
   }).format(date)
 }
 
 function formatUserId(value: string) {
   if (!value) return 'Sem identificador'
-  return `${value.slice(0, 8)}...${value.slice(-4)}`
+  return `${value.slice(0, 8)}…${value.slice(-4)}`
 }
 
 function noticeStyles(tone: 'success' | 'error' | 'neutral') {
-  if (tone === 'success') {
-    return {
-      border: '1px solid rgba(16,185,129,.25)',
-      background: 'rgba(16,185,129,.1)',
-      color: '#34d399',
-    }
-  }
-
-  if (tone === 'error') {
-    return {
-      border: '1px solid rgba(239,68,68,.25)',
-      background: 'rgba(239,68,68,.1)',
-      color: '#f87171',
-    }
-  }
-
-  return {
-    border: '1px solid rgba(245,158,11,.25)',
-    background: 'rgba(245,158,11,.1)',
-    color: '#fbbf24',
-  }
+  if (tone === 'success') return { border: '1px solid rgba(16,185,129,.25)', background: 'rgba(16,185,129,.1)', color: '#34d399' }
+  if (tone === 'error')   return { border: '1px solid rgba(239,68,68,.25)',  background: 'rgba(239,68,68,.1)',  color: '#f87171' }
+  return { border: '1px solid rgba(245,158,11,.25)', background: 'rgba(245,158,11,.1)', color: '#fbbf24' }
 }
 
-function normalizeSearchValue(value: string) {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim()
+function normalize(value: string) {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+}
+
+function planColor(plan: string | null) {
+  if (plan === 'premium') return '#60a5fa'
+  if (plan === 'basico')  return '#34d399'
+  return '#6b7194'
 }
 
 export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
-  const router = useRouter()
+  const router     = useRouter()
   const [isPending, startTransition] = useTransition()
-  const [search, setSearch] = useState('')
-  const [roleFilter, setRoleFilter] = useState<'all' | 'user' | 'admin'>('all')
-  const [planFilter, setPlanFilter] = useState<'all' | 'gratuito' | 'basico' | 'premium'>('all')
-  const [usageFilter, setUsageFilter] = useState<'all' | 'used_today' | 'no_usage_today'>('all')
+
+  /* ── search ──────────────────────────────────────────── */
+  const [search,          setSearch]          = useState('')
+  const [searchFocused,   setSearchFocused]   = useState(false)
+  const searchRef   = useRef<HTMLDivElement>(null)
+  const inputRef    = useRef<HTMLInputElement>(null)
+
+  /* ── filters ─────────────────────────────────────────── */
+  const [roleFilter,   setRoleFilter]   = useState<'all' | 'user' | 'admin'>('all')
+  const [planFilter,   setPlanFilter]   = useState<'all' | 'gratuito' | 'basico' | 'premium'>('all')
+  const [usageFilter,  setUsageFilter]  = useState<'all' | 'used_today' | 'no_usage_today'>('all')
+
+  /* ── drafts / modal ──────────────────────────────────── */
   const [drafts, setDrafts] = useState<Record<string, { planTier: string; role: string }>>(
-    Object.fromEntries(
-      users.map(user => [
-        user.id,
-        {
-          planTier: user.plan_tier ?? 'gratuito',
-          role: user.role === 'admin' ? 'admin' : 'user',
-        },
-      ])
-    )
+    Object.fromEntries(users.map(u => [u.id, {
+      planTier: u.plan_tier ?? 'gratuito',
+      role:     u.role === 'admin' ? 'admin' : 'user',
+    }]))
   )
-  const [savingUserId, setSavingUserId] = useState<string | null>(null)
-  const [notice, setNotice] = useState<Notice>(null)
+  const [savingUserId,   setSavingUserId]   = useState<string | null>(null)
+  const [notice,         setNotice]         = useState<Notice>(null)
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
 
+  /* ── computed ─────────────────────────────────────────── */
   const filteredUsers = useMemo(() => {
-    const searchTokens = normalizeSearchValue(search).split(/\s+/).filter(Boolean)
-
+    const tokens = normalize(search).split(/\s+/).filter(Boolean)
     return users.filter(user => {
       const haystack = [
-        user.name ?? '',
-        user.email ?? '',
-        user.id,
-        user.id.replaceAll('-', ''),
-        formatUserId(user.id),
-        user.target_exam ?? '',
-        user.plan_tier ?? '',
-        user.role ?? '',
-      ]
-        .join(' ')
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase()
+        user.name ?? '', user.email ?? '', user.id,
+        user.id.replaceAll('-', ''), formatUserId(user.id),
+        user.target_exam ?? '', user.plan_tier ?? '', user.role ?? '',
+      ].join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 
-      if (searchTokens.length > 0 && !searchTokens.every(token => haystack.includes(token))) return false
-      if (roleFilter !== 'all' && (user.role === 'admin' ? 'admin' : 'user') !== roleFilter) return false
-      if (planFilter !== 'all' && (user.plan_tier ?? 'gratuito') !== planFilter) return false
+      if (tokens.length > 0 && !tokens.every(t => haystack.includes(t))) return false
+      if (roleFilter  !== 'all' && (user.role === 'admin' ? 'admin' : 'user') !== roleFilter)  return false
+      if (planFilter  !== 'all' && (user.plan_tier ?? 'gratuito') !== planFilter)               return false
 
-      const hasUsageToday = user.alto_today > 0 || user.advanced_today > 0
-      if (usageFilter === 'used_today' && !hasUsageToday) return false
-      if (usageFilter === 'no_usage_today' && hasUsageToday) return false
-
+      const hasUsage = user.alto_today > 0 || user.advanced_today > 0
+      if (usageFilter === 'used_today'     && !hasUsage) return false
+      if (usageFilter === 'no_usage_today' &&  hasUsage) return false
       return true
     })
   }, [users, search, roleFilter, planFilter, usageFilter])
 
-  const totalWithUsageToday = users.filter(user => user.alto_today > 0 || user.advanced_today > 0).length
-  const totalAdmins = users.filter(user => user.role === 'admin').length
-  const totalPremium = users.filter(user => user.plan_tier === 'premium').length
-  const selectedUser = selectedUserId ? users.find(user => user.id === selectedUserId) ?? null : null
+  /* autocomplete suggestions: first 8 of filtered when searching */
+  const suggestions = useMemo(() => {
+    if (!search.trim()) return []
+    return filteredUsers.slice(0, 8)
+  }, [filteredUsers, search])
+
+  const totalWithUsageToday = users.filter(u => u.alto_today > 0 || u.advanced_today > 0).length
+  const totalAdmins  = users.filter(u => u.role === 'admin').length
+  const totalPremium = users.filter(u => u.plan_tier === 'premium').length
+
+  const selectedUser  = selectedUserId ? users.find(u => u.id === selectedUserId) ?? null : null
   const selectedDraft = selectedUser
-    ? drafts[selectedUser.id] ?? {
-        planTier: selectedUser.plan_tier ?? 'gratuito',
-        role: selectedUser.role === 'admin' ? 'admin' : 'user',
-      }
+    ? drafts[selectedUser.id] ?? { planTier: selectedUser.plan_tier ?? 'gratuito', role: selectedUser.role === 'admin' ? 'admin' : 'user' }
     : null
 
+  /* close autocomplete on outside click */
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchFocused(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  /* ── save ─────────────────────────────────────────────── */
   async function handleSave(userId: string) {
     const draft = drafts[userId]
     if (!draft) return
-
     setSavingUserId(userId)
     setNotice(null)
-
     try {
       const response = await fetch(`/api/admin/users/${userId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          planTier: draft.planTier,
-          role: draft.role,
-        }),
+        body: JSON.stringify({ planTier: draft.planTier, role: draft.role }),
       })
-
       const data = await response.json().catch(() => ({}))
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Nao foi possivel atualizar o usuario.')
-      }
-
-      setNotice({
-        tone: data.auditWarning ? 'neutral' : 'success',
-        text: data.message || 'Alteracoes salvas com sucesso.',
-      })
+      if (!response.ok) throw new Error(data.error || 'Não foi possível atualizar o usuário.')
+      setNotice({ tone: data.auditWarning ? 'neutral' : 'success', text: data.message || 'Alterações salvas com sucesso.' })
       setSelectedUserId(null)
       startTransition(() => router.refresh())
     } catch (error) {
-      setNotice({
-        tone: 'error',
-        text: error instanceof Error ? error.message : 'Falha inesperada ao atualizar o usuario.',
-      })
+      setNotice({ tone: 'error', text: error instanceof Error ? error.message : 'Falha inesperada ao atualizar o usuário.' })
     } finally {
       setSavingUserId(null)
     }
   }
 
+  const isSaveDisabled = (user: AdminUserRow) =>
+    savingUserId === user.id ||
+    isPending ||
+    (
+      selectedDraft?.planTier === (user.plan_tier ?? 'gratuito') &&
+      selectedDraft?.role     === (user.role === 'admin' ? 'admin' : 'user')
+    )
+
   return (
     <>
       <style>{`
-        .admin-users-desktop {
-          display: block;
-          width: 100%;
+        /* ── Variables ── */
+        :root {
+          --surf:   #111420;
+          --surf2:  #181d2e;
+          --border: #1f2640;
+          --text:   #e8eaf6;
+          --muted:  #6b7194;
+          --accent: #6c63ff;
         }
-        .admin-users-wrap {
-          padding: 14px 16px 16px;
-          border-bottom: 1px solid rgba(255,255,255,0.06);
-          background: rgba(7,10,18,.08);
+
+        /* ── Shell ── */
+        .aup-shell {
+          background: var(--surf);
+          border: 1px solid var(--border);
+          border-radius: 18px;
+          overflow: hidden;
         }
-        .admin-users-preview-head {
+
+        /* ── Header ── */
+        .aup-header {
+          padding: 18px 20px;
+          border-bottom: 1px solid var(--border);
           display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 16px;
+          flex-wrap: wrap;
+        }
+        .aup-stats {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(110px, 1fr));
+          gap: 10px;
+          min-width: 340px;
+        }
+        .aup-stat {
+          background: var(--surf2);
+          border: 1px solid var(--border);
+          border-radius: 14px;
+          padding: 12px 14px;
+        }
+        .aup-stat-label {
+          font-size: 10px;
+          color: var(--muted);
+          text-transform: uppercase;
+          letter-spacing: 1px;
+        }
+        .aup-stat-value {
+          font-size: 24px;
+          font-weight: 800;
+          margin-top: 6px;
+        }
+
+        /* ── Filters ── */
+        .aup-filters {
+          padding: 14px 20px;
+          border-bottom: 1px solid var(--border);
+          display: grid;
+          grid-template-columns: minmax(260px, 2fr) repeat(3, minmax(150px, 1fr));
+          align-items: center;
+          gap: 12px;
+        }
+        .aup-filters > * { min-width: 0; }
+
+        /* ── Search wrapper ── */
+        .aup-search-wrap {
+          position: relative;
+        }
+        .aup-search-icon {
+          position: absolute;
+          left: 13px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: var(--muted);
+          pointer-events: none;
+        }
+        .aup-search-input {
+          width: 100%;
+          background: var(--surf2);
+          border: 1px solid var(--border);
+          border-radius: 10px;
+          color: var(--text);
+          padding: 10px 12px 10px 38px;
+          font-size: 13px;
+          outline: none;
+          transition: border-color .15s;
+          box-sizing: border-box;
+        }
+        .aup-search-input:focus {
+          border-color: rgba(108,99,255,.5);
+        }
+
+        /* ── Autocomplete dropdown ── */
+        .aup-autocomplete {
+          position: absolute;
+          top: calc(100% + 6px);
+          left: 0;
+          right: 0;
+          background: var(--surf2);
+          border: 1px solid rgba(108,99,255,.35);
+          border-radius: 12px;
+          overflow: hidden;
+          z-index: 60;
+          box-shadow: 0 16px 48px rgba(0,0,0,.5);
+          animation: aup-fade-in .12s ease;
+        }
+        @keyframes aup-fade-in {
+          from { opacity: 0; transform: translateY(-4px); }
+          to   { opacity: 1; transform: translateY(0);    }
+        }
+        .aup-autocomplete-header {
+          padding: 8px 14px;
+          font-size: 10px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          color: var(--muted);
+          border-bottom: 1px solid var(--border);
+        }
+        .aup-suggestion {
+          width: 100%;
+          display: flex;
+          align-items: center;
           justify-content: space-between;
           gap: 12px;
-          color: var(--muted,#6b7194);
-          font-size: 11px;
-          padding: 0 2px 10px;
-        }
-        .admin-users-results {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-          gap: 10px;
-          max-height: 244px;
-          overflow-y: scroll;
-          scrollbar-gutter: stable;
-          padding-right: 6px;
-        }
-        .admin-user-preview {
-          text-align: left;
-          width: 100%;
-          min-height: 104px;
-          padding: 13px 14px;
-          border: 1px solid var(--border,#1f2640);
-          border-radius: 12px;
-          background: var(--surface,#111420);
-          color: var(--text,#e8eaf6);
+          padding: 10px 14px;
+          border: none;
+          background: transparent;
+          color: var(--text);
           cursor: pointer;
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
+          text-align: left;
+          border-bottom: 1px solid rgba(255,255,255,.04);
+          transition: background .1s;
         }
-        .admin-user-preview:hover,
-        .admin-user-preview:focus-visible {
-          background: rgba(255,255,255,0.025);
-          border-color: rgba(108,99,255,.38);
+        .aup-suggestion:last-child { border-bottom: none; }
+        .aup-suggestion:hover, .aup-suggestion:focus-visible {
+          background: rgba(108,99,255,.1);
           outline: none;
         }
-        .admin-user-preview-main {
-          display: flex;
-          justify-content: space-between;
-          gap: 12px;
-        }
-        .admin-user-preview-name {
-          color: var(--text,#e8eaf6);
+        .aup-suggestion-name {
           font-size: 13px;
-          font-weight: 800;
+          font-weight: 700;
+          color: var(--text);
+          white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          white-space: nowrap;
         }
-        .admin-user-preview-email,
-        .admin-user-preview-id,
-        .admin-user-preview-meta {
-          color: var(--muted,#6b7194);
-          font-size: 12px;
+        .aup-suggestion-email {
+          font-size: 11px;
+          color: var(--muted);
+          white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          white-space: nowrap;
         }
-        .admin-user-preview-tags {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-        }
-        .admin-user-tag {
+        .aup-suggestion-badge {
           border: 1px solid rgba(255,255,255,.08);
           border-radius: 999px;
-          padding: 5px 8px;
-          color: var(--muted,#6b7194);
+          padding: 3px 8px;
+          font-size: 10px;
+          font-weight: 700;
+          flex-shrink: 0;
+        }
+        .aup-autocomplete-empty {
+          padding: 14px;
+          text-align: center;
+          font-size: 12px;
+          color: var(--muted);
+        }
+
+        /* ── Filter selects ── */
+        .aup-select {
+          width: 100%;
+          background: var(--surf2);
+          border: 1px solid var(--border);
+          border-radius: 10px;
+          color: var(--text);
+          padding: 10px 12px;
+          font-size: 13px;
+          outline: none;
+          cursor: pointer;
+          transition: border-color .15s;
+        }
+        .aup-select:focus { border-color: rgba(108,99,255,.5); }
+
+        /* ── Notice ── */
+        .aup-notice {
+          margin: 14px 20px 0;
+          padding: 12px 14px;
+          border-radius: 12px;
+          font-size: 13px;
+        }
+
+        /* ── Table section ── */
+        .aup-table-meta {
+          padding: 10px 20px;
+          border-bottom: 1px solid var(--border);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          font-size: 11px;
+          color: var(--muted);
+        }
+        .aup-table-wrap {
+          overflow-x: auto;
+          scrollbar-gutter: stable;
+        }
+        .aup-table {
+          width: 100%;
+          border-collapse: collapse;
+          min-width: 820px;
+        }
+        .aup-table thead th {
+          padding: 11px 14px;
+          font-size: 10px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          color: var(--muted);
+          text-align: left;
+          white-space: nowrap;
+          border-bottom: 1px solid var(--border);
+          background: rgba(7,10,18,.3);
+          position: sticky;
+          top: 0;
+        }
+        .aup-table tbody tr {
+          border-bottom: 1px solid rgba(255,255,255,.04);
+          transition: background .12s;
+        }
+        .aup-table tbody tr:hover {
+          background: rgba(108,99,255,.06);
+        }
+        .aup-table tbody tr:last-child {
+          border-bottom: none;
+        }
+        .aup-table td {
+          padding: 12px 14px;
+          font-size: 13px;
+          color: var(--text);
+          vertical-align: middle;
+        }
+        .aup-cell-user-name {
+          font-size: 13px;
+          font-weight: 700;
+          color: var(--text);
+          white-space: nowrap;
+        }
+        .aup-cell-user-email {
+          font-size: 11px;
+          color: var(--muted);
+          white-space: nowrap;
+          margin-top: 2px;
+        }
+        .aup-cell-user-id {
+          font-size: 10px;
+          color: rgba(107,113,148,.6);
+          margin-top: 2px;
+          font-family: monospace;
+        }
+        .aup-role-badge {
+          display: inline-flex;
+          align-items: center;
+          border-radius: 999px;
+          padding: 4px 10px;
           font-size: 11px;
           font-weight: 700;
         }
-        .admin-users-empty {
-          min-height: 120px;
-          display: flex;
+        .aup-plan-badge {
+          display: inline-flex;
           align-items: center;
-          justify-content: center;
-          padding: 22px 14px;
-          color: var(--muted,#6b7194);
-          text-align: center;
-          border: 1px solid var(--border,#1f2640);
-          border-radius: 12px;
-          background: var(--surface,#111420);
+          border-radius: 999px;
+          padding: 4px 10px;
+          font-size: 11px;
+          font-weight: 700;
+          border: 1px solid rgba(255,255,255,.08);
         }
-        .admin-user-dialog-backdrop {
+        .aup-usage-cell {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        .aup-usage-alto {
+          font-size: 12px;
+          color: #34d399;
+          font-weight: 700;
+        }
+        .aup-usage-adv {
+          font-size: 12px;
+          color: #60a5fa;
+          font-weight: 700;
+        }
+        .aup-edit-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 7px 12px;
+          background: rgba(108,99,255,.12);
+          border: 1px solid rgba(108,99,255,.25);
+          border-radius: 8px;
+          color: #a5b4fc;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: background .14s, border-color .14s;
+          white-space: nowrap;
+        }
+        .aup-edit-btn:hover {
+          background: rgba(108,99,255,.22);
+          border-color: rgba(108,99,255,.5);
+        }
+        .aup-empty {
+          padding: 44px 20px;
+          text-align: center;
+          color: var(--muted);
+          font-size: 13px;
+        }
+
+        /* ── Modal ── */
+        .aup-backdrop {
           position: fixed;
           inset: 0;
           z-index: 80;
-          background: rgba(3,6,14,.66);
+          background: rgba(3,6,14,.72);
           display: flex;
           align-items: center;
           justify-content: center;
           padding: 22px;
+          animation: aup-fade-in .15s ease;
         }
-        .admin-user-dialog {
-          width: min(100%, 560px);
+        .aup-dialog {
+          width: min(100%, 580px);
           max-height: calc(100vh - 44px);
           overflow-y: auto;
-          background: var(--surface,#111420);
-          border: 1px solid var(--border,#1f2640);
+          background: var(--surf);
+          border: 1px solid var(--border);
           border-radius: 18px;
-          box-shadow: 0 26px 90px rgba(0,0,0,.52);
+          box-shadow: 0 32px 100px rgba(0,0,0,.6);
+          animation: aup-dialog-in .18s ease;
         }
-        .admin-user-dialog-header {
+        @keyframes aup-dialog-in {
+          from { opacity: 0; transform: scale(.96) translateY(8px); }
+          to   { opacity: 1; transform: scale(1)  translateY(0);    }
+        }
+        .aup-dialog-header {
           padding: 18px 20px;
-          border-bottom: 1px solid var(--border,#1f2640);
+          border-bottom: 1px solid var(--border);
           display: flex;
           justify-content: space-between;
           gap: 14px;
           align-items: flex-start;
         }
-        .admin-user-dialog-body {
+        .aup-dialog-title {
+          color: var(--text);
+          font-size: 18px;
+          font-weight: 800;
+        }
+        .aup-dialog-subtitle {
+          color: var(--muted);
+          font-size: 12px;
+          margin-top: 4px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .aup-dialog-close {
+          width: 34px;
+          height: 34px;
+          border-radius: 10px;
+          border: 1px solid var(--border);
+          background: var(--surf2);
+          color: var(--text);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          transition: background .12s;
+        }
+        .aup-dialog-close:hover { background: rgba(255,255,255,.06); }
+        .aup-dialog-body {
           padding: 18px 20px 20px;
           display: flex;
           flex-direction: column;
           gap: 14px;
         }
-        .admin-user-dialog-grid {
+        .aup-dialog-grid2 {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 12px;
         }
-        .admin-user-dialog-field {
-          background: var(--surface2,#181d2e);
-          border: 1px solid var(--border,#1f2640);
+        .aup-info-field {
+          background: var(--surf2);
+          border: 1px solid var(--border);
           border-radius: 12px;
           padding: 12px;
         }
-        .admin-user-dialog-field label {
+        .aup-info-label {
           display: block;
-          color: var(--muted,#6b7194);
+          color: var(--muted);
           font-size: 10px;
           text-transform: uppercase;
           letter-spacing: 1px;
           margin-bottom: 7px;
           font-weight: 700;
         }
-        .admin-user-dialog-field div {
-          color: var(--text,#e8eaf6);
+        .aup-info-value {
+          color: var(--text);
           font-size: 13px;
           word-break: break-word;
         }
-        .admin-user-dialog select {
+        .aup-field-label {
+          display: block;
+          color: var(--muted);
+          font-size: 10px;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          margin-bottom: 7px;
+          font-weight: 700;
+        }
+        .aup-dialog select {
           width: 100%;
-          background: var(--surface2,#181d2e);
-          border: 1px solid var(--border,#1f2640);
+          background: var(--surf2);
+          border: 1px solid var(--border);
           border-radius: 10px;
-          color: var(--text,#e8eaf6);
+          color: var(--text);
           padding: 10px 12px;
+          font-size: 13px;
           outline: none;
+          cursor: pointer;
+          transition: border-color .15s;
         }
-        .admin-users-stats {
-          display: grid;
-          grid-template-columns: repeat(3, minmax(110px, 1fr));
+        .aup-dialog select:focus { border-color: rgba(108,99,255,.5); }
+        .aup-dialog-actions {
+          display: flex;
+          justify-content: flex-end;
           gap: 10px;
-          min-width: 340px;
+          flex-wrap: wrap;
+          margin-top: 4px;
         }
-        .admin-users-filters {
-          padding: 16px 20px;
-          border-bottom: 1px solid var(--border,#1f2640);
-          display: grid;
-          grid-template-columns: minmax(280px, 2.1fr) repeat(3, minmax(170px, 1fr));
-          align-items: center;
-          gap: 12px;
-        }
-        .admin-users-filters > * {
-          min-width: 0;
-        }
-        .admin-users-search {
-          position: relative;
-        }
-        .admin-users-search input {
-          width: 100%;
-          background: var(--surface2,#181d2e);
-          border: 1px solid var(--border,#1f2640);
+        .aup-btn-cancel {
+          padding: 11px 16px;
           border-radius: 10px;
-          color: var(--text,#e8eaf6);
-          padding: 10px 12px 10px 38px;
-          outline: none;
+          border: 1px solid var(--border);
+          background: transparent;
+          color: var(--text);
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: background .12s;
         }
-        .admin-users-filters select {
-          width: 100%;
+        .aup-btn-cancel:hover { background: rgba(255,255,255,.04); }
+        .aup-btn-save {
+          padding: 11px 18px;
+          border-radius: 10px;
+          border: none;
+          font-size: 12px;
+          font-weight: 800;
+          cursor: pointer;
+          transition: background .14s, color .14s;
+        }
+        .aup-btn-save:not(:disabled) {
+          background: var(--accent);
+          color: #fff;
+        }
+        .aup-btn-save:disabled {
+          background: var(--surf2);
+          color: var(--muted);
+          cursor: default;
         }
 
-        .admin-users-mobile {
-          display: none;
-          padding: 14px;
-          gap: 12px;
-        }
-        .admin-user-card {
-          border: 1px solid var(--border,#1f2640);
-          background: var(--surface2,#181d2e);
-          border-radius: 14px;
-          padding: 14px;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-        .admin-user-meta {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 10px;
-        }
-        .admin-user-fields {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 10px;
-        }
+        /* ── Responsive ── */
         @media (max-width: 1180px) {
-          .admin-users-stats {
-            min-width: 100%;
-          }
-          .admin-users-filters {
-            grid-template-columns: repeat(2, minmax(220px, 1fr));
-          }
-        }
-        @media (max-width: 1080px) {
-          .admin-users-desktop {
-            display: none;
-          }
-          .admin-users-mobile {
-            display: grid;
-          }
+          .aup-stats    { min-width: 100%; }
+          .aup-filters  { grid-template-columns: repeat(2, minmax(200px, 1fr)); }
         }
         @media (max-width: 760px) {
-          .admin-users-filters {
-            grid-template-columns: 1fr;
-          }
-          .admin-users-stats {
-            grid-template-columns: 1fr;
-          }
-          .admin-user-meta,
-          .admin-user-fields {
-            grid-template-columns: 1fr;
-          }
+          .aup-filters  { grid-template-columns: 1fr; }
+          .aup-stats    { grid-template-columns: 1fr; }
+          .aup-dialog-grid2 { grid-template-columns: 1fr; }
         }
       `}</style>
 
-      <section style={{ background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)', borderRadius: '18px', overflow: 'hidden' }}>
-        <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border,#1f2640)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+      <section className="aup-shell">
+
+        {/* ── Header ────────────────────────────────────── */}
+        <div className="aup-header">
           <div>
-            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text,#e8eaf6)' }}>Gestao de usuarios</div>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text,#e8eaf6)' }}>Gestão de usuários</div>
             <div style={{ fontSize: '12px', color: 'var(--muted,#6b7194)', marginTop: '4px', maxWidth: '560px', lineHeight: 1.6 }}>
-              Promova ou revogue administradores, ajuste planos e acompanhe o consumo do dia com filtros operacionais mais completos.
+              Promova ou revogue administradores, ajuste planos e acompanhe o consumo do dia com filtros operacionais.
             </div>
           </div>
-
-          <div className="admin-users-stats">
+          <div className="aup-stats">
             {[
-              { label: 'Admins', value: String(totalAdmins), color: '#fbbf24' },
-              { label: 'Premium', value: String(totalPremium), color: '#60a5fa' },
-              { label: 'Uso hoje', value: String(totalWithUsageToday), color: '#34d399' },
+              { label: 'Admins',   value: String(totalAdmins),         color: '#fbbf24' },
+              { label: 'Premium',  value: String(totalPremium),         color: '#60a5fa' },
+              { label: 'Uso hoje', value: String(totalWithUsageToday),  color: '#34d399' },
             ].map(item => (
-              <div key={item.label} style={{ background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)', borderRadius: '14px', padding: '12px 14px' }}>
-                <div style={{ fontSize: '10px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '1px' }}>{item.label}</div>
-                <div style={{ fontSize: '24px', fontWeight: 800, color: item.color, marginTop: '6px' }}>{item.value}</div>
+              <div key={item.label} className="aup-stat">
+                <div className="aup-stat-label">{item.label}</div>
+                <div className="aup-stat-value" style={{ color: item.color }}>{item.value}</div>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="admin-users-filters">
-          <div className="admin-users-search">
-            <Search
-              aria-hidden="true"
-              size={16}
-              style={{
-                position: 'absolute',
-                left: '13px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: 'var(--muted,#6b7194)',
-                pointerEvents: 'none',
-              }}
-            />
+        {/* ── Filters ───────────────────────────────────── */}
+        <div className="aup-filters">
+
+          {/* Search with autocomplete */}
+          <div className="aup-search-wrap" ref={searchRef}>
+            <Search aria-hidden="true" size={15} className="aup-search-icon" />
             <input
+              ref={inputRef}
+              className="aup-search-input"
               value={search}
-              onChange={event => setSearch(event.target.value)}
-              placeholder="Buscar por nome, email, id, role ou concurso..."
+              onChange={e => setSearch(e.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              placeholder="Buscar por nome, email, id, role ou concurso…"
+              autoComplete="off"
             />
+
+            {/* Autocomplete dropdown */}
+            {searchFocused && search.trim() && (
+              <div className="aup-autocomplete" role="listbox" aria-label="Sugestões de usuários">
+                <div className="aup-autocomplete-header">
+                  {suggestions.length > 0
+                    ? `${suggestions.length} sugestão${suggestions.length > 1 ? 'ões' : ''} — clique para editar`
+                    : 'Buscando…'}
+                </div>
+
+                {suggestions.length === 0 ? (
+                  <div className="aup-autocomplete-empty">Nenhum usuário encontrado.</div>
+                ) : suggestions.map(user => (
+                  <button
+                    key={user.id}
+                    type="button"
+                    role="option"
+                    className="aup-suggestion"
+                    onMouseDown={e => {
+                      e.preventDefault()
+                      setSearch('')
+                      setSearchFocused(false)
+                      setSelectedUserId(user.id)
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div className="aup-suggestion-name">{user.name || 'Sem nome'}</div>
+                      <div className="aup-suggestion-email">{user.email || formatUserId(user.id)}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                      <span className="aup-suggestion-badge" style={{ color: user.role === 'admin' ? '#fbbf24' : 'var(--muted)', borderColor: user.role === 'admin' ? 'rgba(251,191,36,.25)' : 'rgba(255,255,255,.08)' }}>
+                        {user.role === 'admin' ? 'Admin' : 'User'}
+                      </span>
+                      <span className="aup-suggestion-badge" style={{ color: planColor(user.plan_tier), borderColor: 'rgba(255,255,255,.08)' }}>
+                        {user.plan_tier ?? 'gratuito'}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          <select
-            value={roleFilter}
-            onChange={event => setRoleFilter(event.target.value as typeof roleFilter)}
-            style={{
-              background: 'var(--surface2,#181d2e)',
-              border: '1px solid var(--border,#1f2640)',
-              borderRadius: '10px',
-              color: 'var(--text,#e8eaf6)',
-              padding: '10px 12px',
-              outline: 'none',
-            }}
-          >
+          <select className="aup-select" value={roleFilter} onChange={e => setRoleFilter(e.target.value as typeof roleFilter)}>
             <option value="all">Todas as roles</option>
             <option value="admin">Apenas admins</option>
             <option value="user">Apenas users</option>
           </select>
 
-          <select
-            value={planFilter}
-            onChange={event => setPlanFilter(event.target.value as typeof planFilter)}
-            style={{
-              background: 'var(--surface2,#181d2e)',
-              border: '1px solid var(--border,#1f2640)',
-              borderRadius: '10px',
-              color: 'var(--text,#e8eaf6)',
-              padding: '10px 12px',
-              outline: 'none',
-            }}
-          >
+          <select className="aup-select" value={planFilter} onChange={e => setPlanFilter(e.target.value as typeof planFilter)}>
             <option value="all">Todos os planos</option>
             <option value="gratuito">Gratuito</option>
-            <option value="basico">Basico</option>
+            <option value="basico">Básico</option>
             <option value="premium">Premium</option>
           </select>
 
-          <select
-            value={usageFilter}
-            onChange={event => setUsageFilter(event.target.value as typeof usageFilter)}
-            style={{
-              background: 'var(--surface2,#181d2e)',
-              border: '1px solid var(--border,#1f2640)',
-              borderRadius: '10px',
-              color: 'var(--text,#e8eaf6)',
-              padding: '10px 12px',
-              outline: 'none',
-            }}
-          >
+          <select className="aup-select" value={usageFilter} onChange={e => setUsageFilter(e.target.value as typeof usageFilter)}>
             <option value="all">Todo uso de hoje</option>
             <option value="used_today">Com uso hoje</option>
             <option value="no_usage_today">Sem uso hoje</option>
           </select>
         </div>
 
+        {/* ── Notice ───────────────────────────────────── */}
         {notice && (
-          <div
-            style={{
-              margin: '16px 20px 0',
-              padding: '12px 14px',
-              borderRadius: '12px',
-              fontSize: '13px',
-              ...noticeStyles(notice.tone),
-            }}
-          >
+          <div className="aup-notice" style={noticeStyles(notice.tone)}>
             {notice.text}
           </div>
         )}
 
-        <div className="admin-users-wrap">
-          <div className="admin-users-preview-head">
-            <span>{filteredUsers.length} usuario{filteredUsers.length === 1 ? '' : 's'} encontrado{filteredUsers.length === 1 ? '' : 's'}</span>
-            <span>Clique em um usuario para abrir a caixa de alteracoes</span>
-          </div>
-
-          <div className="admin-users-results">
-            {filteredUsers.length === 0 ? (
-              <div className="admin-users-empty">
-                Nenhum usuario encontrado com os filtros atuais.
-              </div>
-            ) : filteredUsers.map(user => (
-              <button
-                key={user.id}
-                type="button"
-                className="admin-user-preview"
-                onClick={() => setSelectedUserId(user.id)}
-              >
-                <div className="admin-user-preview-main">
-                  <div style={{ minWidth: 0 }}>
-                    <div className="admin-user-preview-name">{user.name || 'Sem nome'}</div>
-                    <div className="admin-user-preview-email">{user.email || formatUserId(user.id)}</div>
-                    <div className="admin-user-preview-id">{formatUserId(user.id)}</div>
-                  </div>
-                  <div style={{ color: user.role === 'admin' ? '#fbbf24' : 'var(--muted,#6b7194)', fontSize: '12px', fontWeight: 800, flexShrink: 0 }}>
-                    {user.role === 'admin' ? 'Admin' : 'User'}
-                  </div>
-                </div>
-                <div className="admin-user-preview-tags">
-                  <span className="admin-user-tag">Plano: {user.plan_tier ?? 'gratuito'}</span>
-                  <span className="admin-user-tag">Concurso: {user.target_exam || 'Nao informado'}</span>
-                  <span className="admin-user-tag">Alto: {user.alto_today}</span>
-                  <span className="admin-user-tag">Avancada: {user.advanced_today}</span>
-                </div>
-              </button>
-            ))}
-          </div>
+        {/* ── Table meta ───────────────────────────────── */}
+        <div className="aup-table-meta">
+          <span>{filteredUsers.length} usuário{filteredUsers.length !== 1 ? 's' : ''} encontrado{filteredUsers.length !== 1 ? 's' : ''}</span>
+          <span>Clique em <strong style={{ color: 'var(--text)' }}>Editar</strong> para abrir a caixa de alterações</span>
         </div>
 
+        {/* ── Table ────────────────────────────────────── */}
+        <div className="aup-table-wrap">
+          {filteredUsers.length === 0 ? (
+            <div className="aup-empty">Nenhum usuário encontrado com os filtros atuais.</div>
+          ) : (
+            <table className="aup-table">
+              <thead>
+                <tr>
+                  <th>Usuário</th>
+                  <th>Role</th>
+                  <th>Plano</th>
+                  <th>Concurso</th>
+                  <th>Uso hoje</th>
+                  <th>Cadastro</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUsers.map(user => (
+                  <tr key={user.id}>
+                    {/* Usuário */}
+                    <td>
+                      <div className="aup-cell-user-name">{user.name || 'Sem nome'}</div>
+                      <div className="aup-cell-user-email">{user.email || '—'}</div>
+                      <div className="aup-cell-user-id">{formatUserId(user.id)}</div>
+                    </td>
+
+                    {/* Role */}
+                    <td>
+                      <span
+                        className="aup-role-badge"
+                        style={
+                          user.role === 'admin'
+                            ? { background: 'rgba(251,191,36,.12)', border: '1px solid rgba(251,191,36,.25)', color: '#fbbf24' }
+                            : { background: 'rgba(107,113,148,.1)', border: '1px solid rgba(107,113,148,.2)',  color: '#6b7194' }
+                        }
+                      >
+                        {user.role === 'admin' ? 'Admin' : 'User'}
+                      </span>
+                    </td>
+
+                    {/* Plano */}
+                    <td>
+                      <span
+                        className="aup-plan-badge"
+                        style={{ color: planColor(user.plan_tier) }}
+                      >
+                        {user.plan_tier ?? 'gratuito'}
+                      </span>
+                    </td>
+
+                    {/* Concurso */}
+                    <td style={{ color: 'var(--muted,#6b7194)', fontSize: '12px' }}>
+                      {user.target_exam || '—'}
+                    </td>
+
+                    {/* Uso hoje */}
+                    <td>
+                      <div className="aup-usage-cell">
+                        <span className="aup-usage-alto">Alto: {user.alto_today}</span>
+                        <span className="aup-usage-adv">Avanç.: {user.advanced_today}</span>
+                      </div>
+                    </td>
+
+                    {/* Cadastro */}
+                    <td style={{ color: 'var(--muted,#6b7194)', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                      {formatDate(user.created_at)}
+                    </td>
+
+                    {/* Ações */}
+                    <td>
+                      <button
+                        type="button"
+                        className="aup-edit-btn"
+                        onClick={() => setSelectedUserId(user.id)}
+                      >
+                        <Pencil size={12} />
+                        Editar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* ── Edit Modal ───────────────────────────────── */}
         {selectedUser && selectedDraft && (
-          <div className="admin-user-dialog-backdrop" role="dialog" aria-modal="true" aria-label="Alterar usuario">
-            <div className="admin-user-dialog">
-              <div className="admin-user-dialog-header">
+          <div
+            className="aup-backdrop"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Alterar usuário"
+            onClick={e => { if (e.target === e.currentTarget) setSelectedUserId(null) }}
+          >
+            <div className="aup-dialog">
+              <div className="aup-dialog-header">
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ color: 'var(--text,#e8eaf6)', fontSize: '18px', fontWeight: 800 }}>{selectedUser.name || 'Sem nome'}</div>
-                  <div style={{ color: 'var(--muted,#6b7194)', fontSize: '12px', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedUser.email || formatUserId(selectedUser.id)}</div>
+                  <div className="aup-dialog-title">{selectedUser.name || 'Sem nome'}</div>
+                  <div className="aup-dialog-subtitle">{selectedUser.email || formatUserId(selectedUser.id)}</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedUserId(null)}
-                  style={{ width: '34px', height: '34px', borderRadius: '10px', border: '1px solid var(--border,#1f2640)', background: 'var(--surface2,#181d2e)', color: 'var(--text,#e8eaf6)', cursor: 'pointer', flexShrink: 0 }}
-                >
-                  X
+                <button type="button" className="aup-dialog-close" onClick={() => setSelectedUserId(null)} aria-label="Fechar">
+                  <X size={16} />
                 </button>
               </div>
 
-              <div className="admin-user-dialog-body">
-                <div className="admin-user-dialog-grid">
-                  <div className="admin-user-dialog-field"><label>ID</label><div>{selectedUser.id}</div></div>
-                  <div className="admin-user-dialog-field"><label>Criado em</label><div>{formatDate(selectedUser.created_at)}</div></div>
-                  <div className="admin-user-dialog-field"><label>Concurso</label><div>{selectedUser.target_exam || 'Nao informado'}</div></div>
-                  <div className="admin-user-dialog-field"><label>Uso hoje</label><div>Alto: {selectedUser.alto_today} | Avancada: {selectedUser.advanced_today}</div></div>
+              <div className="aup-dialog-body">
+                {/* Info fields */}
+                <div className="aup-dialog-grid2">
+                  <div className="aup-info-field">
+                    <label className="aup-info-label">ID</label>
+                    <div className="aup-info-value" style={{ fontFamily: 'monospace', fontSize: '12px', wordBreak: 'break-all' }}>
+                      {selectedUser.id}
+                    </div>
+                  </div>
+                  <div className="aup-info-field">
+                    <label className="aup-info-label">Criado em</label>
+                    <div className="aup-info-value">{formatDate(selectedUser.created_at)}</div>
+                  </div>
+                  <div className="aup-info-field">
+                    <label className="aup-info-label">Concurso</label>
+                    <div className="aup-info-value">{selectedUser.target_exam || 'Não informado'}</div>
+                  </div>
+                  <div className="aup-info-field">
+                    <label className="aup-info-label">Uso hoje</label>
+                    <div className="aup-info-value" style={{ display: 'flex', gap: '10px' }}>
+                      <span style={{ color: '#34d399' }}>Alto: {selectedUser.alto_today}</span>
+                      <span style={{ color: '#60a5fa' }}>Avanç.: {selectedUser.advanced_today}</span>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="admin-user-dialog-grid">
+                {/* Editable fields */}
+                <div className="aup-dialog-grid2">
                   <div>
-                    <label style={{ display: 'block', color: 'var(--muted,#6b7194)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '7px', fontWeight: 700 }}>Role</label>
+                    <label className="aup-field-label">Role</label>
                     <select
                       value={selectedDraft.role}
-                      onChange={event =>
-                        setDrafts(current => ({
-                          ...current,
-                          [selectedUser.id]: { ...selectedDraft, role: event.target.value },
-                        }))
-                      }
                       disabled={savingUserId === selectedUser.id || isPending}
+                      onChange={e => setDrafts(cur => ({ ...cur, [selectedUser.id]: { ...selectedDraft, role: e.target.value } }))}
                     >
-                      {ROLE_OPTIONS.map(option => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
+                      {ROLE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                     </select>
                   </div>
-
                   <div>
-                    <label style={{ display: 'block', color: 'var(--muted,#6b7194)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '7px', fontWeight: 700 }}>Plano</label>
+                    <label className="aup-field-label">Plano</label>
                     <select
                       value={selectedDraft.planTier}
-                      onChange={event =>
-                        setDrafts(current => ({
-                          ...current,
-                          [selectedUser.id]: { ...selectedDraft, planTier: event.target.value },
-                        }))
-                      }
                       disabled={savingUserId === selectedUser.id || isPending}
+                      onChange={e => setDrafts(cur => ({ ...cur, [selectedUser.id]: { ...selectedDraft, planTier: e.target.value } }))}
                     >
-                      {PLAN_OPTIONS.map(option => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
+                      {PLAN_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                     </select>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', flexWrap: 'wrap', marginTop: '4px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedUserId(null)}
-                    style={{ padding: '11px 14px', borderRadius: '10px', border: '1px solid var(--border,#1f2640)', background: 'transparent', color: 'var(--text,#e8eaf6)', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
-                  >
+                {/* Actions */}
+                <div className="aup-dialog-actions">
+                  <button type="button" className="aup-btn-cancel" onClick={() => setSelectedUserId(null)}>
                     Cancelar
                   </button>
                   <button
                     type="button"
+                    className="aup-btn-save"
+                    disabled={isSaveDisabled(selectedUser)}
                     onClick={() => handleSave(selectedUser.id)}
-                    disabled={
-                      savingUserId === selectedUser.id ||
-                      isPending ||
-                      (
-                        selectedDraft.planTier === (selectedUser.plan_tier ?? 'gratuito') &&
-                        selectedDraft.role === (selectedUser.role === 'admin' ? 'admin' : 'user')
-                      )
-                    }
-                    style={{
-                      padding: '11px 14px',
-                      borderRadius: '10px',
-                      border: 'none',
-                      background:
-                        savingUserId === selectedUser.id ||
-                        isPending ||
-                        (
-                          selectedDraft.planTier === (selectedUser.plan_tier ?? 'gratuito') &&
-                          selectedDraft.role === (selectedUser.role === 'admin' ? 'admin' : 'user')
-                        )
-                          ? 'var(--surface2,#181d2e)'
-                          : 'var(--accent,#6c63ff)',
-                      color:
-                        savingUserId === selectedUser.id ||
-                        isPending ||
-                        (
-                          selectedDraft.planTier === (selectedUser.plan_tier ?? 'gratuito') &&
-                          selectedDraft.role === (selectedUser.role === 'admin' ? 'admin' : 'user')
-                        )
-                          ? 'var(--muted,#6b7194)'
-                          : '#fff',
-                      fontSize: '12px',
-                      fontWeight: 800,
-                      cursor:
-                        savingUserId === selectedUser.id ||
-                        isPending ||
-                        (
-                          selectedDraft.planTier === (selectedUser.plan_tier ?? 'gratuito') &&
-                          selectedDraft.role === (selectedUser.role === 'admin' ? 'admin' : 'user')
-                        )
-                          ? 'default'
-                          : 'pointer',
-                    }}
                   >
-                    {savingUserId === selectedUser.id ? 'Salvando...' : 'Salvar alteracoes'}
+                    {savingUserId === selectedUser.id ? 'Salvando…' : 'Salvar alterações'}
                   </button>
                 </div>
               </div>
