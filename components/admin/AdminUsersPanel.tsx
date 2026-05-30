@@ -191,8 +191,21 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
           min-width: 1040px;
         }
         .admin-users-wrap {
-          max-height: clamp(260px, 38vh, 480px);
-          overflow: auto;
+          overflow-x: auto;
+          overflow-y: hidden;
+          scrollbar-gutter: stable;
+        }
+        .admin-users-table thead,
+        .admin-users-table tbody tr {
+          display: table;
+          width: 100%;
+          table-layout: fixed;
+        }
+        .admin-users-table tbody {
+          display: block;
+          height: clamp(164px, 24vh, 320px);
+          overflow-y: auto;
+          overflow-x: hidden;
           scrollbar-gutter: stable;
         }
         .admin-users-table th:nth-child(1),
@@ -238,14 +251,16 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
           letter-spacing: 1px;
           font-weight: 700;
           white-space: nowrap;
-          position: sticky;
-          top: 0;
-          z-index: 2;
           background: var(--surface,#111420);
         }
         .admin-users-table td {
           font-size: 13px;
           color: var(--text,#e8eaf6);
+        }
+        .admin-users-table select,
+        .admin-users-table button {
+          width: 100%;
+          box-sizing: border-box;
         }
         .admin-users-stats {
           display: grid;
