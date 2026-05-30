@@ -13,7 +13,29 @@ export default function RegisterPage() {
   const [targetExam, setTargetExam] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
+
+  function getRegisterErrorMessage(message: string) {
+    const normalized = message.toLowerCase()
+
+    if (normalized.includes('already registered') || normalized.includes('already been registered')) {
+      return 'Este email ja esta cadastrado. Faca login.'
+    }
+
+    if (normalized.includes('signups not allowed') || normalized.includes('signup is disabled')) {
+      return 'O cadastro esta desativado no Supabase. Ative novos usuarios em Authentication > Providers > Email.'
+    }
+
+    if (normalized.includes('invalid email')) {
+      return 'Informe um email valido.'
+    }
+
+    if (normalized.includes('password')) {
+      return 'A senha nao atende aos requisitos do Supabase.'
+    }
+
+    return `Erro ao criar conta: ${message}`
+  }
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault()
@@ -27,44 +49,60 @@ export default function RegisterPage() {
     }
 
     const supabase = createClient()
-    const { error } = await supabase.auth.signUp({
-      email,
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim().toLowerCase(),
       password,
       options: {
-        data: { name, target_exam: targetExam },
+        data: { name: name.trim(), target_exam: targetExam.trim() },
         emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     })
 
     if (error) {
-      setError(error.message === 'User already registered'
-        ? 'Este email já está cadastrado. Faça login.'
-        : 'Erro ao criar conta. Tente novamente.')
+      setError(getRegisterErrorMessage(error.message))
       setLoading(false)
       return
     }
 
-    setSuccess(true)
-    setLoading(false)
+    if (data.session) {
+      router.push('/dashboard')
+      router.refresh()
+      return
+    }
 
-    // Se confirmação de email desativada no Supabase, redireciona direto
-    setTimeout(() => router.push('/dashboard'), 1500)
+    setSuccessMessage('Conta criada. Confira seu email para confirmar o cadastro antes de entrar.')
+    setLoading(false)
   }
 
-  if (success) {
+  if (successMessage) {
     return (
       <div style={{
         minHeight: '100vh', display: 'flex', alignItems: 'center',
         justifyContent: 'center', background: 'var(--bg)'
       }}>
         <div style={{ textAlign: 'center', padding: '40px' }}>
-          <div style={{ fontSize: '40px', marginBottom: '16px' }}>✓</div>
+          <div style={{ fontSize: '40px', marginBottom: '16px' }}>OK</div>
           <div style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text)', marginBottom: '8px' }}>
             Conta criada com sucesso!
           </div>
-          <div style={{ fontSize: '13px', color: 'var(--muted)' }}>
-            Redirecionando para o dashboard...
+          <div style={{ fontSize: '13px', color: 'var(--muted)', lineHeight: 1.5, marginBottom: '22px' }}>
+            {successMessage}
           </div>
+          <Link
+            href="/auth/login"
+            style={{
+              display: 'inline-block',
+              padding: '10px 16px',
+              borderRadius: '8px',
+              background: 'var(--accent)',
+              color: '#fff',
+              textDecoration: 'none',
+              fontSize: '14px',
+              fontWeight: 600,
+            }}
+          >
+            Ir para login
+          </Link>
         </div>
       </div>
     )
@@ -89,7 +127,7 @@ export default function RegisterPage() {
           Criar sua conta
         </div>
         <div style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: '28px' }}>
-          Comece a estudar com inteligência
+          Comece a estudar com inteligencia
         </div>
 
         {error && (
@@ -106,8 +144,8 @@ export default function RegisterPage() {
           {[
             { label: 'Nome completo', value: name, set: setName, type: 'text', placeholder: 'Maria Silva' },
             { label: 'Email', value: email, set: setEmail, type: 'email', placeholder: 'seu@email.com' },
-            { label: 'Senha', value: password, set: setPassword, type: 'password', placeholder: 'Mínimo 6 caracteres' },
-            { label: 'Concurso alvo (opcional)', value: targetExam, set: setTargetExam, type: 'text', placeholder: 'Ex: TRF 1ª Região, AGU, TCU...' },
+            { label: 'Senha', value: password, set: setPassword, type: 'password', placeholder: 'Minimo 6 caracteres' },
+            { label: 'Concurso alvo (opcional)', value: targetExam, set: setTargetExam, type: 'text', placeholder: 'Ex: TRF 1a Regiao, AGU, TCU...' },
           ].map(({ label, value, set, type, placeholder }) => (
             <div key={label} style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', fontSize: '12px', color: 'var(--muted)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '1px' }}>
@@ -142,14 +180,14 @@ export default function RegisterPage() {
                 cursor: loading ? 'default' : 'pointer', transition: 'all .15s'
               }}
             >
-              {loading ? 'Criando conta...' : 'Criar conta grátis'}
+              {loading ? 'Criando conta...' : 'Criar conta gratis'}
             </button>
           </div>
         </form>
 
         <div style={{ textAlign: 'center', marginTop: '24px', fontSize: '13px', color: 'var(--muted)' }}>
-          Já tem conta?{' '}
-          <Link href="/login" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}>
+          Ja tem conta?{' '}
+          <Link href="/auth/login" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}>
             Entrar
           </Link>
         </div>
