@@ -184,81 +184,64 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
           display: block;
           width: 100%;
         }
-        .admin-users-table {
-          width: 100%;
-          border-collapse: collapse;
-          table-layout: fixed;
-          min-width: 1040px;
-        }
         .admin-users-wrap {
           overflow-x: auto;
-          overflow-y: hidden;
-          scrollbar-gutter: stable;
-        }
-        .admin-users-table thead,
-        .admin-users-table tbody tr {
-          display: table;
-          width: 100%;
-          table-layout: fixed;
-        }
-        .admin-users-table tbody {
-          display: block;
-          height: clamp(164px, 24vh, 320px);
-          overflow-y: auto;
-          overflow-x: hidden;
-          scrollbar-gutter: stable;
-        }
-        .admin-users-table th:nth-child(1),
-        .admin-users-table td:nth-child(1) {
-          width: 24%;
-        }
-        .admin-users-table th:nth-child(2),
-        .admin-users-table td:nth-child(2) {
-          width: 16%;
-        }
-        .admin-users-table th:nth-child(3),
-        .admin-users-table td:nth-child(3) {
-          width: 12%;
-        }
-        .admin-users-table th:nth-child(4),
-        .admin-users-table td:nth-child(4),
-        .admin-users-table th:nth-child(5),
-        .admin-users-table td:nth-child(5) {
-          width: 12%;
-        }
-        .admin-users-table th:nth-child(6),
-        .admin-users-table td:nth-child(6) {
-          width: 11%;
-        }
-        .admin-users-table th:nth-child(7),
-        .admin-users-table td:nth-child(7) {
-          width: 13%;
-        }
-        .admin-users-table th,
-        .admin-users-table td {
-          padding: 14px 16px;
           border-bottom: 1px solid rgba(255,255,255,0.06);
-          text-align: left;
-          vertical-align: middle;
         }
-        .admin-users-table tr:hover td {
-          background: rgba(255,255,255,0.02);
+        .admin-users-grid {
+          min-width: 1080px;
         }
-        .admin-users-table th {
+        .admin-users-grid-head,
+        .admin-users-grid-row {
+          display: grid;
+          grid-template-columns: minmax(240px, 1.55fr) minmax(150px, .95fr) minmax(128px, .75fr) minmax(128px, .75fr) minmax(140px, .8fr) minmax(128px, .75fr) minmax(150px, .85fr);
+          align-items: center;
+          column-gap: 14px;
+        }
+        .admin-users-grid-head {
+          padding: 13px 16px;
           font-size: 11px;
           color: var(--muted,#6b7194);
           text-transform: uppercase;
           letter-spacing: 1px;
           font-weight: 700;
-          white-space: nowrap;
           background: var(--surface,#111420);
         }
-        .admin-users-table td {
+        .admin-users-grid-body {
+          height: 184px;
+          overflow-y: scroll;
+          overflow-x: hidden;
+          scrollbar-gutter: stable;
+          background: rgba(7,10,18,.08);
+        }
+        .admin-users-grid-row {
+          min-height: 76px;
+          padding: 12px 16px;
+          border-top: 1px solid rgba(255,255,255,0.06);
           font-size: 13px;
           color: var(--text,#e8eaf6);
         }
-        .admin-users-table select,
-        .admin-users-table button {
+        .admin-users-grid-row:hover {
+          background: rgba(255,255,255,0.02);
+        }
+        .admin-users-grid-empty {
+          min-height: 120px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 22px 14px;
+          color: var(--muted,#6b7194);
+          text-align: center;
+          border-top: 1px solid rgba(255,255,255,0.06);
+        }
+        .admin-users-cell {
+          min-width: 0;
+        }
+        .admin-users-cell-muted {
+          color: var(--muted,#6b7194);
+        }
+        .admin-users-grid select,
+        .admin-users-grid button {
           width: 100%;
           box-sizing: border-box;
         }
@@ -462,25 +445,22 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
 
         <div className="admin-users-desktop">
           <div className="admin-users-wrap">
-            <table className="admin-users-table">
-              <thead>
-                <tr>
-                  <th>Usuario</th>
-                  <th>Concurso</th>
-                  <th>Uso hoje</th>
-                  <th>Role</th>
-                  <th>Plano</th>
-                  <th>Criado em</th>
-                  <th>Acoes</th>
-                </tr>
-              </thead>
-              <tbody>
+            <div className="admin-users-grid" role="table" aria-label="Gestao de usuarios">
+              <div className="admin-users-grid-head" role="row">
+                <div role="columnheader">Usuario</div>
+                <div role="columnheader">Concurso</div>
+                <div role="columnheader">Uso hoje</div>
+                <div role="columnheader">Role</div>
+                <div role="columnheader">Plano</div>
+                <div role="columnheader">Criado em</div>
+                <div role="columnheader">Acoes</div>
+              </div>
+
+              <div className="admin-users-grid-body">
                 {filteredUsers.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} style={{ padding: '22px 14px', color: 'var(--muted,#6b7194)', textAlign: 'center' }}>
-                      Nenhum usuario encontrado com os filtros atuais.
-                    </td>
-                  </tr>
+                  <div className="admin-users-grid-empty">
+                    Nenhum usuario encontrado com os filtros atuais.
+                  </div>
                 ) : filteredUsers.map(user => {
                   const draft = drafts[user.id] ?? {
                     planTier: user.plan_tier ?? 'gratuito',
@@ -492,22 +472,22 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
                     draft.role !== (user.role === 'admin' ? 'admin' : 'user')
 
                   return (
-                    <tr key={user.id}>
-                      <td>
+                    <div key={user.id} className="admin-users-grid-row" role="row">
+                      <div className="admin-users-cell" role="cell">
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                          <strong style={{ color: 'var(--text,#e8eaf6)', fontSize: '13px' }}>{user.name || 'Sem nome'}</strong>
-                          <span style={{ color: 'var(--muted,#6b7194)', fontSize: '12px' }}>{user.email || formatUserId(user.id)}</span>
-                          <span style={{ color: 'var(--muted,#6b7194)', fontSize: '11px' }}>{formatUserId(user.id)}</span>
+                          <strong style={{ color: 'var(--text,#e8eaf6)', fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.name || 'Sem nome'}</strong>
+                          <span style={{ color: 'var(--muted,#6b7194)', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email || formatUserId(user.id)}</span>
+                          <span style={{ color: 'var(--muted,#6b7194)', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatUserId(user.id)}</span>
                         </div>
-                      </td>
-                      <td style={{ color: 'var(--muted,#6b7194)' }}>{user.target_exam || 'Nao informado'}</td>
-                      <td>
+                      </div>
+                      <div className="admin-users-cell admin-users-cell-muted" role="cell">{user.target_exam || 'Nao informado'}</div>
+                      <div className="admin-users-cell" role="cell">
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <span style={{ color: '#34d399', fontWeight: 700 }}>Alto: {user.alto_today}</span>
                           <span style={{ color: '#60a5fa', fontWeight: 700 }}>Avancada: {user.advanced_today}</span>
                         </div>
-                      </td>
-                      <td>
+                      </div>
+                      <div className="admin-users-cell" role="cell">
                         <select
                           value={draft.role}
                           onChange={event =>
@@ -518,7 +498,6 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
                           }
                           disabled={isSaving || isPending}
                           style={{
-                            minWidth: '110px',
                             background: 'var(--surface2,#181d2e)',
                             border: '1px solid var(--border,#1f2640)',
                             borderRadius: '10px',
@@ -534,8 +513,8 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
                             </option>
                           ))}
                         </select>
-                      </td>
-                      <td>
+                      </div>
+                      <div className="admin-users-cell" role="cell">
                         <select
                           value={draft.planTier}
                           onChange={event =>
@@ -546,7 +525,6 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
                           }
                           disabled={isSaving || isPending}
                           style={{
-                            minWidth: '130px',
                             background: 'var(--surface2,#181d2e)',
                             border: '1px solid var(--border,#1f2640)',
                             borderRadius: '10px',
@@ -561,9 +539,9 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
                             </option>
                           ))}
                         </select>
-                      </td>
-                      <td style={{ color: 'var(--muted,#6b7194)' }}>{formatDate(user.created_at)}</td>
-                      <td>
+                      </div>
+                      <div className="admin-users-cell admin-users-cell-muted" role="cell">{formatDate(user.created_at)}</div>
+                      <div className="admin-users-cell" role="cell">
                         <button
                           type="button"
                           onClick={() => handleSave(user.id)}
@@ -577,17 +555,16 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
                             fontSize: '12px',
                             fontWeight: 700,
                             cursor: !isDirty || isSaving || isPending ? 'default' : 'pointer',
-                            minWidth: '128px',
                           }}
                         >
                           {isSaving ? 'Salvando...' : 'Salvar alteracoes'}
                         </button>
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   )
                 })}
-              </tbody>
-            </table>
+              </div>
+            </div>
           </div>
         </div>
 
