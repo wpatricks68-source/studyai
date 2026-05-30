@@ -187,7 +187,39 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
         .admin-users-table {
           width: 100%;
           border-collapse: collapse;
-          table-layout: auto;
+          table-layout: fixed;
+          min-width: 1040px;
+        }
+        .admin-users-wrap {
+          max-height: clamp(260px, 38vh, 480px);
+          overflow: auto;
+          scrollbar-gutter: stable;
+        }
+        .admin-users-table th:nth-child(1),
+        .admin-users-table td:nth-child(1) {
+          width: 24%;
+        }
+        .admin-users-table th:nth-child(2),
+        .admin-users-table td:nth-child(2) {
+          width: 16%;
+        }
+        .admin-users-table th:nth-child(3),
+        .admin-users-table td:nth-child(3) {
+          width: 12%;
+        }
+        .admin-users-table th:nth-child(4),
+        .admin-users-table td:nth-child(4),
+        .admin-users-table th:nth-child(5),
+        .admin-users-table td:nth-child(5) {
+          width: 12%;
+        }
+        .admin-users-table th:nth-child(6),
+        .admin-users-table td:nth-child(6) {
+          width: 11%;
+        }
+        .admin-users-table th:nth-child(7),
+        .admin-users-table td:nth-child(7) {
+          width: 13%;
         }
         .admin-users-table th,
         .admin-users-table td {
@@ -206,6 +238,10 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
           letter-spacing: 1px;
           font-weight: 700;
           white-space: nowrap;
+          position: sticky;
+          top: 0;
+          z-index: 2;
+          background: var(--surface,#111420);
         }
         .admin-users-table td {
           font-size: 13px;
@@ -220,17 +256,15 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
         .admin-users-filters {
           padding: 16px 20px;
           border-bottom: 1px solid var(--border,#1f2640);
-          display: flex;
-          flex-wrap: wrap;
+          display: grid;
+          grid-template-columns: minmax(280px, 2.1fr) repeat(3, minmax(170px, 1fr));
+          align-items: center;
           gap: 12px;
         }
         .admin-users-filters > * {
-          flex: 1;
-          min-width: 140px;
+          min-width: 0;
         }
         .admin-users-search {
-          flex: 2.2;
-          min-width: 280px;
           position: relative;
         }
         .admin-users-search input {
@@ -241,6 +275,9 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
           color: var(--text,#e8eaf6);
           padding: 10px 12px 10px 38px;
           outline: none;
+        }
+        .admin-users-filters select {
+          width: 100%;
         }
 
         .admin-users-mobile {
@@ -267,14 +304,12 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
           grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 10px;
         }
-        @media (max-width: 1400px) {
-          .admin-users-search {
-             flex: 1 1 100%;
-          }
-        }
         @media (max-width: 1180px) {
           .admin-users-stats {
             min-width: 100%;
+          }
+          .admin-users-filters {
+            grid-template-columns: repeat(2, minmax(220px, 1fr));
           }
         }
         @media (max-width: 1080px) {
@@ -284,13 +319,10 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
           .admin-users-mobile {
             display: grid;
           }
-          .admin-users-filters > * {
-            flex: 1 1 calc(50% - 12px);
-          }
         }
         @media (max-width: 760px) {
-          .admin-users-filters > * {
-            flex: 1 1 100%;
+          .admin-users-filters {
+            grid-template-columns: 1fr;
           }
           .admin-users-stats {
             grid-template-columns: 1fr;
@@ -414,7 +446,7 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
         )}
 
         <div className="admin-users-desktop">
-          <div className="admin-users-wrap" style={{ overflowX: 'auto' }}>
+          <div className="admin-users-wrap">
             <table className="admin-users-table">
               <thead>
                 <tr>
