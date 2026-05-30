@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Pencil, X } from 'lucide-react'
+import { Download, Search, Pencil, X } from 'lucide-react'
 
 type AdminUserRow = {
   id: string
@@ -35,6 +35,17 @@ const ROLE_OPTIONS = [
   { value: 'admin', label: 'Admin' },
 ] as const
 
+const SEARCH_SCOPE_OPTIONS = [
+  { value: 'all', label: 'Buscar em tudo' },
+  { value: 'name', label: 'Nome' },
+  { value: 'email', label: 'Email' },
+  { value: 'id', label: 'ID' },
+  { value: 'target_exam', label: 'Concurso' },
+  { value: 'created_at', label: 'Data de cadastro' },
+  { value: 'role', label: 'Role' },
+  { value: 'plan_tier', label: 'Plano' },
+] as const
+
 function formatDate(value: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return 'Não informado'
@@ -64,6 +75,123 @@ function planColor(plan: string | null) {
   return '#6b7194'
 }
 
+function getDateKey(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toISOString().slice(0, 10)
+}
+
+function pdfText(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\x20-\x7E]/g, ' ')
+    .replace(/\\/g, '\\\\')
+    .replace(/\(/g, '\\(')
+    .replace(/\)/g, '\\)')
+}
+
+function wrapPdfLine(value: string, maxLength = 104) {
+  const words = value.split(/\s+/)
+  const lines: string[] = []
+  let current = ''
+
+  for (const word of words) {
+    if (!word) continue
+    const next = current ? `${current} ${word}` : word
+    if (next.length <= maxLength) {
+      current = next
+      continue
+    }
+    if (current) lines.push(current)
+    current = word.length > maxLength ? word.slice(0, maxLength) : word
+  }
+
+  if (current) lines.push(current)
+  return lines
+}
+
+function buildUsersPdf(users: AdminUserRow[], filtersDescription: string) {
+  const generatedAt = new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date())
+
+  const sourceLines = [
+    'StudyAI - Relatorio de usuarios',
+    `Gerado em: ${generatedAt}`,
+    `Total exportado: ${users.length}`,
+    `Filtros: ${filtersDescription || 'Todos os usuarios cadastrados'}`,
+    '',
+  ]
+
+  users.forEach((user, index) => {
+    sourceLines.push(`${index + 1}. ${user.name || 'Sem nome'} | ${user.email || 'Sem email'}`)
+    sourceLines.push(`   ID: ${user.id}`)
+    sourceLines.push(`   Role: ${user.role === 'admin' ? 'Admin' : 'User'} | Plano: ${user.plan_tier ?? 'gratuito'} | Cadastro: ${formatDate(user.created_at)}`)
+    sourceLines.push(`   Concurso: ${user.target_exam || 'Nao informado'} | Alto hoje: ${user.alto_today} | Avancada hoje: ${user.advanced_today}`)
+    sourceLines.push('')
+  })
+
+  const lines = sourceLines.flatMap(line => wrapPdfLine(line))
+  const linesPerPage = 44
+  const pages: string[][] = []
+
+  for (let index = 0; index < lines.length; index += linesPerPage) {
+    pages.push(lines.slice(index, index + linesPerPage))
+  }
+
+  if (pages.length === 0) pages.push(['Nenhum usuario encontrado.'])
+
+  const objects: string[] = []
+  const addObject = (content: string) => {
+    objects.push(content)
+    return objects.length
+  }
+
+  const catalogId = addObject('<< /Type /Catalog /Pages 2 0 R >>')
+  const pagesId = addObject('')
+  const fontId = addObject('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>')
+  const pageIds: number[] = []
+
+  pages.forEach(pageLines => {
+    const streamLines = [
+      'BT',
+      '/F1 10 Tf',
+      '40 800 Td',
+      '14 TL',
+      ...pageLines.map(line => `(${pdfText(line)}) Tj T*`),
+      'ET',
+    ]
+    const stream = streamLines.join('\n')
+    const contentId = addObject(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`)
+    const pageId = addObject(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentId} 0 R >>`)
+    pageIds.push(pageId)
+  })
+
+  objects[pagesId - 1] = `<< /Type /Pages /Kids [${pageIds.map(id => `${id} 0 R`).join(' ')}] /Count ${pageIds.length} >>`
+
+  let pdf = '%PDF-1.4\n'
+  const offsets = [0]
+  objects.forEach((object, index) => {
+    offsets.push(pdf.length)
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`
+  })
+
+  const xrefOffset = pdf.length
+  pdf += `xref\n0 ${objects.length + 1}\n`
+  pdf += '0000000000 65535 f \n'
+  offsets.slice(1).forEach(offset => {
+    pdf += `${String(offset).padStart(10, '0')} 00000 n \n`
+  })
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root ${catalogId} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`
+
+  return pdf
+}
+
 export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
   const router     = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -78,6 +206,9 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
   const [roleFilter,   setRoleFilter]   = useState<'all' | 'user' | 'admin'>('all')
   const [planFilter,   setPlanFilter]   = useState<'all' | 'gratuito' | 'basico' | 'premium'>('all')
   const [usageFilter,  setUsageFilter]  = useState<'all' | 'used_today' | 'no_usage_today'>('all')
+  const [searchScope,  setSearchScope]  = useState<(typeof SEARCH_SCOPE_OPTIONS)[number]['value']>('all')
+  const [dateFrom,     setDateFrom]     = useState('')
+  const [dateTo,       setDateTo]       = useState('')
 
   /* ── drafts / modal ──────────────────────────────────── */
   const [drafts, setDrafts] = useState<Record<string, { planTier: string; role: string }>>(
@@ -94,22 +225,36 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
   const filteredUsers = useMemo(() => {
     const tokens = normalize(search).split(/\s+/).filter(Boolean)
     return users.filter(user => {
-      const haystack = [
-        user.name ?? '', user.email ?? '', user.id,
-        user.id.replaceAll('-', ''), formatUserId(user.id),
-        user.target_exam ?? '', user.plan_tier ?? '', user.role ?? '',
-      ].join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+      const createdDateKey = getDateKey(user.created_at)
+      const searchableFields = {
+        all: [
+          user.name ?? '', user.email ?? '', user.id,
+          user.id.replaceAll('-', ''), formatUserId(user.id),
+          user.target_exam ?? '', user.plan_tier ?? '', user.role ?? '',
+          formatDate(user.created_at), createdDateKey,
+        ].join(' '),
+        name: user.name ?? '',
+        email: user.email ?? '',
+        id: `${user.id} ${user.id.replaceAll('-', '')} ${formatUserId(user.id)}`,
+        target_exam: user.target_exam ?? '',
+        created_at: `${formatDate(user.created_at)} ${createdDateKey}`,
+        role: user.role ?? '',
+        plan_tier: user.plan_tier ?? '',
+      }
+      const haystack = normalize(searchableFields[searchScope])
 
       if (tokens.length > 0 && !tokens.every(t => haystack.includes(t))) return false
       if (roleFilter  !== 'all' && (user.role === 'admin' ? 'admin' : 'user') !== roleFilter)  return false
       if (planFilter  !== 'all' && (user.plan_tier ?? 'gratuito') !== planFilter)               return false
+      if (dateFrom && (!createdDateKey || createdDateKey < dateFrom)) return false
+      if (dateTo && (!createdDateKey || createdDateKey > dateTo)) return false
 
       const hasUsage = user.alto_today > 0 || user.advanced_today > 0
       if (usageFilter === 'used_today'     && !hasUsage) return false
       if (usageFilter === 'no_usage_today' &&  hasUsage) return false
       return true
     })
-  }, [users, search, roleFilter, planFilter, usageFilter])
+  }, [users, search, searchScope, roleFilter, planFilter, usageFilter, dateFrom, dateTo])
 
   /* autocomplete suggestions: first 8 of filtered when searching */
   const suggestions = useMemo(() => {
@@ -125,6 +270,21 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
   const selectedDraft = selectedUser
     ? drafts[selectedUser.id] ?? { planTier: selectedUser.plan_tier ?? 'gratuito', role: selectedUser.role === 'admin' ? 'admin' : 'user' }
     : null
+
+  const filtersDescription = useMemo(() => {
+    const parts: string[] = []
+    const scopeLabel = SEARCH_SCOPE_OPTIONS.find(option => option.value === searchScope)?.label ?? 'Busca'
+
+    if (search.trim()) parts.push(`${scopeLabel}: "${search.trim()}"`)
+    if (roleFilter !== 'all') parts.push(`Role: ${roleFilter}`)
+    if (planFilter !== 'all') parts.push(`Plano: ${planFilter}`)
+    if (usageFilter === 'used_today') parts.push('Uso hoje: com uso')
+    if (usageFilter === 'no_usage_today') parts.push('Uso hoje: sem uso')
+    if (dateFrom) parts.push(`Cadastro de: ${dateFrom}`)
+    if (dateTo) parts.push(`Cadastro ate: ${dateTo}`)
+
+    return parts.join(' | ')
+  }, [search, searchScope, roleFilter, planFilter, usageFilter, dateFrom, dateTo])
 
   /* close autocomplete on outside click */
   useEffect(() => {
@@ -159,6 +319,21 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
     } finally {
       setSavingUserId(null)
     }
+  }
+
+  function handleExportPdf() {
+    const pdf = buildUsersPdf(filteredUsers, filtersDescription)
+    const blob = new Blob([pdf], { type: 'application/pdf' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    const dateKey = new Date().toISOString().slice(0, 10)
+
+    link.href = url
+    link.download = `usuarios-studyai-${dateKey}.pdf`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
   }
 
   const isSaveDisabled = (user: AdminUserRow) =>
@@ -229,7 +404,7 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
           padding: 14px 20px;
           border-bottom: 1px solid var(--border);
           display: grid;
-          grid-template-columns: minmax(260px, 2fr) repeat(3, minmax(150px, 1fr));
+          grid-template-columns: minmax(260px, 2fr) repeat(4, minmax(140px, 1fr)) auto;
           align-items: center;
           gap: 12px;
         }
@@ -354,6 +529,46 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
           transition: border-color .15s;
         }
         .aup-select:focus { border-color: rgba(108,99,255,.5); }
+        .aup-date-input {
+          width: 100%;
+          background: var(--surf2);
+          border: 1px solid var(--border);
+          border-radius: 10px;
+          color: var(--text);
+          padding: 10px 12px;
+          font-size: 13px;
+          outline: none;
+          box-sizing: border-box;
+        }
+        .aup-export-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          min-height: 40px;
+          padding: 10px 13px;
+          border: 1px solid rgba(96,165,250,.28);
+          border-radius: 10px;
+          background: rgba(96,165,250,.12);
+          color: #93c5fd;
+          font-size: 12px;
+          font-weight: 800;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+        .aup-export-btn:disabled {
+          opacity: .52;
+          cursor: default;
+        }
+        .aup-filter-caption {
+          color: var(--muted);
+          font-size: 10px;
+          line-height: 1;
+          margin-bottom: 5px;
+          text-transform: uppercase;
+          letter-spacing: .8px;
+          font-weight: 700;
+        }
 
         /* ── Notice ── */
         .aup-notice {
@@ -645,6 +860,7 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
         @media (max-width: 1180px) {
           .aup-stats    { min-width: 100%; }
           .aup-filters  { grid-template-columns: repeat(2, minmax(200px, 1fr)); }
+          .aup-export-btn { width: 100%; }
         }
         @media (max-width: 760px) {
           .aup-filters  { grid-template-columns: 1fr; }
@@ -735,6 +951,12 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
             )}
           </div>
 
+          <select className="aup-select" value={searchScope} onChange={e => setSearchScope(e.target.value as typeof searchScope)}>
+            {SEARCH_SCOPE_OPTIONS.map(option => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+
           <select className="aup-select" value={roleFilter} onChange={e => setRoleFilter(e.target.value as typeof roleFilter)}>
             <option value="all">Todas as roles</option>
             <option value="admin">Apenas admins</option>
@@ -753,6 +975,37 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
             <option value="used_today">Com uso hoje</option>
             <option value="no_usage_today">Sem uso hoje</option>
           </select>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px' }}>
+            <div>
+              <div className="aup-filter-caption">De</div>
+              <input
+                className="aup-date-input"
+                type="date"
+                value={dateFrom}
+                onChange={e => setDateFrom(e.target.value)}
+              />
+            </div>
+            <div>
+              <div className="aup-filter-caption">Ate</div>
+              <input
+                className="aup-date-input"
+                type="date"
+                value={dateTo}
+                onChange={e => setDateTo(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="aup-export-btn"
+            onClick={handleExportPdf}
+            disabled={filteredUsers.length === 0}
+          >
+            <Download size={15} />
+            Exportar PDF
+          </button>
         </div>
 
         {/* ── Notice ───────────────────────────────────── */}
