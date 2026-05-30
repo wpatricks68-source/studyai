@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { Search } from 'lucide-react'
 
 type AdminUserRow = {
   id: string
@@ -74,6 +75,14 @@ function noticeStyles(tone: 'success' | 'error' | 'neutral') {
   }
 }
 
+function normalizeSearchValue(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+}
+
 export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -96,19 +105,25 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
   const [notice, setNotice] = useState<Notice>(null)
 
   const filteredUsers = useMemo(() => {
+    const searchTokens = normalizeSearchValue(search).split(/\s+/).filter(Boolean)
+
     return users.filter(user => {
       const haystack = [
         user.name ?? '',
         user.email ?? '',
         user.id,
+        user.id.replaceAll('-', ''),
+        formatUserId(user.id),
         user.target_exam ?? '',
         user.plan_tier ?? '',
         user.role ?? '',
       ]
         .join(' ')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
         .toLowerCase()
 
-      if (!haystack.includes(search.trim().toLowerCase())) return false
+      if (searchTokens.length > 0 && !searchTokens.every(token => haystack.includes(token))) return false
       if (roleFilter !== 'all' && (user.role === 'admin' ? 'admin' : 'user') !== roleFilter) return false
       if (planFilter !== 'all' && (user.plan_tier ?? 'gratuito') !== planFilter) return false
 
@@ -213,9 +228,19 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
           flex: 1;
           min-width: 140px;
         }
-        .admin-users-filters input {
+        .admin-users-search {
           flex: 2.2;
           min-width: 280px;
+          position: relative;
+        }
+        .admin-users-search input {
+          width: 100%;
+          background: var(--surface2,#181d2e);
+          border: 1px solid var(--border,#1f2640);
+          border-radius: 10px;
+          color: var(--text,#e8eaf6);
+          padding: 10px 12px 10px 38px;
+          outline: none;
         }
 
         .admin-users-mobile {
@@ -243,7 +268,7 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
           gap: 10px;
         }
         @media (max-width: 1400px) {
-          .admin-users-filters input {
+          .admin-users-search {
              flex: 1 1 100%;
           }
         }
@@ -301,20 +326,25 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
         </div>
 
         <div className="admin-users-filters">
-          <input
-            value={search}
-            onChange={event => setSearch(event.target.value)}
-            placeholder="Buscar por nome, email, id, role ou concurso..."
-            style={{
-              width: '100%',
-              background: 'var(--surface2,#181d2e)',
-              border: '1px solid var(--border,#1f2640)',
-              borderRadius: '10px',
-              color: 'var(--text,#e8eaf6)',
-              padding: '10px 12px',
-              outline: 'none',
-            }}
-          />
+          <div className="admin-users-search">
+            <Search
+              aria-hidden="true"
+              size={16}
+              style={{
+                position: 'absolute',
+                left: '13px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--muted,#6b7194)',
+                pointerEvents: 'none',
+              }}
+            />
+            <input
+              value={search}
+              onChange={event => setSearch(event.target.value)}
+              placeholder="Buscar por nome, email, id, role ou concurso..."
+            />
+          </div>
 
           <select
             value={roleFilter}

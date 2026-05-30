@@ -22,7 +22,7 @@ type UsageRow = {
 }
 
 async function listAllAuthUsers(adminSupabase: ReturnType<typeof createAdminClient>) {
-  const users: Array<{ id: string; email: string | null }> = []
+  const users: Array<{ id: string; email: string | null; created_at: string }> = []
   let page = 1
   const perPage = 1000
 
@@ -30,7 +30,11 @@ async function listAllAuthUsers(adminSupabase: ReturnType<typeof createAdminClie
     const { data, error } = await adminSupabase.auth.admin.listUsers({ page, perPage })
     if (error) throw error
 
-    const batch = data.users.map(user => ({ id: user.id, email: user.email ?? null }))
+    const batch = data.users.map(user => ({
+      id: user.id,
+      email: user.email ?? null,
+      created_at: user.created_at,
+    }))
     users.push(...batch)
 
     if (batch.length < perPage) break
@@ -120,7 +124,7 @@ export default async function AdminPage() {
 
     const profileRows = (profilesRes.data ?? []) as ProfileRow[]
     const recentUsage = (usageRes.data ?? []) as UsageRow[]
-    let authUsers: Array<{ id: string; email: string | null }> = []
+    let authUsers: Array<{ id: string; email: string | null; created_at: string }> = []
 
     try {
       authUsers = await listAllAuthUsers(adminSupabase)
@@ -129,6 +133,7 @@ export default async function AdminPage() {
     }
 
     const authEmailMap = new Map(authUsers.map(user => [user.id, user.email]))
+    const authUserMap = new Map(authUsers.map(user => [user.id, user]))
     const profileMap = new Map(profileRows.map(profile => [profile.id, profile]))
     const usageTodayByUser = new Map<string, { alto: number; advanced: number }>()
 
@@ -142,16 +147,30 @@ export default async function AdminPage() {
       })
     }
 
-    users = profileRows.map(profile => {
-      const todayUsage = usageTodayByUser.get(profile.id) ?? { alto: 0, advanced: 0 }
+    const mergedUserIds = Array.from(new Set([
+      ...authUsers.map(user => user.id),
+      ...profileRows.map(profile => profile.id),
+    ]))
 
-      return {
-        ...profile,
-        email: authEmailMap.get(profile.id) ?? null,
-        alto_today: todayUsage.alto,
-        advanced_today: todayUsage.advanced,
-      }
-    })
+    users = mergedUserIds
+      .map(userId => {
+        const profile = profileMap.get(userId)
+        const authUser = authUserMap.get(userId)
+        const todayUsage = usageTodayByUser.get(userId) ?? { alto: 0, advanced: 0 }
+
+        return {
+          id: userId,
+          name: profile?.name ?? null,
+          email: authEmailMap.get(userId) ?? null,
+          plan_tier: profile?.plan_tier ?? null,
+          role: profile?.role ?? null,
+          target_exam: profile?.target_exam ?? null,
+          created_at: profile?.created_at ?? authUser?.created_at ?? new Date(0).toISOString(),
+          alto_today: todayUsage.alto,
+          advanced_today: todayUsage.advanced,
+        }
+      })
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
     usageRows = recentUsage.map(row => {
       const profile = profileMap.get(row.user_id)

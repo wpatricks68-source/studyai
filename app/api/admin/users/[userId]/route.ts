@@ -59,26 +59,28 @@ export async function PATCH(
     .from('profiles')
     .select('id, name, plan_tier, role')
     .eq('id', params.userId)
-    .single()
+    .maybeSingle()
 
-  if (targetError || !currentProfile) {
-    return NextResponse.json({ error: 'Usuario de destino nao encontrado.' }, { status: 404 })
+  if (targetError) {
+    return NextResponse.json({ error: 'Nao foi possivel carregar o usuario de destino.' }, { status: 500 })
   }
 
   const changedFields: string[] = []
   const payload: Record<string, string> = {}
+  const currentPlanTier = currentProfile?.plan_tier ?? 'gratuito'
+  const currentRole = currentProfile?.role ?? 'user'
 
-  if (nextPlanTier && currentProfile.plan_tier !== nextPlanTier) {
+  if (nextPlanTier && currentPlanTier !== nextPlanTier) {
     payload.plan_tier = nextPlanTier
     changedFields.push('plan_tier')
   }
 
-  if (nextRole && currentProfile.role !== nextRole) {
+  if (nextRole && currentRole !== nextRole) {
     if (params.userId === user.id && nextRole !== 'admin') {
       return NextResponse.json({ error: 'Voce nao pode revogar o proprio acesso administrativo.' }, { status: 400 })
     }
 
-    if (currentProfile.role === 'admin' && nextRole !== 'admin') {
+    if (currentRole === 'admin' && nextRole !== 'admin') {
       const { count: adminCount, error: adminCountError } = await adminSupabase
         .from('profiles')
         .select('id', { count: 'exact', head: true })
@@ -99,22 +101,51 @@ export async function PATCH(
 
   if (!changedFields.length) {
     return NextResponse.json({
-      user: currentProfile,
+      user: currentProfile ?? {
+        id: params.userId,
+        name: null,
+        plan_tier: currentPlanTier,
+        role: currentRole,
+      },
       message: 'Nenhuma alteracao foi necessaria.',
     })
   }
 
-  const { data: updatedProfile, error: updateError } = await adminSupabase
-    .from('profiles')
-    .update(payload)
-    .eq('id', params.userId)
-    .select('id, name, plan_tier, role')
-    .single()
+  if (!currentProfile) {
+    const { data: targetAuthUser, error: targetAuthError } = await adminSupabase.auth.admin.getUserById(params.userId)
+
+    if (targetAuthError || !targetAuthUser.user) {
+      return NextResponse.json({ error: 'Usuario de destino nao encontrado.' }, { status: 404 })
+    }
+  }
+
+  const writeQuery = currentProfile
+    ? adminSupabase
+        .from('profiles')
+        .update(payload)
+        .eq('id', params.userId)
+        .select('id, name, plan_tier, role')
+        .single()
+    : adminSupabase
+        .from('profiles')
+        .insert({
+          id: params.userId,
+          name: null,
+          target_exam: null,
+          exam_date: null,
+          daily_goal: 0,
+          plan_tier: payload.plan_tier ?? currentPlanTier,
+          role: payload.role ?? currentRole,
+        })
+        .select('id, name, plan_tier, role')
+        .single()
+
+  const { data: updatedProfile, error: updateError } = await writeQuery
 
   if (updateError || !updatedProfile) {
     console.error('[AdminAPI] Erro ao atualizar perfil:', updateError)
     return NextResponse.json({ 
-      error: 'Nao foi possivel atualizar o plano do usuario.',
+      error: 'Nao foi possivel atualizar o usuario.',
       details: updateError?.message 
     }, { status: 500 })
   }
@@ -127,9 +158,9 @@ export async function PATCH(
       target_type: 'profile',
       target_id: params.userId,
       payload: {
-        previous_plan_tier: currentProfile.plan_tier,
+        previous_plan_tier: currentProfile?.plan_tier ?? null,
         next_plan_tier: updatedProfile.plan_tier,
-        previous_role: currentProfile.role,
+        previous_role: currentProfile?.role ?? null,
         next_role: updatedProfile.role,
         changed_fields: changedFields,
       },
