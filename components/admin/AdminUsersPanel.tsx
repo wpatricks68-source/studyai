@@ -185,21 +185,21 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
           width: 100%;
         }
         .admin-users-wrap {
-          overflow-x: auto;
+          padding: 14px 16px 16px;
           border-bottom: 1px solid rgba(255,255,255,0.06);
+          background: rgba(7,10,18,.08);
         }
         .admin-users-grid {
-          min-width: 1080px;
-        }
-        .admin-users-grid-head,
-        .admin-users-grid-row {
-          display: grid;
-          grid-template-columns: minmax(240px, 1.55fr) minmax(150px, .95fr) minmax(128px, .75fr) minmax(128px, .75fr) minmax(140px, .8fr) minmax(128px, .75fr) minmax(150px, .85fr);
-          align-items: center;
-          column-gap: 14px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
         }
         .admin-users-grid-head {
-          padding: 13px 16px;
+          display: grid;
+          grid-template-columns: minmax(220px, 1.5fr) minmax(120px, .8fr) minmax(112px, .72fr) minmax(112px, .72fr) minmax(124px, .76fr) minmax(112px, .72fr) minmax(132px, .8fr);
+          align-items: center;
+          column-gap: 14px;
+          padding: 0 12px 2px;
           font-size: 11px;
           color: var(--muted,#6b7194);
           text-transform: uppercase;
@@ -208,21 +208,29 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
           background: var(--surface,#111420);
         }
         .admin-users-grid-body {
-          height: 184px;
+          max-height: 244px;
+          min-height: 96px;
           overflow-y: scroll;
           overflow-x: hidden;
           scrollbar-gutter: stable;
-          background: rgba(7,10,18,.08);
+          padding-right: 6px;
         }
         .admin-users-grid-row {
-          min-height: 76px;
-          padding: 12px 16px;
-          border-top: 1px solid rgba(255,255,255,0.06);
+          display: grid;
+          grid-template-columns: minmax(220px, 1.5fr) minmax(120px, .8fr) minmax(112px, .72fr) minmax(112px, .72fr) minmax(124px, .76fr) minmax(112px, .72fr) minmax(132px, .8fr);
+          align-items: center;
+          column-gap: 14px;
+          min-height: 72px;
+          padding: 10px 12px;
+          border: 1px solid var(--border,#1f2640);
+          border-radius: 12px;
+          background: var(--surface,#111420);
           font-size: 13px;
           color: var(--text,#e8eaf6);
+          margin-bottom: 8px;
         }
         .admin-users-grid-row:hover {
-          background: rgba(255,255,255,0.02);
+          background: rgba(255,255,255,0.025);
         }
         .admin-users-grid-empty {
           min-height: 120px;
@@ -232,7 +240,9 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
           padding: 22px 14px;
           color: var(--muted,#6b7194);
           text-align: center;
-          border-top: 1px solid rgba(255,255,255,0.06);
+          border: 1px solid var(--border,#1f2640);
+          border-radius: 12px;
+          background: var(--surface,#111420);
         }
         .admin-users-cell {
           min-width: 0;
@@ -244,6 +254,14 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
         .admin-users-grid button {
           width: 100%;
           box-sizing: border-box;
+        }
+        .admin-users-grid-foot {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          color: var(--muted,#6b7194);
+          font-size: 11px;
+          padding: 0 12px;
         }
         .admin-users-stats {
           display: grid;
@@ -563,6 +581,10 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
                     </div>
                   )
                 })}
+              </div>
+              <div className="admin-users-grid-foot">
+                <span>{filteredUsers.length} usuario{filteredUsers.length === 1 ? '' : 's'} encontrado{filteredUsers.length === 1 ? '' : 's'}</span>
+                <span>Role a lista para navegar entre as linhas</span>
               </div>
             </div>
           </div>
