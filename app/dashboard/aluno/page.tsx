@@ -3,10 +3,6 @@ import StudentAreaPanel from '@/components/ui/StudentAreaPanel'
 import { createClient } from '@/lib/supabase/server'
 import { normalizePlanTier } from '@/lib/search-plans'
 
-function getTodayKey() {
-  return new Date().toISOString().slice(0, 10)
-}
-
 export default async function AlunoPage() {
   const supabase = await createClient()
 
@@ -16,20 +12,14 @@ export default async function AlunoPage() {
 
   if (!user) redirect('/auth/login')
 
-  const todayKey = getTodayKey()
-
-  const [profileRes, usageRes, sessionsCountRes, flashcardsCountRes, answersCountRes] = await Promise.allSettled([
+  const [profileRes, sessionsCountRes, flashcardsCountRes, answersCountRes] = await Promise.allSettled([
     supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
-    supabase.from('usage_daily').select('*').eq('user_id', user.id).eq('usage_date', todayKey).maybeSingle(),
     supabase.from('study_sessions').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
     supabase.from('flashcards').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
     supabase.from('question_answers').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
   ])
 
   const profile = profileRes.status === 'fulfilled' ? profileRes.value.data : null
-  const usage = usageRes.status === 'fulfilled'
-    ? usageRes.value.data ?? { alto_busca_count: 0, advanced_busca_count: 0 }
-    : { alto_busca_count: 0, advanced_busca_count: 0 }
 
   const stats = {
     sessionsCount: sessionsCountRes.status === 'fulfilled' ? sessionsCountRes.value.count ?? 0 : 0,
@@ -57,7 +47,6 @@ export default async function AlunoPage() {
         lastSignInAt: user.last_sign_in_at,
       }}
       initialProfile={profile}
-      initialUsage={usage}
       stats={stats}
       profileCompletion={profileCompletion}
       normalizedPlan={normalizePlanTier(profile?.plan_tier)}

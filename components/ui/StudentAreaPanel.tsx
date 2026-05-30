@@ -3,9 +3,9 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { Bot, CheckCircle2, Crown, LockKeyhole, Mail, MessageSquare, ShieldCheck, Sparkles, UserRound } from 'lucide-react'
+import { Bot, Crown, LockKeyhole, Mail, MessageSquare, ShieldCheck, Sparkles, UserRound } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { getSearchLimits, normalizePlanTier, type PlanTier } from '@/lib/search-plans'
+import { normalizePlanTier, type PlanTier } from '@/lib/search-plans'
 import type { Profile } from '@/types/database'
 
 type UserSnapshot = {
@@ -13,11 +13,6 @@ type UserSnapshot = {
   email: string
   createdAt?: string
   lastSignInAt?: string | null
-}
-
-type UsageSnapshot = {
-  alto_busca_count: number
-  advanced_busca_count: number
 }
 
 type StatsSnapshot = {
@@ -34,7 +29,6 @@ type Notice = {
 type StudentAreaPanelProps = {
   user: UserSnapshot
   initialProfile: Profile | null
-  initialUsage: UsageSnapshot
   stats: StatsSnapshot
   profileCompletion: number
   normalizedPlan: PlanTier
@@ -70,7 +64,6 @@ function noticeStyle(tone: 'success' | 'error' | 'neutral') {
 export default function StudentAreaPanel({
   user,
   initialProfile,
-  initialUsage,
   stats,
   profileCompletion,
   normalizedPlan,
@@ -96,32 +89,6 @@ export default function StudentAreaPanel({
   const [sendingRecovery, setSendingRecovery] = useState(false)
   const [recoverySent, setRecoverySent] = useState(false)
   const effectivePlan = normalizePlanTier(profile?.plan_tier ?? normalizedPlan)
-  const altoLimits = getSearchLimits(effectivePlan, 'alto')
-  const advancedLimits = getSearchLimits(effectivePlan, 'advanced')
-
-  const planCards = [
-    {
-      key: 'gratuito' as const,
-      title: 'Gratuito',
-      badge: 'Entrada',
-      description: 'Ideal para validacao da experiencia.',
-      features: [`${getSearchLimits('gratuito', 'alto').dailySearchLimit} buscas por dia`, 'Sem busca avancada', 'Fluxo principal liberado'],
-    },
-    {
-      key: 'basico' as const,
-      title: 'Basico',
-      badge: 'Mais vendido',
-      description: 'Escala equilibrada para recorrencia.',
-      features: [`${getSearchLimits('basico', 'alto').dailySearchLimit} buscas por dia`, `${getSearchLimits('basico', 'advanced').dailyAdvancedLimit} avancadas`, 'Providers liberados com modelos gratuitos'],
-    },
-    {
-      key: 'premium' as const,
-      title: 'Premium',
-      badge: 'Top tier',
-      description: 'Capacidade completa para uso intensivo.',
-      features: [`${getSearchLimits('premium', 'alto').dailySearchLimit} buscas por dia`, `${getSearchLimits('premium', 'advanced').dailyAdvancedLimit} avancadas`, 'Modelos pagos e limites maximos'],
-    },
-  ]
 
   async function handleEmailUpdate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -242,19 +209,17 @@ export default function StudentAreaPanel({
     <>
       <style>{`
         .student-shell { padding: 28px 32px 36px; display: flex; flex-direction: column; gap: 16px; min-height: 100%; background: radial-gradient(circle at top right, rgba(0,212,170,.08), transparent 32%), radial-gradient(circle at top left, rgba(108,99,255,.12), transparent 28%), var(--bg,#0a0c12); }
-        .student-grid, .student-grid-equal, .student-plan-grid, .student-mini-grid, .student-form-grid, .student-split-grid { display: grid; gap: 16px; }
+        .student-grid, .student-grid-equal, .student-mini-grid, .student-form-grid { display: grid; gap: 16px; }
         .student-grid { grid-template-columns: minmax(0,1.45fr) minmax(320px,.85fr); }
         .student-grid-equal { grid-template-columns: repeat(2, minmax(0,1fr)); }
         .student-mini-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
-        .student-plan-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
         .student-form-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
-        .student-split-grid { grid-template-columns: minmax(0,1.1fr) minmax(0,.9fr); }
         .student-card { background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0)), var(--surface,#111420); border: 1px solid var(--border,#1f2640); border-radius: 18px; padding: 20px; box-shadow: 0 18px 40px rgba(0,0,0,.16); }
         .student-field { width: 100%; background: var(--surface2,#181d2e); border: 1px solid var(--border,#1f2640); border-radius: 10px; color: var(--text,#e8eaf6); padding: 11px 13px; outline: none; }
         .student-field:focus { border-color: var(--accent,#6c63ff); box-shadow: 0 0 0 3px rgba(108,99,255,.12); }
         .student-button { border: none; border-radius: 10px; padding: 11px 16px; cursor: pointer; font-size: 13px; font-weight: 700; }
         .student-chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 6px 10px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.04); color: var(--text,#e8eaf6); font-size: 11px; font-weight: 600; }
-        @media (max-width: 1180px) { .student-grid, .student-grid-equal, .student-plan-grid, .student-mini-grid, .student-split-grid { grid-template-columns: 1fr; } }
+        @media (max-width: 1180px) { .student-grid, .student-grid-equal, .student-mini-grid { grid-template-columns: 1fr; } }
         @media (max-width: 780px) { .student-shell { padding: 20px 16px 24px; } .student-form-grid { grid-template-columns: 1fr; } }
       `}</style>
 
@@ -430,51 +395,6 @@ export default function StudentAreaPanel({
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <section className="student-card">
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Crown size={18} color="var(--amber)" /><div><div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)' }}>Plano e beneficios</div><div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '2px' }}>Status comercial e operacional do aluno.</div></div></div>
-                <div className="student-chip" style={{ color: 'var(--amber)' }}><Crown size={14} /> Plano atual: {getPlanLabel(effectivePlan)}</div>
-              </div>
-
-              <div className="student-split-grid" style={{ marginBottom: '16px' }}>
-                <div style={{ padding: '16px', borderRadius: '14px', background: 'var(--surface2)', border: '1px solid var(--border)' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Consumo do dia</div>
-                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '12px' }}>
-                    <div><div style={{ fontSize: '26px', color: 'var(--accent)', fontWeight: 700 }}>{initialUsage.alto_busca_count}</div><div style={{ fontSize: '12px', color: 'var(--muted)' }}>de {altoLimits.dailySearchLimit} buscas</div></div>
-                    <div><div style={{ fontSize: '26px', color: 'var(--accent2)', fontWeight: 700 }}>{initialUsage.advanced_busca_count}</div><div style={{ fontSize: '12px', color: 'var(--muted)' }}>de {advancedLimits.dailyAdvancedLimit} avancadas</div></div>
-                  </div>
-                </div>
-                <div style={{ padding: '16px', borderRadius: '14px', background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Leitura do plano</div>
-                  <div style={{ fontSize: '15px', color: 'var(--text)', fontWeight: 700, marginTop: '8px', lineHeight: 1.5 }}>{getPlanSubtitle(effectivePlan)}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '8px', lineHeight: 1.6 }}>A troca automatica do plano pode ser ligada depois ao checkout sem refazer esta interface.</div>
-                </div>
-              </div>
-
-              <div className="student-plan-grid">
-                {planCards.map(plan => {
-                  const active = plan.key === effectivePlan
-                  return (
-                    <div key={plan.key} style={{ padding: '16px', borderRadius: '14px', background: active ? 'rgba(108,99,255,.12)' : 'var(--surface2)', border: active ? '1px solid rgba(108,99,255,.34)' : '1px solid var(--border)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'center' }}>
-                        <div style={{ fontSize: '16px', color: 'var(--text)', fontWeight: 700 }}>{plan.title}</div>
-                        <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', padding: '5px 8px', borderRadius: '999px', background: active ? 'rgba(108,99,255,.16)' : 'rgba(255,255,255,.06)', color: active ? 'var(--accent)' : 'var(--muted)' }}>{active ? 'Plano atual' : plan.badge}</div>
-                      </div>
-                      <p style={{ margin: '10px 0 0', fontSize: '12px', lineHeight: 1.65, color: 'var(--muted)' }}>{plan.description}</p>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
-                        {plan.features.map(feature => (
-                          <div key={feature} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '12px', color: 'var(--text)', lineHeight: 1.55 }}>
-                            <CheckCircle2 size={14} color={active ? 'var(--accent)' : 'var(--accent2)'} style={{ flexShrink: 0, marginTop: '2px' }} />
-                            <span>{feature}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </section>
-
             <section className="student-card">
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}><MessageSquare size={18} color="var(--accent2)" /><div><div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)' }}>Chat e acompanhamento</div><div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '2px' }}>Entrada clara para a conversa com IA.</div></div></div>
               <div style={{ padding: '18px', borderRadius: '16px', background: 'linear-gradient(135deg, rgba(0,212,170,.12), rgba(108,99,255,.1))', border: '1px solid rgba(0,212,170,.16)' }}>
