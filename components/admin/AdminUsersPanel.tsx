@@ -103,6 +103,7 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
   )
   const [savingUserId, setSavingUserId] = useState<string | null>(null)
   const [notice, setNotice] = useState<Notice>(null)
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
 
   const filteredUsers = useMemo(() => {
     const searchTokens = normalizeSearchValue(search).split(/\s+/).filter(Boolean)
@@ -138,6 +139,13 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
   const totalWithUsageToday = users.filter(user => user.alto_today > 0 || user.advanced_today > 0).length
   const totalAdmins = users.filter(user => user.role === 'admin').length
   const totalPremium = users.filter(user => user.plan_tier === 'premium').length
+  const selectedUser = selectedUserId ? users.find(user => user.id === selectedUserId) ?? null : null
+  const selectedDraft = selectedUser
+    ? drafts[selectedUser.id] ?? {
+        planTier: selectedUser.plan_tier ?? 'gratuito',
+        role: selectedUser.role === 'admin' ? 'admin' : 'user',
+      }
+    : null
 
   async function handleSave(userId: string) {
     const draft = drafts[userId]
@@ -166,6 +174,7 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
         tone: data.auditWarning ? 'neutral' : 'success',
         text: data.message || 'Alteracoes salvas com sucesso.',
       })
+      setSelectedUserId(null)
       startTransition(() => router.refresh())
     } catch (error) {
       setNotice({
@@ -189,50 +198,79 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
           border-bottom: 1px solid rgba(255,255,255,0.06);
           background: rgba(7,10,18,.08);
         }
-        .admin-users-grid {
+        .admin-users-preview-head {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          color: var(--muted,#6b7194);
+          font-size: 11px;
+          padding: 0 2px 10px;
+        }
+        .admin-users-results {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          gap: 10px;
+          max-height: 244px;
+          overflow-y: scroll;
+          scrollbar-gutter: stable;
+          padding-right: 6px;
+        }
+        .admin-user-preview {
+          text-align: left;
+          width: 100%;
+          min-height: 104px;
+          padding: 13px 14px;
+          border: 1px solid var(--border,#1f2640);
+          border-radius: 12px;
+          background: var(--surface,#111420);
+          color: var(--text,#e8eaf6);
+          cursor: pointer;
           display: flex;
           flex-direction: column;
           gap: 10px;
         }
-        .admin-users-grid-head {
-          display: grid;
-          grid-template-columns: minmax(220px, 1.5fr) minmax(120px, .8fr) minmax(112px, .72fr) minmax(112px, .72fr) minmax(124px, .76fr) minmax(112px, .72fr) minmax(132px, .8fr);
-          align-items: center;
-          column-gap: 14px;
-          padding: 0 12px 2px;
-          font-size: 11px;
-          color: var(--muted,#6b7194);
-          text-transform: uppercase;
-          letter-spacing: 1px;
-          font-weight: 700;
-          background: var(--surface,#111420);
-        }
-        .admin-users-grid-body {
-          max-height: 244px;
-          min-height: 96px;
-          overflow-y: scroll;
-          overflow-x: hidden;
-          scrollbar-gutter: stable;
-          padding-right: 6px;
-        }
-        .admin-users-grid-row {
-          display: grid;
-          grid-template-columns: minmax(220px, 1.5fr) minmax(120px, .8fr) minmax(112px, .72fr) minmax(112px, .72fr) minmax(124px, .76fr) minmax(112px, .72fr) minmax(132px, .8fr);
-          align-items: center;
-          column-gap: 14px;
-          min-height: 72px;
-          padding: 10px 12px;
-          border: 1px solid var(--border,#1f2640);
-          border-radius: 12px;
-          background: var(--surface,#111420);
-          font-size: 13px;
-          color: var(--text,#e8eaf6);
-          margin-bottom: 8px;
-        }
-        .admin-users-grid-row:hover {
+        .admin-user-preview:hover,
+        .admin-user-preview:focus-visible {
           background: rgba(255,255,255,0.025);
+          border-color: rgba(108,99,255,.38);
+          outline: none;
         }
-        .admin-users-grid-empty {
+        .admin-user-preview-main {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+        }
+        .admin-user-preview-name {
+          color: var(--text,#e8eaf6);
+          font-size: 13px;
+          font-weight: 800;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .admin-user-preview-email,
+        .admin-user-preview-id,
+        .admin-user-preview-meta {
+          color: var(--muted,#6b7194);
+          font-size: 12px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .admin-user-preview-tags {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        .admin-user-tag {
+          border: 1px solid rgba(255,255,255,.08);
+          border-radius: 999px;
+          padding: 5px 8px;
+          color: var(--muted,#6b7194);
+          font-size: 11px;
+          font-weight: 700;
+        }
+        .admin-users-empty {
           min-height: 120px;
           display: flex;
           align-items: center;
@@ -244,24 +282,72 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
           border-radius: 12px;
           background: var(--surface,#111420);
         }
-        .admin-users-cell {
-          min-width: 0;
+        .admin-user-dialog-backdrop {
+          position: fixed;
+          inset: 0;
+          z-index: 80;
+          background: rgba(3,6,14,.66);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 22px;
         }
-        .admin-users-cell-muted {
-          color: var(--muted,#6b7194);
+        .admin-user-dialog {
+          width: min(100%, 560px);
+          max-height: calc(100vh - 44px);
+          overflow-y: auto;
+          background: var(--surface,#111420);
+          border: 1px solid var(--border,#1f2640);
+          border-radius: 18px;
+          box-shadow: 0 26px 90px rgba(0,0,0,.52);
         }
-        .admin-users-grid select,
-        .admin-users-grid button {
-          width: 100%;
-          box-sizing: border-box;
-        }
-        .admin-users-grid-foot {
+        .admin-user-dialog-header {
+          padding: 18px 20px;
+          border-bottom: 1px solid var(--border,#1f2640);
           display: flex;
           justify-content: space-between;
+          gap: 14px;
+          align-items: flex-start;
+        }
+        .admin-user-dialog-body {
+          padding: 18px 20px 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+        }
+        .admin-user-dialog-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 12px;
+        }
+        .admin-user-dialog-field {
+          background: var(--surface2,#181d2e);
+          border: 1px solid var(--border,#1f2640);
+          border-radius: 12px;
+          padding: 12px;
+        }
+        .admin-user-dialog-field label {
+          display: block;
           color: var(--muted,#6b7194);
-          font-size: 11px;
-          padding: 0 12px;
+          font-size: 10px;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          margin-bottom: 7px;
+          font-weight: 700;
+        }
+        .admin-user-dialog-field div {
+          color: var(--text,#e8eaf6);
+          font-size: 13px;
+          word-break: break-word;
+        }
+        .admin-user-dialog select {
+          width: 100%;
+          background: var(--surface2,#181d2e);
+          border: 1px solid var(--border,#1f2640);
+          border-radius: 10px;
+          color: var(--text,#e8eaf6);
+          padding: 10px 12px;
+          outline: none;
         }
         .admin-users-stats {
           display: grid;
@@ -461,254 +547,173 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
           </div>
         )}
 
-        <div className="admin-users-desktop">
-          <div className="admin-users-wrap">
-            <div className="admin-users-grid" role="table" aria-label="Gestao de usuarios">
-              <div className="admin-users-grid-head" role="row">
-                <div role="columnheader">Usuario</div>
-                <div role="columnheader">Concurso</div>
-                <div role="columnheader">Uso hoje</div>
-                <div role="columnheader">Role</div>
-                <div role="columnheader">Plano</div>
-                <div role="columnheader">Criado em</div>
-                <div role="columnheader">Acoes</div>
-              </div>
+        <div className="admin-users-wrap">
+          <div className="admin-users-preview-head">
+            <span>{filteredUsers.length} usuario{filteredUsers.length === 1 ? '' : 's'} encontrado{filteredUsers.length === 1 ? '' : 's'}</span>
+            <span>Clique em um usuario para abrir a caixa de alteracoes</span>
+          </div>
 
-              <div className="admin-users-grid-body">
-                {filteredUsers.length === 0 ? (
-                  <div className="admin-users-grid-empty">
-                    Nenhum usuario encontrado com os filtros atuais.
+          <div className="admin-users-results">
+            {filteredUsers.length === 0 ? (
+              <div className="admin-users-empty">
+                Nenhum usuario encontrado com os filtros atuais.
+              </div>
+            ) : filteredUsers.map(user => (
+              <button
+                key={user.id}
+                type="button"
+                className="admin-user-preview"
+                onClick={() => setSelectedUserId(user.id)}
+              >
+                <div className="admin-user-preview-main">
+                  <div style={{ minWidth: 0 }}>
+                    <div className="admin-user-preview-name">{user.name || 'Sem nome'}</div>
+                    <div className="admin-user-preview-email">{user.email || formatUserId(user.id)}</div>
+                    <div className="admin-user-preview-id">{formatUserId(user.id)}</div>
                   </div>
-                ) : filteredUsers.map(user => {
-                  const draft = drafts[user.id] ?? {
-                    planTier: user.plan_tier ?? 'gratuito',
-                    role: user.role === 'admin' ? 'admin' : 'user',
-                  }
-                  const isSaving = savingUserId === user.id
-                  const isDirty =
-                    draft.planTier !== (user.plan_tier ?? 'gratuito') ||
-                    draft.role !== (user.role === 'admin' ? 'admin' : 'user')
-
-                  return (
-                    <div key={user.id} className="admin-users-grid-row" role="row">
-                      <div className="admin-users-cell" role="cell">
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                          <strong style={{ color: 'var(--text,#e8eaf6)', fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.name || 'Sem nome'}</strong>
-                          <span style={{ color: 'var(--muted,#6b7194)', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email || formatUserId(user.id)}</span>
-                          <span style={{ color: 'var(--muted,#6b7194)', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatUserId(user.id)}</span>
-                        </div>
-                      </div>
-                      <div className="admin-users-cell admin-users-cell-muted" role="cell">{user.target_exam || 'Nao informado'}</div>
-                      <div className="admin-users-cell" role="cell">
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <span style={{ color: '#34d399', fontWeight: 700 }}>Alto: {user.alto_today}</span>
-                          <span style={{ color: '#60a5fa', fontWeight: 700 }}>Avancada: {user.advanced_today}</span>
-                        </div>
-                      </div>
-                      <div className="admin-users-cell" role="cell">
-                        <select
-                          value={draft.role}
-                          onChange={event =>
-                            setDrafts(current => ({
-                              ...current,
-                              [user.id]: { ...(current[user.id] ?? draft), role: event.target.value },
-                            }))
-                          }
-                          disabled={isSaving || isPending}
-                          style={{
-                            background: 'var(--surface2,#181d2e)',
-                            border: '1px solid var(--border,#1f2640)',
-                            borderRadius: '10px',
-                            color: draft.role === 'admin' ? '#fbbf24' : 'var(--text,#e8eaf6)',
-                            padding: '9px 10px',
-                            outline: 'none',
-                            fontWeight: 700,
-                          }}
-                        >
-                          {ROLE_OPTIONS.map(option => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="admin-users-cell" role="cell">
-                        <select
-                          value={draft.planTier}
-                          onChange={event =>
-                            setDrafts(current => ({
-                              ...current,
-                              [user.id]: { ...(current[user.id] ?? draft), planTier: event.target.value },
-                            }))
-                          }
-                          disabled={isSaving || isPending}
-                          style={{
-                            background: 'var(--surface2,#181d2e)',
-                            border: '1px solid var(--border,#1f2640)',
-                            borderRadius: '10px',
-                            color: 'var(--text,#e8eaf6)',
-                            padding: '9px 10px',
-                            outline: 'none',
-                          }}
-                        >
-                          {PLAN_OPTIONS.map(option => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="admin-users-cell admin-users-cell-muted" role="cell">{formatDate(user.created_at)}</div>
-                      <div className="admin-users-cell" role="cell">
-                        <button
-                          type="button"
-                          onClick={() => handleSave(user.id)}
-                          disabled={!isDirty || isSaving || isPending}
-                          style={{
-                            padding: '9px 12px',
-                            borderRadius: '10px',
-                            border: 'none',
-                            background: !isDirty || isSaving || isPending ? 'var(--surface2,#181d2e)' : 'var(--accent,#6c63ff)',
-                            color: !isDirty || isSaving || isPending ? 'var(--muted,#6b7194)' : '#fff',
-                            fontSize: '12px',
-                            fontWeight: 700,
-                            cursor: !isDirty || isSaving || isPending ? 'default' : 'pointer',
-                          }}
-                        >
-                          {isSaving ? 'Salvando...' : 'Salvar alteracoes'}
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-              <div className="admin-users-grid-foot">
-                <span>{filteredUsers.length} usuario{filteredUsers.length === 1 ? '' : 's'} encontrado{filteredUsers.length === 1 ? '' : 's'}</span>
-                <span>Role a lista para navegar entre as linhas</span>
-              </div>
-            </div>
+                  <div style={{ color: user.role === 'admin' ? '#fbbf24' : 'var(--muted,#6b7194)', fontSize: '12px', fontWeight: 800, flexShrink: 0 }}>
+                    {user.role === 'admin' ? 'Admin' : 'User'}
+                  </div>
+                </div>
+                <div className="admin-user-preview-tags">
+                  <span className="admin-user-tag">Plano: {user.plan_tier ?? 'gratuito'}</span>
+                  <span className="admin-user-tag">Concurso: {user.target_exam || 'Nao informado'}</span>
+                  <span className="admin-user-tag">Alto: {user.alto_today}</span>
+                  <span className="admin-user-tag">Avancada: {user.advanced_today}</span>
+                </div>
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="admin-users-mobile">
-          {filteredUsers.length === 0 ? (
-            <div style={{ padding: '18px', borderRadius: '14px', border: '1px solid var(--border,#1f2640)', background: 'var(--surface2,#181d2e)', color: 'var(--muted,#6b7194)', textAlign: 'center' }}>
-              Nenhum usuario encontrado com os filtros atuais.
-            </div>
-          ) : filteredUsers.map(user => {
-            const draft = drafts[user.id] ?? {
-              planTier: user.plan_tier ?? 'gratuito',
-              role: user.role === 'admin' ? 'admin' : 'user',
-            }
-            const isSaving = savingUserId === user.id
-            const isDirty =
-              draft.planTier !== (user.plan_tier ?? 'gratuito') ||
-              draft.role !== (user.role === 'admin' ? 'admin' : 'user')
-
-            return (
-              <div key={user.id} className="admin-user-card">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <strong style={{ color: 'var(--text,#e8eaf6)', fontSize: '14px' }}>{user.name || 'Sem nome'}</strong>
-                  <span style={{ color: 'var(--muted,#6b7194)', fontSize: '12px' }}>{user.email || formatUserId(user.id)}</span>
-                  <span style={{ color: 'var(--muted,#6b7194)', fontSize: '11px' }}>{formatUserId(user.id)}</span>
+        {selectedUser && selectedDraft && (
+          <div className="admin-user-dialog-backdrop" role="dialog" aria-modal="true" aria-label="Alterar usuario">
+            <div className="admin-user-dialog">
+              <div className="admin-user-dialog-header">
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ color: 'var(--text,#e8eaf6)', fontSize: '18px', fontWeight: 800 }}>{selectedUser.name || 'Sem nome'}</div>
+                  <div style={{ color: 'var(--muted,#6b7194)', fontSize: '12px', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedUser.email || formatUserId(selectedUser.id)}</div>
                 </div>
-
-                <div className="admin-user-meta">
-                  <div>
-                    <div style={{ fontSize: '10px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Concurso</div>
-                    <div style={{ fontSize: '13px', color: 'var(--text,#e8eaf6)' }}>{user.target_exam || 'Nao informado'}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '10px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Criado em</div>
-                    <div style={{ fontSize: '13px', color: 'var(--text,#e8eaf6)' }}>{formatDate(user.created_at)}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '10px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Alto hoje</div>
-                    <div style={{ fontSize: '13px', color: '#34d399', fontWeight: 700 }}>{user.alto_today}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '10px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Avancada hoje</div>
-                    <div style={{ fontSize: '13px', color: '#60a5fa', fontWeight: 700 }}>{user.advanced_today}</div>
-                  </div>
-                </div>
-
-                <div className="admin-user-fields">
-                  <select
-                    value={draft.role}
-                    onChange={event =>
-                      setDrafts(current => ({
-                        ...current,
-                        [user.id]: { ...(current[user.id] ?? draft), role: event.target.value },
-                      }))
-                    }
-                    disabled={isSaving || isPending}
-                    style={{
-                      width: '100%',
-                      background: 'var(--surface,#111420)',
-                      border: '1px solid var(--border,#1f2640)',
-                      borderRadius: '10px',
-                      color: draft.role === 'admin' ? '#fbbf24' : 'var(--text,#e8eaf6)',
-                      padding: '10px 12px',
-                      outline: 'none',
-                      fontWeight: 700,
-                    }}
-                  >
-                    {ROLE_OPTIONS.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={draft.planTier}
-                    onChange={event =>
-                      setDrafts(current => ({
-                        ...current,
-                        [user.id]: { ...(current[user.id] ?? draft), planTier: event.target.value },
-                      }))
-                    }
-                    disabled={isSaving || isPending}
-                    style={{
-                      width: '100%',
-                      background: 'var(--surface,#111420)',
-                      border: '1px solid var(--border,#1f2640)',
-                      borderRadius: '10px',
-                      color: 'var(--text,#e8eaf6)',
-                      padding: '10px 12px',
-                      outline: 'none',
-                    }}
-                  >
-                    {PLAN_OPTIONS.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
                 <button
                   type="button"
-                  onClick={() => handleSave(user.id)}
-                  disabled={!isDirty || isSaving || isPending}
-                  style={{
-                    width: '100%',
-                    padding: '11px 14px',
-                    borderRadius: '10px',
-                    border: 'none',
-                    background: !isDirty || isSaving || isPending ? 'var(--surface,#111420)' : 'var(--accent,#6c63ff)',
-                    color: !isDirty || isSaving || isPending ? 'var(--muted,#6b7194)' : '#fff',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    cursor: !isDirty || isSaving || isPending ? 'default' : 'pointer',
-                  }}
+                  onClick={() => setSelectedUserId(null)}
+                  style={{ width: '34px', height: '34px', borderRadius: '10px', border: '1px solid var(--border,#1f2640)', background: 'var(--surface2,#181d2e)', color: 'var(--text,#e8eaf6)', cursor: 'pointer', flexShrink: 0 }}
                 >
-                  {isSaving ? 'Salvando...' : 'Salvar alteracoes'}
+                  X
                 </button>
               </div>
-            )
-          })}
-        </div>
+
+              <div className="admin-user-dialog-body">
+                <div className="admin-user-dialog-grid">
+                  <div className="admin-user-dialog-field"><label>ID</label><div>{selectedUser.id}</div></div>
+                  <div className="admin-user-dialog-field"><label>Criado em</label><div>{formatDate(selectedUser.created_at)}</div></div>
+                  <div className="admin-user-dialog-field"><label>Concurso</label><div>{selectedUser.target_exam || 'Nao informado'}</div></div>
+                  <div className="admin-user-dialog-field"><label>Uso hoje</label><div>Alto: {selectedUser.alto_today} | Avancada: {selectedUser.advanced_today}</div></div>
+                </div>
+
+                <div className="admin-user-dialog-grid">
+                  <div>
+                    <label style={{ display: 'block', color: 'var(--muted,#6b7194)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '7px', fontWeight: 700 }}>Role</label>
+                    <select
+                      value={selectedDraft.role}
+                      onChange={event =>
+                        setDrafts(current => ({
+                          ...current,
+                          [selectedUser.id]: { ...selectedDraft, role: event.target.value },
+                        }))
+                      }
+                      disabled={savingUserId === selectedUser.id || isPending}
+                    >
+                      {ROLE_OPTIONS.map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', color: 'var(--muted,#6b7194)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '7px', fontWeight: 700 }}>Plano</label>
+                    <select
+                      value={selectedDraft.planTier}
+                      onChange={event =>
+                        setDrafts(current => ({
+                          ...current,
+                          [selectedUser.id]: { ...selectedDraft, planTier: event.target.value },
+                        }))
+                      }
+                      disabled={savingUserId === selectedUser.id || isPending}
+                    >
+                      {PLAN_OPTIONS.map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', flexWrap: 'wrap', marginTop: '4px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedUserId(null)}
+                    style={{ padding: '11px 14px', borderRadius: '10px', border: '1px solid var(--border,#1f2640)', background: 'transparent', color: 'var(--text,#e8eaf6)', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSave(selectedUser.id)}
+                    disabled={
+                      savingUserId === selectedUser.id ||
+                      isPending ||
+                      (
+                        selectedDraft.planTier === (selectedUser.plan_tier ?? 'gratuito') &&
+                        selectedDraft.role === (selectedUser.role === 'admin' ? 'admin' : 'user')
+                      )
+                    }
+                    style={{
+                      padding: '11px 14px',
+                      borderRadius: '10px',
+                      border: 'none',
+                      background:
+                        savingUserId === selectedUser.id ||
+                        isPending ||
+                        (
+                          selectedDraft.planTier === (selectedUser.plan_tier ?? 'gratuito') &&
+                          selectedDraft.role === (selectedUser.role === 'admin' ? 'admin' : 'user')
+                        )
+                          ? 'var(--surface2,#181d2e)'
+                          : 'var(--accent,#6c63ff)',
+                      color:
+                        savingUserId === selectedUser.id ||
+                        isPending ||
+                        (
+                          selectedDraft.planTier === (selectedUser.plan_tier ?? 'gratuito') &&
+                          selectedDraft.role === (selectedUser.role === 'admin' ? 'admin' : 'user')
+                        )
+                          ? 'var(--muted,#6b7194)'
+                          : '#fff',
+                      fontSize: '12px',
+                      fontWeight: 800,
+                      cursor:
+                        savingUserId === selectedUser.id ||
+                        isPending ||
+                        (
+                          selectedDraft.planTier === (selectedUser.plan_tier ?? 'gratuito') &&
+                          selectedDraft.role === (selectedUser.role === 'admin' ? 'admin' : 'user')
+                        )
+                          ? 'default'
+                          : 'pointer',
+                    }}
+                  >
+                    {savingUserId === selectedUser.id ? 'Salvando...' : 'Salvar alteracoes'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
     </>
   )
