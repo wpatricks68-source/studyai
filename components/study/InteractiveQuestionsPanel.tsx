@@ -102,23 +102,22 @@ export default function InteractiveQuestionsPanel({
     return (
       <div className="iq-shell" style={{ maxWidth, width: '100%' }}>
         <PanelStyles />
-        <div className="iq-empty">
-          <div className="iq-empty-icon">
-            <HelpCircle size={22} />
+        <div className="iq-inline-header">
+          <div className="iq-inline-title">
+            <HelpCircle size={16} />
+            {title}
           </div>
-          <div className="iq-empty-title">Nenhuma questão gerada ainda</div>
-          <div className="iq-empty-copy">Crie questões para praticar sem sair do resumo.</div>
           <div className="iq-empty-actions" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-            {onImport && (
-              <button onClick={onImport} style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 600, border: '1px solid var(--border,#1f2640)', background: 'transparent', color: 'var(--muted,#6b7194)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-                Importar
-              </button>
-            )}
             {onGenerateAI && (
               <button onClick={onGenerateAI} style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 600, border: '1px solid #f59e0b', background: 'transparent', color: '#f59e0b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <Sparkles size={12} />
                 {genTarget === 'questions' ? 'Gerando...' : 'Gerar com IA'}
+              </button>
+            )}
+            {onImport && (
+              <button onClick={onImport} style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 600, border: '1px solid var(--border,#1f2640)', background: 'transparent', color: 'var(--muted,#6b7194)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Upload size={12} />
+                Importar TXT/CSV
               </button>
             )}
             {onOpenManual && (
@@ -128,6 +127,9 @@ export default function InteractiveQuestionsPanel({
               </button>
             )}
           </div>
+        </div>
+        <div className="iq-empty iq-empty-compact">
+          <div className="iq-empty-copy">Nenhuma questão ainda. Use os botões acima para criar.</div>
         </div>
       </div>
     )
@@ -346,6 +348,29 @@ function PanelStyles() {
         justify-content: space-between;
         gap: 12px;
         margin-bottom: 16px;
+      }
+
+      .iq-inline-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+
+      .iq-inline-title {
+        color: var(--text,#e8eaf6);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1.2;
+      }
+
+      .iq-inline-title svg {
+        color: #f59e0b;
       }
 
       .iq-title {
@@ -684,6 +709,13 @@ function PanelStyles() {
         text-align: center;
       }
 
+      .iq-empty-compact {
+        background: var(--surface2,#181d2e);
+        border: 1px dashed var(--border,#1f2640);
+        border-radius: 10px;
+        padding: 20px;
+      }
+
       .iq-empty-icon {
         width: 42px;
         height: 42px;
@@ -735,7 +767,8 @@ function PanelStyles() {
       }
 
       @media (max-width: 720px) {
-        .iq-header {
+        .iq-header,
+        .iq-inline-header {
           align-items: stretch;
           flex-direction: column;
         }

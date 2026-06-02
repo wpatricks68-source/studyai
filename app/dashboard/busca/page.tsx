@@ -2152,7 +2152,7 @@ export default function BuscaPage() {
                   <InteractiveQuestionsPanel
                     questions={session.questions}
                     loading={genTarget === 'questions'}
-                    title="Questões do Tema"
+                    title="Questões"
                     maxWidth="100%"
                     genTarget={genTarget}
                     onDelete={handleDeleteQ}

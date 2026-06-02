@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Download, Search, Pencil, X } from 'lucide-react'
+import { Download, Search, Pencil, Trash2, X } from 'lucide-react'
 
 type AdminUserRow = {
   id: string
@@ -23,6 +23,14 @@ type AdminUsersPanelProps = {
 type Notice =
   | { tone: 'success' | 'error' | 'neutral'; text: string }
   | null
+
+type UserDraft = {
+  name: string
+  email: string
+  targetExam: string
+  planTier: string
+  role: string
+}
 
 const PLAN_OPTIONS = [
   { value: 'gratuito', label: 'Gratuito' },
@@ -211,13 +219,17 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
   const [dateTo,       setDateTo]       = useState('')
 
   /* ── drafts / modal ──────────────────────────────────── */
-  const [drafts, setDrafts] = useState<Record<string, { planTier: string; role: string }>>(
+  const [drafts, setDrafts] = useState<Record<string, UserDraft>>(
     Object.fromEntries(users.map(u => [u.id, {
+      name: u.name ?? '',
+      email: u.email ?? '',
+      targetExam: u.target_exam ?? '',
       planTier: u.plan_tier ?? 'gratuito',
       role:     u.role === 'admin' ? 'admin' : 'user',
     }]))
   )
   const [savingUserId,   setSavingUserId]   = useState<string | null>(null)
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
   const [notice,         setNotice]         = useState<Notice>(null)
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
 
@@ -268,7 +280,13 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
 
   const selectedUser  = selectedUserId ? users.find(u => u.id === selectedUserId) ?? null : null
   const selectedDraft = selectedUser
-    ? drafts[selectedUser.id] ?? { planTier: selectedUser.plan_tier ?? 'gratuito', role: selectedUser.role === 'admin' ? 'admin' : 'user' }
+    ? drafts[selectedUser.id] ?? {
+        name: selectedUser.name ?? '',
+        email: selectedUser.email ?? '',
+        targetExam: selectedUser.target_exam ?? '',
+        planTier: selectedUser.plan_tier ?? 'gratuito',
+        role: selectedUser.role === 'admin' ? 'admin' : 'user',
+      }
     : null
 
   const filtersDescription = useMemo(() => {
@@ -307,7 +325,13 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
       const response = await fetch(`/api/admin/users/${userId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planTier: draft.planTier, role: draft.role }),
+        body: JSON.stringify({
+          name: draft.name,
+          email: draft.email,
+          targetExam: draft.targetExam,
+          planTier: draft.planTier,
+          role: draft.role,
+        }),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error || 'Não foi possível atualizar o usuário.')
@@ -318,6 +342,32 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
       setNotice({ tone: 'error', text: error instanceof Error ? error.message : 'Falha inesperada ao atualizar o usuário.' })
     } finally {
       setSavingUserId(null)
+    }
+  }
+
+  async function handleDelete(user: AdminUserRow) {
+    const label = user.email || user.name || formatUserId(user.id)
+    const confirmed = window.confirm(`Excluir definitivamente ${label}? Esta acao remove o usuario do Auth e do banco de dados.`)
+
+    if (!confirmed) return
+
+    setDeletingUserId(user.id)
+    setNotice(null)
+
+    try {
+      const response = await fetch(`/api/admin/users/${user.id}`, {
+        method: 'DELETE',
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || 'Nao foi possivel excluir o usuario.')
+
+      setNotice({ tone: data.auditWarning ? 'neutral' : 'success', text: data.message || 'Usuario excluido com sucesso.' })
+      setSelectedUserId(null)
+      startTransition(() => router.refresh())
+    } catch (error) {
+      setNotice({ tone: 'error', text: error instanceof Error ? error.message : 'Falha inesperada ao excluir o usuario.' })
+    } finally {
+      setDeletingUserId(null)
     }
   }
 
@@ -338,11 +388,31 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
 
   const isSaveDisabled = (user: AdminUserRow) =>
     savingUserId === user.id ||
+    deletingUserId === user.id ||
     isPending ||
     (
+      selectedDraft?.name.trim() === (user.name ?? '') &&
+      selectedDraft?.email.trim().toLowerCase() === (user.email ?? '') &&
+      selectedDraft?.targetExam.trim() === (user.target_exam ?? '') &&
       selectedDraft?.planTier === (user.plan_tier ?? 'gratuito') &&
       selectedDraft?.role     === (user.role === 'admin' ? 'admin' : 'user')
     )
+
+  function updateSelectedDraft(userId: string, patch: Partial<UserDraft>) {
+    setDrafts(cur => ({
+      ...cur,
+      [userId]: {
+        ...(cur[userId] ?? {
+          name: '',
+          email: '',
+          targetExam: '',
+          planTier: 'gratuito',
+          role: 'user',
+        }),
+        ...patch,
+      },
+    }))
+  }
 
   return (
     <>
@@ -805,7 +875,8 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
           margin-bottom: 7px;
           font-weight: 700;
         }
-        .aup-dialog select {
+        .aup-dialog select,
+        .aup-dialog input {
           width: 100%;
           background: var(--surf2);
           border: 1px solid var(--border);
@@ -817,7 +888,32 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
           cursor: pointer;
           transition: border-color .15s;
         }
-        .aup-dialog select:focus { border-color: rgba(108,99,255,.5); }
+        .aup-dialog input { cursor: text; box-sizing: border-box; }
+        .aup-dialog select:focus,
+        .aup-dialog input:focus { border-color: rgba(108,99,255,.5); }
+        .aup-danger-zone {
+          margin-top: 4px;
+          padding: 12px;
+          border: 1px solid rgba(239,68,68,.22);
+          border-radius: 12px;
+          background: rgba(239,68,68,.07);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+        .aup-danger-title {
+          color: #fecaca;
+          font-size: 12px;
+          font-weight: 800;
+          margin-bottom: 3px;
+        }
+        .aup-danger-copy {
+          color: rgba(254,202,202,.72);
+          font-size: 11px;
+          line-height: 1.45;
+        }
         .aup-dialog-actions {
           display: flex;
           justify-content: flex-end;
@@ -837,6 +933,30 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
           transition: background .12s;
         }
         .aup-btn-cancel:hover { background: rgba(255,255,255,.04); }
+        .aup-btn-delete {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          padding: 10px 14px;
+          border-radius: 10px;
+          border: 1px solid rgba(239,68,68,.34);
+          background: rgba(239,68,68,.12);
+          color: #fca5a5;
+          font-size: 12px;
+          font-weight: 800;
+          cursor: pointer;
+          transition: background .14s, border-color .14s, color .14s;
+        }
+        .aup-btn-delete:hover:not(:disabled) {
+          background: rgba(239,68,68,.2);
+          border-color: rgba(239,68,68,.55);
+          color: #fecaca;
+        }
+        .aup-btn-delete:disabled {
+          opacity: .55;
+          cursor: default;
+        }
         .aup-btn-save {
           padding: 11px 18px;
           border-radius: 10px;
@@ -1142,14 +1262,16 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
                     <div className="aup-info-value">{formatDate(selectedUser.created_at)}</div>
                   </div>
                   <div className="aup-info-field">
-                    <label className="aup-info-label">Concurso</label>
-                    <div className="aup-info-value">{selectedUser.target_exam || 'Não informado'}</div>
-                  </div>
-                  <div className="aup-info-field">
                     <label className="aup-info-label">Uso hoje</label>
                     <div className="aup-info-value" style={{ display: 'flex', gap: '10px' }}>
                       <span style={{ color: '#34d399' }}>Alto: {selectedUser.alto_today}</span>
                       <span style={{ color: '#60a5fa' }}>Avanç.: {selectedUser.advanced_today}</span>
+                    </div>
+                  </div>
+                  <div className="aup-info-field">
+                    <label className="aup-info-label">Status</label>
+                    <div className="aup-info-value">
+                      {(selectedUser.role === 'admin' ? 'Admin' : 'User')}{' / '}{selectedUser.plan_tier || 'gratuito'}
                     </div>
                   </div>
                 </div>
@@ -1157,11 +1279,43 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
                 {/* Editable fields */}
                 <div className="aup-dialog-grid2">
                   <div>
+                    <label className="aup-field-label">Nome</label>
+                    <input
+                      value={selectedDraft.name}
+                      disabled={savingUserId === selectedUser.id || deletingUserId === selectedUser.id || isPending}
+                      onChange={e => updateSelectedDraft(selectedUser.id, { name: e.target.value })}
+                      placeholder="Nome do usuario"
+                    />
+                  </div>
+                  <div>
+                    <label className="aup-field-label">Email</label>
+                    <input
+                      type="email"
+                      value={selectedDraft.email}
+                      disabled={savingUserId === selectedUser.id || deletingUserId === selectedUser.id || isPending}
+                      onChange={e => updateSelectedDraft(selectedUser.id, { email: e.target.value })}
+                      placeholder="email@dominio.com"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="aup-field-label">Concurso</label>
+                  <input
+                    value={selectedDraft.targetExam}
+                    disabled={savingUserId === selectedUser.id || deletingUserId === selectedUser.id || isPending}
+                    onChange={e => updateSelectedDraft(selectedUser.id, { targetExam: e.target.value })}
+                    placeholder="Ex: TRF 1a Regiao, AGU, TCU"
+                  />
+                </div>
+
+                <div className="aup-dialog-grid2">
+                  <div>
                     <label className="aup-field-label">Role</label>
                     <select
                       value={selectedDraft.role}
-                      disabled={savingUserId === selectedUser.id || isPending}
-                      onChange={e => setDrafts(cur => ({ ...cur, [selectedUser.id]: { ...selectedDraft, role: e.target.value } }))}
+                      disabled={savingUserId === selectedUser.id || deletingUserId === selectedUser.id || isPending}
+                      onChange={e => updateSelectedDraft(selectedUser.id, { role: e.target.value })}
                     >
                       {ROLE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                     </select>
@@ -1170,17 +1324,40 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
                     <label className="aup-field-label">Plano</label>
                     <select
                       value={selectedDraft.planTier}
-                      disabled={savingUserId === selectedUser.id || isPending}
-                      onChange={e => setDrafts(cur => ({ ...cur, [selectedUser.id]: { ...selectedDraft, planTier: e.target.value } }))}
+                      disabled={savingUserId === selectedUser.id || deletingUserId === selectedUser.id || isPending}
+                      onChange={e => updateSelectedDraft(selectedUser.id, { planTier: e.target.value })}
                     >
                       {PLAN_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                     </select>
                   </div>
                 </div>
 
+                <div className="aup-danger-zone">
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div className="aup-danger-title">Excluir usuario</div>
+                    <div className="aup-danger-copy">
+                      Remove o usuario do Supabase Auth. As tabelas vinculadas por cascade tambem sao limpas no banco.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="aup-btn-delete"
+                    disabled={savingUserId === selectedUser.id || deletingUserId === selectedUser.id || isPending}
+                    onClick={() => handleDelete(selectedUser)}
+                  >
+                    <Trash2 size={13} />
+                    {deletingUserId === selectedUser.id ? 'Excluindo...' : 'Excluir'}
+                  </button>
+                </div>
+
                 {/* Actions */}
                 <div className="aup-dialog-actions">
-                  <button type="button" className="aup-btn-cancel" onClick={() => setSelectedUserId(null)}>
+                  <button
+                    type="button"
+                    className="aup-btn-cancel"
+                    disabled={savingUserId === selectedUser.id || deletingUserId === selectedUser.id || isPending}
+                    onClick={() => setSelectedUserId(null)}
+                  >
                     Cancelar
                   </button>
                   <button
@@ -1189,7 +1366,7 @@ export default function AdminUsersPanel({ users }: AdminUsersPanelProps) {
                     disabled={isSaveDisabled(selectedUser)}
                     onClick={() => handleSave(selectedUser.id)}
                   >
-                    {savingUserId === selectedUser.id ? 'Salvando…' : 'Salvar alterações'}
+                    {savingUserId === selectedUser.id ? 'Salvando...' : 'Salvar alteracoes'}
                   </button>
                 </div>
               </div>

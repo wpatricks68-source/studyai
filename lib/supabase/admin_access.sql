@@ -55,6 +55,16 @@ begin
     return new;
   end if;
 
+  -- Supabase Auth user-created hooks run while the auth user is being saved,
+  -- before there is an authenticated browser user in the database context.
+  if acting_user_id is null and tg_op = 'INSERT' then
+    if exists (select 1 from auth.users where id = new.id) then
+      new.role := 'user';
+      new.plan_tier := 'gratuito';
+      return new;
+    end if;
+  end if;
+
   if acting_user_id is null then
     raise exception 'Authentication required to change profiles.';
   end if;
