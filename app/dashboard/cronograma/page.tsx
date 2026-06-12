@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts'
 import { Plus, Disc, Calendar, RotateCw, X, CircleDashed, Edit3, Trash2 } from 'lucide-react'
-import type { PlannerSubject, Schedule, StudyCycle } from '@/types/database'
+import type { PlannerRevisionRow, PlannerSubject, Schedule, StudyCycle } from '@/types/database'
 
 const DAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
 const DAY_DB_VALUES = [1, 2, 3, 4, 5, 6, 0]
@@ -62,6 +62,21 @@ const createRevisionRow = (): RevisionRow => ({
   date: ''
 })
 
+function mapRevisionRowFromDb(row: PlannerRevisionRow): RevisionRow {
+  return {
+    id: row.id,
+    selected: false,
+    revisionType: row.revision_type === 'partial' || row.revision_type === 'general' ? row.revision_type : '',
+    subjectIds: row.subject_ids ?? [],
+    comment: row.comment ?? '',
+    date: row.revision_date ?? ''
+  }
+}
+
+function isRevisionRowEmpty(row: RevisionRow) {
+  return !row.revisionType && row.subjectIds.length === 0 && !row.comment.trim() && !row.date
+}
+
 export default function CronogramaPage() {
   const [loading, setLoading] = useState(true)
   const [subjects, setSubjects] = useState<PlannerSubject[]>([])
@@ -72,6 +87,7 @@ export default function CronogramaPage() {
   const [revisionRows, setRevisionRows] = useState<RevisionRow[]>([
     createRevisionRow()
   ])
+  const [revisionsLoaded, setRevisionsLoaded] = useState(false)
 
   // Modals state
   const [showSubjectModal, setShowSubjectModal] = useState(false)
@@ -91,22 +107,87 @@ export default function CronogramaPage() {
     loadData()
   }, [])
 
+  useEffect(() => {
+    if (!revisionsLoaded) return
+
+    const timeout = window.setTimeout(() => {
+      void saveRevisionRows(revisionRows)
+    }, 600)
+
+    return () => window.clearTimeout(timeout)
+  }, [revisionRows, revisionsLoaded])
+
   async function loadData() {
     setLoading(true)
+    setRevisionsLoaded(false)
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) {
+      setLoading(false)
+      return
+    }
 
-    const [subjRes, schedRes, cycRes] = await Promise.all([
+    const [subjRes, schedRes, cycRes, revRes] = await Promise.all([
       supabase.from('planner_subjects').select('*').eq('user_id', user.id).order('created_at', { ascending: true }),
       supabase.from('schedules').select('*').eq('user_id', user.id).eq('is_active', true),
-      supabase.from('study_cycles').select('*').eq('user_id', user.id).order('order_index', { ascending: true })
+      supabase.from('study_cycles').select('*').eq('user_id', user.id).order('order_index', { ascending: true }),
+      supabase.from('planner_revision_rows').select('*').eq('user_id', user.id).order('order_index', { ascending: true }).order('created_at', { ascending: true })
     ])
 
     setSubjects(subjRes.data ?? [])
     setSchedules(schedRes.data ?? [])
     setCycles(cycRes.data ?? [])
+    setRevisionRows(revRes.data?.length ? (revRes.data as PlannerRevisionRow[]).map(mapRevisionRowFromDb) : [createRevisionRow()])
+    if (revRes.error) {
+      console.error(revRes.error)
+    }
+    setRevisionsLoaded(true)
     setLoading(false)
+  }
+
+  async function saveRevisionRows(rows: RevisionRow[]) {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const rowsWithContent = rows
+      .map((row, orderIndex) => ({ row, orderIndex }))
+      .filter(({ row }) => !isRevisionRowEmpty(row))
+
+    const emptyRowIds = rows
+      .filter(isRevisionRowEmpty)
+      .map(row => row.id)
+
+    if (rowsWithContent.length > 0) {
+      const { error } = await supabase.from('planner_revision_rows').upsert(
+        rowsWithContent.map(({ row, orderIndex }) => ({
+          id: row.id,
+          user_id: user.id,
+          revision_type: row.revisionType || null,
+          subject_ids: row.subjectIds,
+          comment: row.comment || null,
+          revision_date: row.date || null,
+          order_index: orderIndex
+        })),
+        { onConflict: 'id' }
+      )
+
+      if (error) {
+        console.error(error)
+      }
+    }
+
+    if (emptyRowIds.length > 0) {
+      const { error } = await supabase
+        .from('planner_revision_rows')
+        .delete()
+        .eq('user_id', user.id)
+        .in('id', emptyRowIds)
+
+      if (error) {
+        console.error(error)
+      }
+    }
   }
 
   // ==== ACTIONS ====
@@ -324,7 +405,27 @@ export default function CronogramaPage() {
     setRevisionRows(rows => rows.map(row => ({ ...row, selected: checked })))
   }
 
-  function removeSelectedRevisionRows() {
+  async function removeSelectedRevisionRows() {
+    const selectedIds = revisionRows.filter(row => row.selected).map(row => row.id)
+    if (selectedIds.length === 0) return
+
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (user) {
+      const { error } = await supabase
+        .from('planner_revision_rows')
+        .delete()
+        .eq('user_id', user.id)
+        .in('id', selectedIds)
+
+      if (error) {
+        console.error(error)
+        alert("Erro ao excluir revisoes selecionadas.")
+        return
+      }
+    }
+
     setRevisionRows(rows => {
       const remainingRows = rows.filter(row => !row.selected)
       return remainingRows.length > 0 ? remainingRows : [createRevisionRow()]

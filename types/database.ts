@@ -109,6 +109,18 @@ export interface StudyCycle {
   created_at: string
 }
 
+export interface PlannerRevisionRow {
+  id: string
+  user_id: string
+  revision_type: 'partial' | 'general' | string | null
+  subject_ids: string[]
+  comment: string | null
+  revision_date: string | null
+  order_index: number
+  created_at: string
+  updated_at: string
+}
+
 export interface DailyStudyLog {
   id: string
   user_id: string
