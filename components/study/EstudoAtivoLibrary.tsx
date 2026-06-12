@@ -275,6 +275,9 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null)
   const [activeTab,     setActiveTab]     = useState<'flashcards' | 'questoes'>('flashcards')
   const [isDeleting,    setIsDeleting]    = useState(false)
+  const [query,         setQuery]         = useState('')
+  const [filterMat,     setFilterMat]     = useState('all')
+  const [expandedDisc,  setExpandedDisc]  = useState<string | null>(groups[0]?.disciplina ?? null)
   const [sessionActive, setSessionActive] = useState(false)
   const [timerMode,    setTimerMode]     = useState<'chrono' | 'timer'>('chrono')
   const [seconds,      setSeconds]       = useState(0)
@@ -303,6 +306,31 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
   const topicGroup  = discGroup?.topics.find(t => t.topic === selectedTopic) ?? null
   const importInitialDisc = selectedDisc && selectedDisc !== 'Sem disciplina' ? selectedDisc : ''
   const importInitialTema = selectedTopic && selectedTopic !== 'Sem tema' ? selectedTopic : ''
+  const materias = groups.map(g => g.disciplina)
+  const normalizedQuery = query.trim().toLowerCase()
+  const filteredGroups = groups
+    .filter(g => filterMat === 'all' || g.disciplina === filterMat)
+    .map(g => {
+      const discMatches = !normalizedQuery || g.disciplina.toLowerCase().includes(normalizedQuery)
+      const topics = discMatches
+        ? g.topics
+        : g.topics.filter(t => {
+            const topicMatches = t.topic.toLowerCase().includes(normalizedQuery)
+            const flashcardMatches = t.flashcards.some(card =>
+              card.front.toLowerCase().includes(normalizedQuery) ||
+              card.back.toLowerCase().includes(normalizedQuery)
+            )
+            const questionMatches = t.questions.some(question =>
+              question.question.toLowerCase().includes(normalizedQuery) ||
+              (question.banca?.toLowerCase() ?? '').includes(normalizedQuery)
+            )
+            return topicMatches || flashcardMatches || questionMatches
+          })
+
+      return { ...g, topics }
+    })
+    .filter(g => g.topics.length > 0)
+  const filteredTopicCount = filteredGroups.reduce((total, g) => total + g.topics.length, 0)
 
   // Lógica do Timer
   useEffect(() => {
@@ -451,12 +479,9 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
   }
 
 
-  // Auto-select first topic when discipline changes
-  const handleSelectDisc = (disc: string) => {
+  const toggleDisc = (disc: string) => {
     setSelectedDisc(disc)
-    const g = groups.find(d => d.disciplina === disc)
-    setSelectedTopic(g?.topics[0]?.topic ?? null)
-    setActiveTab('flashcards')
+    setExpandedDisc(prev => prev === disc ? null : disc)
   }
 
   const handleDeleteDisc = async (e: React.MouseEvent, g: DisciplinaGroup) => {
@@ -691,7 +716,7 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
 
       {/* ── Painel esquerdo: disciplinas e temas ── */}
       <div style={{
-        width: isSidebarOpen ? '240px' : '0px', 
+        width: isSidebarOpen ? '300px' : '0px', 
         opacity: isSidebarOpen ? 1 : 0,
         flexShrink: 0,
         background: 'var(--surface,#111420)', 
@@ -702,47 +727,83 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
         transition: 'width 0.25s ease, opacity 0.2s ease',
         position: 'relative'
       }}>
-        <div style={{ padding: '14px 14px 10px', borderBottom: '1px solid var(--border,#1f2640)' }}>
-          <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1.4px', color: 'var(--muted,#6b7194)', fontWeight: 600 }}>
+        <div style={{ padding: '16px 14px 12px', borderBottom: '1px solid var(--border,#1f2640)' }}>
+          <div style={{ fontSize: '15px', fontWeight: 500, color: 'var(--text,#e8eaf6)', marginBottom: '10px' }}>
             Estudo Ativo
+          </div>
+          <input
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Buscar estudo..."
+            style={{
+              width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border,#1f2640)',
+              borderRadius: '8px', padding: '7px 11px', color: 'var(--text,#e8eaf6)',
+              fontSize: '13px', outline: 'none', marginBottom: '10px',
+            }}
+          />
+          <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '10px' }}>
+            {['all', ...materias].map(m => (
+              <button
+                key={m}
+                onClick={() => setFilterMat(m)}
+                style={{
+                  padding: '3px 9px', borderRadius: '20px', fontSize: '11px',
+                  border: '1px solid var(--border,#1f2640)', cursor: 'pointer',
+                  background: filterMat === m ? 'rgba(108,99,255,.15)' : 'transparent',
+                  borderColor: filterMat === m ? 'var(--accent,#6c63ff)' : 'var(--border,#1f2640)',
+                  color: filterMat === m ? 'var(--accent,#6c63ff)' : 'var(--muted,#6b7194)',
+                }}
+              >
+                {m === 'all' ? 'Todas' : m.replace('Direito ', 'Dir. ')}
+              </button>
+            ))}
           </div>
           <button
             onClick={() => { setImportError(''); setShowImportModal(true) }}
-            style={{ width: '100%', marginBottom: '8px', minHeight: '34px', borderRadius: '8px', border: '1px solid rgba(108,99,255,.35)', background: 'rgba(108,99,255,.12)', color: 'var(--accent,#6c63ff)', fontSize: '12px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px' }}
+            style={{ width: '100%', minHeight: '34px', borderRadius: '8px', border: '1px solid rgba(108,99,255,.35)', background: 'rgba(108,99,255,.12)', color: 'var(--accent,#6c63ff)', fontSize: '12px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px' }}
           >
             <UploadCloud size={15} /> Importar TXT/CSV
           </button>
-          <div style={{ fontSize: '12px', color: 'var(--muted,#6b7194)', marginTop: '4px' }}>
-            {flashcards.length} flashcard{flashcards.length !== 1 ? 's' : ''} · {questions.length} questão(ões)
-          </div>
+        </div>
+
+        <div style={{ fontSize: '11px', color: 'var(--muted,#6b7194)', padding: '7px 14px', borderBottom: '1px solid var(--border,#1f2640)' }}>
+          {filteredTopicCount} tema(s) em {filteredGroups.length} disciplina(s)
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
-          {groups.map(g => (
-            <div key={g.disciplina} style={{ marginBottom: '4px' }}>
-              {/* Disciplina header */}
-              <button
-                onClick={() => handleSelectDisc(g.disciplina)}
-                style={{
-                  width: '100%', textAlign: 'left', padding: '8px 10px',
-                  borderRadius: '8px', border: 'none', cursor: 'pointer',
-                  background: selectedDisc === g.disciplina ? 'rgba(108,99,255,.15)' : 'transparent',
-                  color:      selectedDisc === g.disciplina ? 'var(--accent,#6c63ff)' : 'var(--text,#e8eaf6)',
-                  borderLeft: selectedDisc === g.disciplina ? '2px solid var(--accent,#6c63ff)' : '2px solid transparent',
-                  transition: 'all .12s',
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px',
-                }}
-              >
-                  <span style={{ fontSize: '12px', fontWeight: 600, flex: 1, lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {g.disciplina}
-                  </span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{
-                      fontSize: '10px', padding: '1px 6px', borderRadius: '8px', flexShrink: 0,
-                      background: selectedDisc === g.disciplina ? 'rgba(108,99,255,.2)' : 'var(--surface2,#181d2e)',
-                      color: selectedDisc === g.disciplina ? 'var(--accent,#6c63ff)' : 'var(--muted,#6b7194)',
-                    }}>
-                      {g.topics.length}
+          {filteredGroups.length === 0 ? (
+            <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--muted,#6b7194)', fontSize: '13px' }}>
+              Nenhum estudo encontrado
+            </div>
+          ) : filteredGroups.map(g => {
+            const isExpanded = expandedDisc === g.disciplina
+            const totalItems = g.totalFlashcards + g.totalQuestions
+
+            return (
+              <div key={g.disciplina} style={{ marginBottom: '4px' }}>
+                <div
+                  onClick={() => toggleDisc(g.disciplina)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '10px 12px', borderRadius: '10px', cursor: 'pointer',
+                    background: isExpanded ? 'rgba(108,99,255,.12)' : 'var(--surface2,#181d2e)',
+                    border: `1px solid ${isExpanded ? 'var(--accent,#6c63ff)' : 'var(--border,#1f2640)'}`,
+                    borderLeft: isExpanded ? '3px solid var(--accent,#6c63ff)' : '3px solid transparent',
+                    transition: 'all .15s'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+                    <ChevronRight
+                      size={14}
+                      style={{ flexShrink: 0, color: isExpanded ? 'var(--accent,#6c63ff)' : 'var(--muted,#6b7194)', transition: 'transform .2s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
+                    />
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: isExpanded ? 'var(--accent,#6c63ff)' : 'var(--text,#e8eaf6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {g.disciplina}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                    <span style={{ fontSize: '10px', color: 'var(--muted,#6b7194)', background: 'var(--surface,#111420)', padding: '2px 6px', borderRadius: '8px' }}>
+                      {totalItems}
                     </span>
                     <button
                       onClick={(e) => handleDeleteDisc(e, g)}
@@ -756,46 +817,63 @@ export default function EstudoAtivoLibrary({ flashcards, questions }: Props) {
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
                     </button>
                   </div>
-                </button>
-
-              {/* Temas da disciplina selecionada */}
-              {selectedDisc === g.disciplina && (
-                <div style={{ marginLeft: '10px', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                  {g.topics.map(t => (
-                    <button
-                      key={t.topic}
-                      onClick={() => { setSelectedTopic(t.topic); setActiveTab('flashcards') }}
-                      style={{
-                        width: '100%', textAlign: 'left', padding: '6px 10px',
-                        borderRadius: '6px', border: 'none', cursor: 'pointer',
-                        background: selectedTopic === t.topic ? 'rgba(108,99,255,.1)' : 'transparent',
-                        color:      selectedTopic === t.topic ? 'var(--accent,#6c63ff)' : 'var(--muted,#6b7194)',
-                        fontSize: '12px', lineHeight: 1.4, transition: 'all .1s',
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px',
-                      }}
-                    >
-                      <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.topic}</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '10px', flexShrink: 0, opacity: .7 }}>
-                        </span>
-                        <button
-                          onClick={(e) => handleDeleteTopic(e, t, g.disciplina)}
-                          style={{
-                            background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: selectedTopic === t.topic ? 'var(--accent,#6c63ff)' : 'var(--muted,#6b7194)', opacity: .7, transition: 'all .15s'
-                          }}
-                          title="Excluir tema e questões/flashcards dele"
-                        >
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                        </button>
-                      </div>
-                    </button>
-                  ))}
                 </div>
-              )}
-            </div>
-          ))}
+
+                {isExpanded && (
+                  <div style={{ marginLeft: '16px', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {g.topics.map(t => {
+                      const isTopicSelected = selectedDisc === g.disciplina && selectedTopic === t.topic
+
+                      return (
+                        <div
+                          key={t.topic}
+                          onClick={() => { setSelectedDisc(g.disciplina); setSelectedTopic(t.topic); setActiveTab('flashcards') }}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '6px',
+                            padding: '8px 10px', borderRadius: '8px', cursor: 'pointer',
+                            border: `1px solid ${isTopicSelected ? 'var(--accent,#6c63ff)' : 'transparent'}`,
+                            borderLeft: `2px solid ${isTopicSelected ? 'var(--accent,#6c63ff)' : 'var(--border,#1f2640)'}`,
+                            background: isTopicSelected ? 'rgba(108,99,255,.15)' : 'transparent',
+                            color: isTopicSelected ? 'var(--accent,#6c63ff)' : 'var(--muted,#6b7194)',
+                            transition: 'all .12s'
+                          }}
+                        >
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
+                            <path d="M4 6h16M4 12h16M4 18h10"/>
+                          </svg>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: '12px', fontWeight: 500, color: 'inherit', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.4 }}>
+                              {t.topic}
+                            </div>
+                            <div style={{ display: 'flex', gap: '6px', fontSize: '10px', color: 'var(--muted,#6b7194)', marginTop: '2px' }}>
+                              <span>{t.flashcards.length} flash.</span>
+                              <span>{t.questions.length} quest.</span>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                            <span style={{ fontSize: '10px', opacity: .7 }}>
+                              {t.flashcards.length + t.questions.length}
+                            </span>
+                            <button
+                              onClick={(e) => handleDeleteTopic(e, t, g.disciplina)}
+                              style={{
+                                background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                color: isTopicSelected ? 'var(--accent,#6c63ff)' : 'var(--muted,#6b7194)', opacity: .7, transition: 'all .15s'
+                              }}
+                              title="Excluir tema e questoes/flashcards dele"
+                            >
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
 
