@@ -49,6 +49,7 @@ type RevisionRow = {
   selected: boolean
   revisionType: '' | 'partial' | 'general'
   subjectIds: string[]
+  comment: string
   date: string
 }
 
@@ -57,6 +58,7 @@ const createRevisionRow = (): RevisionRow => ({
   selected: false,
   revisionType: '',
   subjectIds: [],
+  comment: '',
   date: ''
 })
 
@@ -498,15 +500,16 @@ export default function CronogramaPage() {
               <button onClick={addRevisionRow} title="Adicionar revisao" style={{ background: 'var(--accent,#6c63ff)', color: 'var(--text,#fff)', border: 'none', width: '34px', height: '34px', borderRadius: '10px', fontSize: '18px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>+</button>
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '24px minmax(140px, .9fr) minmax(180px, 1.2fr) minmax(140px, .8fr)', gap: '10px', padding: '12px 16px', fontSize: '10px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '1px', borderBottom: '1px solid var(--border,#1f2640)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '24px minmax(130px, .8fr) minmax(170px, 1.1fr) minmax(160px, 1fr) minmax(130px, .7fr)', gap: '10px', padding: '12px 16px', fontSize: '10px', color: 'var(--muted,#6b7194)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '1px', borderBottom: '1px solid var(--border,#1f2640)' }}>
             <span />
             <span>REVISAO</span>
             <span>DISCIPLINAS</span>
+            <span>COMENTARIO</span>
             <span>DATA</span>
           </div>
           <div style={{ flex: 1, minHeight: 0, overflow: 'visible', padding: '14px 16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {revisionRows.map(row => (
-              <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '24px minmax(140px, .9fr) minmax(180px, 1.2fr) minmax(140px, .8fr)', gap: '10px', alignItems: 'center', padding: '12px', borderRadius: '14px', border: '1px solid var(--border,#1f2640)', background: 'var(--surface2,#181d2e)' }}>
+              <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '24px minmax(130px, .8fr) minmax(170px, 1.1fr) minmax(160px, 1fr) minmax(130px, .7fr)', gap: '10px', alignItems: 'center', padding: '12px', borderRadius: '14px', border: '1px solid var(--border,#1f2640)', background: 'var(--surface2,#181d2e)' }}>
                 <input type="checkbox" checked={row.selected} onChange={e => updateRevisionRow(row.id, 'selected', e.target.checked)} title="Selecionar linha" style={{ width: '18px', height: '18px', accentColor: 'var(--accent,#6c63ff)', cursor: 'pointer' }} />
                 <select value={row.revisionType} onChange={e => updateRevisionRow(row.id, 'revisionType', e.target.value as RevisionRow['revisionType'])} style={{ minWidth: 0, width: '100%', background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)', borderRadius: '10px', padding: '10px 8px', color: row.revisionType ? 'var(--text,#fff)' : 'var(--muted,#6b7194)', outline: 'none', fontSize: '12px' }}>
                   <option value="">Tipo de revisão</option>
@@ -572,6 +575,7 @@ export default function CronogramaPage() {
                     </div>
                   )}
                 </div>
+                <input type="text" value={row.comment} onChange={e => updateRevisionRow(row.id, 'comment', e.target.value)} placeholder="Comentario..." style={{ minWidth: 0, width: '100%', background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)', borderRadius: '10px', padding: '10px 8px', color: row.comment ? 'var(--text,#fff)' : 'var(--muted,#6b7194)', outline: 'none', fontSize: '12px' }} />
                 <input type="date" value={row.date} onChange={e => updateRevisionRow(row.id, 'date', e.target.value)} style={{ minWidth: 0, width: '100%', background: 'var(--surface,#111420)', border: '1px solid var(--border,#1f2640)', borderRadius: '10px', padding: '9px 8px', color: row.date ? 'var(--text,#fff)' : 'var(--muted,#6b7194)', outline: 'none', fontSize: '12px' }} />
               </div>
             ))}
