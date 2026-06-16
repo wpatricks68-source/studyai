@@ -16,6 +16,21 @@ const SCHEDULE_SLOTS = HOURS.map(hour => ({
   end: (hour + 1) * 60,
   label: `${formatFixedHour(hour)}-${formatFixedHour(hour + 1)}`
 }))
+const SCHEDULE_CYCLE_META_PREFIX = '__cycle_meta__'
+
+type ScheduleCycleMeta = {
+  cycleId: string | null
+  cycleOrder: number | null
+  code: string | null
+}
+
+type ScheduleOption = {
+  id: string
+  subjectId: string
+  cycleId: string | null
+  cycleOrder: number | null
+  label: string
+}
 
 function formatFixedHour(hour: number) {
   return `${String(hour % 24).padStart(2, '0')}:00`
@@ -24,6 +39,27 @@ function formatFixedHour(hour: number) {
 function timeToMinutes(time: string) {
   const [hour = '0', minute = '0'] = time.split(':')
   return Number(hour) * 60 + Number(minute)
+}
+
+function encodeScheduleMateria(code: string | null | undefined, cycleId: string | null, cycleOrder: number | null) {
+  const cleanCode = code?.trim() ?? ''
+  if (!cycleId || !cycleOrder) return cleanCode
+  return [SCHEDULE_CYCLE_META_PREFIX, cycleId, String(cycleOrder), cleanCode].join('|')
+}
+
+function decodeScheduleMateria(materia: string | null | undefined): ScheduleCycleMeta {
+  if (!materia?.startsWith(`${SCHEDULE_CYCLE_META_PREFIX}|`)) {
+    return { cycleId: null, cycleOrder: null, code: materia || null }
+  }
+
+  const [, cycleId = '', order = '', ...codeParts] = materia.split('|')
+  const cycleOrder = Number(order)
+
+  return {
+    cycleId: cycleId || null,
+    cycleOrder: Number.isFinite(cycleOrder) && cycleOrder > 0 ? cycleOrder : null,
+    code: codeParts.join('|') || null
+  }
 }
 
 // Modals Overlay Component
@@ -98,7 +134,7 @@ export default function CronogramaPage() {
   
   // Forms
   const [subForm, setSubForm] = useState(INITIAL_SUBJECT_FORM)
-  const [schedForm, setSchedForm] = useState({ subject_id: '', day_of_week: 1, start_time: '08:00', end_time: '10:00' })
+  const [schedForm, setSchedForm] = useState({ selection_id: '', day_of_week: 1, start_time: '08:00', end_time: '10:00' })
   const [cycleForm, setCycleForm] = useState({ subject_id: '', duration_minutes: 60 })
 
   const colors = ['#6c63ff', '#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#06b6d4']
@@ -281,15 +317,22 @@ export default function CronogramaPage() {
       subject.id === editingSubjectId ? data : subject
     )))
 
-    const { error: scheduleError } = await supabase
-      .from('schedules')
-      .update({
-        subject: payload.name,
-        materia: payload.code,
-        color: payload.color
+    const scheduleUpdates = schedules
+      .filter(schedule => schedule.subject === originalSubject.name)
+      .map(schedule => {
+        const meta = decodeScheduleMateria(schedule.materia)
+        return supabase
+          .from('schedules')
+          .update({
+            subject: payload.name,
+            materia: encodeScheduleMateria(payload.code, meta.cycleId, meta.cycleOrder),
+            color: payload.color
+          })
+          .eq('id', schedule.id)
       })
-      .eq('user_id', originalSubject.user_id)
-      .eq('subject', originalSubject.name)
+
+    const scheduleResults = await Promise.all(scheduleUpdates)
+    const scheduleError = scheduleResults.find(result => result.error)?.error
 
     if (scheduleError) {
       console.error(scheduleError)
@@ -299,7 +342,12 @@ export default function CronogramaPage() {
 
     setSchedules(prev => prev.map(schedule => (
       schedule.subject === originalSubject.name
-        ? { ...schedule, subject: data.name, materia: data.code, color: data.color }
+        ? {
+            ...schedule,
+            subject: data.name,
+            materia: encodeScheduleMateria(data.code, decodeScheduleMateria(schedule.materia).cycleId, decodeScheduleMateria(schedule.materia).cycleOrder),
+            color: data.color
+          }
         : schedule
     )))
 
@@ -307,8 +355,9 @@ export default function CronogramaPage() {
   }
 
   async function handleAddSchedule() {
-    if (!schedForm.subject_id) return
-    const subj = subjects.find(s => s.id === schedForm.subject_id)
+    const selectedOption = scheduleOptions.find(option => option.id === schedForm.selection_id)
+    if (!selectedOption) return
+    const subj = subjects.find(s => s.id === selectedOption.subjectId)
     if (!subj) return
 
     const supabase = createClient()
@@ -318,11 +367,11 @@ export default function CronogramaPage() {
     const { data } = await supabase.from('schedules').insert({
       user_id: user.id,
       subject: subj.name,
-      materia: subj.code,
       day_of_week: schedForm.day_of_week,
       start_time: schedForm.start_time,
       end_time: schedForm.end_time,
       color: subj.color,
+      materia: encodeScheduleMateria(subj.code, selectedOption.cycleId, selectedOption.cycleOrder),
       is_active: true
     }).select().single()
 
@@ -484,6 +533,50 @@ export default function CronogramaPage() {
     return time?.slice(0, 5) ?? '--:--'
   }
 
+  const orderedCycles = [...cycles].sort((a, b) => a.order_index - b.order_index)
+
+  const scheduleOptions: ScheduleOption[] = orderedCycles.length > 0
+    ? orderedCycles.flatMap((cyc, i) => {
+        const subj = subjects.find(s => s.id === cyc.subject_id)
+        if (!subj) return []
+        const num = String(i + 1).padStart(2, '0')
+        return [{
+          id: `cycle:${cyc.id}`,
+          subjectId: subj.id,
+          cycleId: cyc.id,
+          cycleOrder: i + 1,
+          label: `${num} - ${subj.name}${subj.code ? ` - ${subj.code}` : ''}`
+        }]
+      })
+    : subjects.map((s, i) => {
+        const num = String(i + 1).padStart(2, '0')
+        return {
+          id: `subject:${s.id}`,
+          subjectId: s.id,
+          cycleId: null,
+          cycleOrder: i + 1,
+          label: `${num} - ${s.name}${s.code ? ` - ${s.code}` : ''}`
+        }
+      })
+
+  function getScheduleCycleNumber(schedule: Schedule) {
+    const meta = decodeScheduleMateria(schedule.materia)
+    const cycleIndex = meta.cycleId ? orderedCycles.findIndex(cycle => cycle.id === meta.cycleId) : -1
+    if (cycleIndex >= 0) return String(cycleIndex + 1).padStart(2, '0')
+    if (meta.cycleOrder) return String(meta.cycleOrder).padStart(2, '0')
+
+    const subject = subjects.find(s => s.name === schedule.subject)
+    const fallbackCycleIndex = subject ? orderedCycles.findIndex(cycle => cycle.subject_id === subject.id) : -1
+    if (fallbackCycleIndex >= 0) return String(fallbackCycleIndex + 1).padStart(2, '0')
+
+    const subjectIndex = subjects.findIndex(s => s.name === schedule.subject)
+    return subjectIndex >= 0 ? String(subjectIndex + 1).padStart(2, '0') : '--'
+  }
+
+  function getScheduleMateriaLabel(schedule: Schedule) {
+    return decodeScheduleMateria(schedule.materia).code
+  }
+
   const chartData = subjects.map(s => ({
     name: s.name,
     value: s.target_sessions || 1,
@@ -491,17 +584,18 @@ export default function CronogramaPage() {
     sessions: s.target_sessions || 0
   }))
 
-  const cycleChartData = cycles.map(cyc => {
+  const cycleChartData = orderedCycles.map(cyc => {
     const subj = subjects.find(s => s.id === cyc.subject_id)
     if (!subj) return null
     return {
+      cycleId: cyc.id,
       name: subj.code ? `${subj.code}` : subj.name.substring(0, 4).toUpperCase(),
       fullName: subj.name,
       value: cyc.duration_minutes,
       color: subj.color,
       duration: cyc.duration_minutes
     }
-  }).filter(Boolean) as { name: string; fullName: string; value: number; color: string; duration: number }[]
+  }).filter(Boolean) as { cycleId: string; name: string; fullName: string; value: number; color: string; duration: number }[]
 
   const totalSessions = chartData.reduce((acc, curr) => acc + curr.sessions, 0)
   const hasSelectedRevisionRows = revisionRows.some(row => row.selected)
@@ -564,8 +658,8 @@ export default function CronogramaPage() {
                       return (
                         <div key={`${row.label}-${dayIndex}`} style={{ minHeight: '76px', padding: '6px', borderLeft: '1px solid var(--border,#1f2640)', borderBottom: '1px solid var(--border,#1f2640)', background: blocks.length ? 'linear-gradient(135deg, rgba(255,255,255,0.055), rgba(255,255,255,0.015))' : 'transparent' }}>
                           {blocks.map(schedule => {
-                            const subjIndex = cycles.findIndex(c => c.subject_id === subjects.find(s => s.name === schedule.subject)?.id)
-                            const num = subjIndex >= 0 ? String(subjIndex + 1).padStart(2, '0') : String(subjects.findIndex(s => s.name === schedule.subject) + 1).padStart(2, '0')
+                            const num = getScheduleCycleNumber(schedule)
+                            const materiaLabel = getScheduleMateriaLabel(schedule)
                             return (
                             <button
                               key={schedule.id}
@@ -575,8 +669,8 @@ export default function CronogramaPage() {
                             >
                               <span style={{ fontSize: '10px', fontWeight: 400, lineHeight: 1.25, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{num} - {schedule.subject}</span>
                               <span style={{ fontSize: '9px', fontWeight: 400, opacity: 0.95, lineHeight: 1.2 }}>{formatScheduleTime(schedule.start_time)} - {formatScheduleTime(schedule.end_time)}</span>
-                              {schedule.materia && (
-                                <span style={{ maxWidth: '100%', fontSize: '9px', fontWeight: 400, opacity: 0.9, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{schedule.materia}</span>
+                              {materiaLabel && (
+                                <span style={{ maxWidth: '100%', fontSize: '9px', fontWeight: 400, opacity: 0.9, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{materiaLabel}</span>
                               )}
                             </button>
                           )})}
@@ -838,7 +932,7 @@ export default function CronogramaPage() {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span style={{ color: 'var(--muted)', fontSize: '10px' }}>{d.duration >= 60 ? `${Math.floor(d.duration/60)}h${d.duration%60>0?d.duration%60+'m':''}` : `${d.duration}m`}</span>
-                      <button onClick={() => removeCycle(cycles[i]?.id)} title="Remover do ciclo" style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', transition: 'all .2s' }}>
+                      <button onClick={() => removeCycle(d.cycleId)} title="Remover do ciclo" style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', transition: 'all .2s' }}>
                         <X size={14} />
                       </button>
                     </div>
@@ -1066,20 +1160,11 @@ export default function CronogramaPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
             <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '6px', fontWeight: 700 }}>ESCOLHER DISCIPLINA</div>
-            <select value={schedForm.subject_id} onChange={e => setSchedForm({...schedForm, subject_id: e.target.value})} style={{ width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', color: 'var(--text,#fff)', outline: 'none', fontSize: '14px' }}>
+            <select value={schedForm.selection_id} onChange={e => setSchedForm({...schedForm, selection_id: e.target.value})} style={{ width: '100%', background: 'var(--surface2,#181d2e)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', color: 'var(--text,#fff)', outline: 'none', fontSize: '14px' }}>
               <option value="">-- Selecionar --</option>
-              {cycles.length > 0 
-                ? [...cycles].sort((a, b) => a.order_index - b.order_index).map((cyc, i) => {
-                    const subj = subjects.find(s => s.id === cyc.subject_id)
-                    if (!subj) return null
-                    const num = String(i + 1).padStart(2, '0')
-                    return <option key={subj.id} value={subj.id}>{num} - {subj.name} {subj.code ? `- ${subj.code}` : ''}</option>
-                  })
-                : subjects.map((s, i) => {
-                    const num = String(i + 1).padStart(2, '0')
-                    return <option key={s.id} value={s.id}>{num} - {s.name} {s.code ? `- ${s.code}` : ''}</option>
-                  })
-              }
+              {scheduleOptions.map(option => (
+                <option key={option.id} value={option.id}>{option.label}</option>
+              ))}
             </select>
           </div>
           <div>
