@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Clock3, Pencil, Plus, Save, Target, Trash2, X } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Pencil, Plus, Save, Target, Trash2, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { DailyStudyLog, PlannerSubject } from '@/types/database'
 
@@ -38,6 +38,7 @@ const emptyForm: FormState = {
 }
 
 const MATERIAL_OPTIONS = ['PDF', 'Video aula', 'Outros'] as const
+const PAGE_SIZE = 15
 
 /* ─── shared styles ─────────────────────────────────────────────────────── */
 const box: React.CSSProperties = {
@@ -134,6 +135,7 @@ export default function ControleDiarioPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [dbError, setDbError] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => { void loadLogs() }, [])
 
@@ -226,6 +228,7 @@ export default function ControleDiarioPage() {
     if (error) { setDbError(error.message); setSaving(false); return }
     const saved = data as DailyStudyLog
     setLogs(prev => editingId ? prev.map(log => log.id === editingId ? saved : log) : [saved, ...prev])
+    if (!editingId) setCurrentPage(1)
     setSaving(false)
     closeModal()
   }
@@ -249,6 +252,11 @@ export default function ControleDiarioPage() {
     (selectedSubject === 'all' || log.subject === selectedSubject) &&
     (selectedStatus === 'all' || log.target_status === selectedStatus)
   )
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const activePage = Math.min(currentPage, totalPages)
+  const paginatedLogs = filtered.slice((activePage - 1) * PAGE_SIZE, activePage * PAGE_SIZE)
+  const firstVisibleRecord = filtered.length === 0 ? 0 : (activePage - 1) * PAGE_SIZE + 1
+  const lastVisibleRecord = Math.min(activePage * PAGE_SIZE, filtered.length)
   const planned = filtered.reduce((sum, log) => sum + (log.planned_minutes ?? 0), 0)
   const effective = filtered.reduce((sum, log) => sum + (log.effective_minutes ?? 0), 0)
   const completed = filtered.filter(log => log.target_status === 'concluido').length
@@ -257,6 +265,14 @@ export default function ControleDiarioPage() {
   const totalCorrect = filtered.reduce((sum, log) => sum + (log.correct_answers ?? 0), 0)
   const score = totalQuestions ? Math.round((totalCorrect / totalQuestions) * 100) : null
   const missingTable = !!dbError && dbError.includes('daily_study_logs')
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [selectedWeek, selectedSubject, selectedStatus])
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages)
+  }, [currentPage, totalPages])
 
   /* ── render ───────────────────────────────────────────────────────────── */
   return (
@@ -439,7 +455,7 @@ export default function ControleDiarioPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map(log => {
+                  {paginatedLogs.map(log => {
                     const scoreValue = accuracy(log)
                     const scoreColor = scoreValue === null ? '#6b7194' : scoreValue < 70 ? '#ef4444' : scoreValue <= 80 ? '#f59e0b' : '#10b981'
                     const status = log.target_status === 'concluido' ? 'Concluido' : log.target_status === 'nao_concluido' ? 'Nao concluido' : 'Parcial'
@@ -478,6 +494,48 @@ export default function ControleDiarioPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {!loading && filtered.length > 0 && (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              gap: 16, flexWrap: 'wrap', marginTop: 18, paddingTop: 16,
+              borderTop: '1px solid rgba(255,255,255,.07)',
+            }}>
+              <span style={{ fontSize: 12, color: 'var(--muted,#6b7194)' }}>
+                Exibindo {firstVisibleRecord}-{lastVisibleRecord} de {filtered.length} lançamentos
+              </span>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} aria-label="Paginação dos lançamentos">
+                <button
+                  type="button"
+                  className="action-btn"
+                  onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
+                  disabled={activePage === 1}
+                  style={{ ...iconButton, opacity: activePage === 1 ? .4 : 1, cursor: activePage === 1 ? 'not-allowed' : 'pointer' }}
+                  title="Página anterior"
+                  aria-label="Página anterior"
+                >
+                  <ChevronLeft size={17} />
+                </button>
+
+                <span style={{ minWidth: 100, textAlign: 'center', fontSize: 13, color: 'var(--text,#e8eaf6)', fontWeight: 600 }}>
+                  Página {activePage} de {totalPages}
+                </span>
+
+                <button
+                  type="button"
+                  className="action-btn"
+                  onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
+                  disabled={activePage === totalPages}
+                  style={{ ...iconButton, opacity: activePage === totalPages ? .4 : 1, cursor: activePage === totalPages ? 'not-allowed' : 'pointer' }}
+                  title="Próxima página"
+                  aria-label="Próxima página"
+                >
+                  <ChevronRight size={17} />
+                </button>
+              </div>
             </div>
           )}
         </section>
