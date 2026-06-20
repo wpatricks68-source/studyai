@@ -255,6 +255,11 @@ export default function ControleDiarioPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const activePage = Math.min(currentPage, totalPages)
   const paginatedLogs = filtered.slice((activePage - 1) * PAGE_SIZE, activePage * PAGE_SIZE)
+  const firstPageButton = Math.max(1, Math.min(activePage - 2, totalPages - 4))
+  const visiblePageButtons = Array.from(
+    { length: Math.min(5, totalPages) },
+    (_, index) => firstPageButton + index
+  )
   const firstVisibleRecord = filtered.length === 0 ? 0 : (activePage - 1) * PAGE_SIZE + 1
   const lastVisibleRecord = Math.min(activePage * PAGE_SIZE, filtered.length)
   const planned = filtered.reduce((sum, log) => sum + (log.planned_minutes ?? 0), 0)
@@ -507,35 +512,63 @@ export default function ControleDiarioPage() {
                 Exibindo {firstVisibleRecord}-{lastVisibleRecord} de {filtered.length} lançamentos
               </span>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} aria-label="Paginação dos lançamentos">
+              <nav
+                data-testid="study-log-pagination"
+                style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}
+                aria-label="Paginação dos lançamentos"
+              >
                 <button
                   type="button"
                   className="action-btn"
                   onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
                   disabled={activePage === 1}
-                  style={{ ...iconButton, opacity: activePage === 1 ? .4 : 1, cursor: activePage === 1 ? 'not-allowed' : 'pointer' }}
+                  style={{
+                    ...iconButton, width: 'auto', padding: '0 12px', gap: 6,
+                    opacity: activePage === 1 ? .4 : 1,
+                    cursor: activePage === 1 ? 'not-allowed' : 'pointer',
+                  }}
                   title="Página anterior"
                   aria-label="Página anterior"
                 >
                   <ChevronLeft size={17} />
+                  Anterior
                 </button>
 
-                <span style={{ minWidth: 100, textAlign: 'center', fontSize: 13, color: 'var(--text,#e8eaf6)', fontWeight: 600 }}>
-                  Página {activePage} de {totalPages}
-                </span>
+                {visiblePageButtons.map(page => (
+                  <button
+                    key={page}
+                    type="button"
+                    onClick={() => setCurrentPage(page)}
+                    aria-label={`Ir para página ${page}`}
+                    aria-current={page === activePage ? 'page' : undefined}
+                    style={{
+                      ...iconButton,
+                      background: page === activePage ? 'var(--accent,#6c63ff)' : 'rgba(255,255,255,.04)',
+                      borderColor: page === activePage ? 'var(--accent,#6c63ff)' : 'rgba(255,255,255,.08)',
+                      color: '#fff', fontWeight: 700,
+                    }}
+                  >
+                    {page}
+                  </button>
+                ))}
 
                 <button
                   type="button"
                   className="action-btn"
                   onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
                   disabled={activePage === totalPages}
-                  style={{ ...iconButton, opacity: activePage === totalPages ? .4 : 1, cursor: activePage === totalPages ? 'not-allowed' : 'pointer' }}
+                  style={{
+                    ...iconButton, width: 'auto', padding: '0 12px', gap: 6,
+                    opacity: activePage === totalPages ? .4 : 1,
+                    cursor: activePage === totalPages ? 'not-allowed' : 'pointer',
+                  }}
                   title="Próxima página"
                   aria-label="Próxima página"
                 >
+                  Próxima
                   <ChevronRight size={17} />
                 </button>
-              </div>
+              </nav>
             </div>
           )}
         </section>
