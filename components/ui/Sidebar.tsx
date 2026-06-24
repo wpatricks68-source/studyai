@@ -32,7 +32,10 @@ const baseNavItems = [
   },
   {
     section: 'Ferramentas',
-    items: [{ href: '/dashboard/ferramentas', label: 'Pomodoro', icon: IconClock }],
+    items: [
+      { href: '/dashboard/ferramentas', label: 'Pomodoro', icon: IconClock },
+      { href: '/dashboard/lembretes', label: 'Lembretes', icon: IconNote },
+    ],
   },
 ]
 
@@ -415,4 +418,7 @@ function IconUser({ active }: { active: boolean }) {
 }
 function IconShield({ active }: { active: boolean }) {
   return <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: active ? 1 : 0.7, flexShrink: 0 }}><path d="M8 1.5l5 2v3.9c0 3.1-1.9 5.9-5 7.1-3.1-1.2-5-4-5-7.1V3.5l5-2z" /><path d="M6.2 8.1l1.2 1.2 2.5-2.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+}
+function IconNote({ active }: { active: boolean }) {
+  return <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: active ? 1 : 0.7, flexShrink: 0 }}><rect x="2" y="1" width="12" height="14" rx="2" /><path d="M5 5h6M5 8h6M5 11h3" strokeLinecap="round" /></svg>
 }
