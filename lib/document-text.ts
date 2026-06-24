@@ -1,5 +1,11 @@
 type ExtractionMode = 'plain' | 'pdfjs' | 'pdf-parse' | 'ocr'
 
+type PdfjsWorkerGlobal = typeof globalThis & {
+  pdfjsWorker?: {
+    WorkerMessageHandler?: unknown
+  }
+}
+
 export class DocumentExtractionError extends Error {
   constructor(
     message: string,
@@ -108,8 +114,28 @@ async function ensurePdfPolyfills() {
   }
 }
 
+async function ensurePdfWorker() {
+  const target = globalThis as PdfjsWorkerGlobal
+
+  if (target.pdfjsWorker?.WorkerMessageHandler) {
+    return
+  }
+
+  const worker = await import('pdfjs-dist/legacy/build/pdf.worker.mjs') as {
+    WorkerMessageHandler?: unknown
+  }
+
+  if (worker.WorkerMessageHandler) {
+    target.pdfjsWorker = {
+      ...target.pdfjsWorker,
+      WorkerMessageHandler: worker.WorkerMessageHandler,
+    }
+  }
+}
+
 async function extractTextWithPdfjs(file: File) {
   await ensurePdfPolyfills()
+  await ensurePdfWorker()
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
   const data = new Uint8Array(await file.arrayBuffer())
   const loadingTask = pdfjs.getDocument({ data, verbosity: pdfjs.VerbosityLevel.ERRORS })
@@ -145,6 +171,7 @@ export async function extractTextFromFile(file: File): Promise<{ content: string
 
   let content = ''
   let extractionMode: ExtractionMode = 'plain'
+  let pdfExtractionError = ''
   const lowerName = file.name.toLowerCase()
 
   if (
@@ -169,9 +196,12 @@ export async function extractTextFromFile(file: File): Promise<{ content: string
         throw new Error('PDF vazio ou sem texto extraido pelo pdfjs.')
       }
     } catch (error) {
-      console.warn('[document-text] pdfjs falhou, tentando pdf-parse:', (error as Error).message)
+      const message = (error as Error).message
+      pdfExtractionError = message
+      console.warn('[document-text] pdfjs falhou, tentando pdf-parse:', message)
       try {
         await ensurePdfPolyfills()
+        await ensurePdfWorker()
         const { PDFParse } = await import('pdf-parse')
         const data = new Uint8Array(await file.arrayBuffer())
         const parser = new PDFParse({ data })
@@ -179,7 +209,9 @@ export async function extractTextFromFile(file: File): Promise<{ content: string
         content = (parsed?.text ?? '').trim()
         extractionMode = 'pdf-parse'
       } catch (innerError) {
-        console.warn('[document-text] pdf-parse falhou, tentando OCR:', (innerError as Error).message)
+        const message = (innerError as Error).message
+        pdfExtractionError = `${pdfExtractionError} ${message}`.trim()
+        console.warn('[document-text] pdf-parse falhou, tentando OCR:', message)
       }
     }
 
@@ -205,6 +237,15 @@ export async function extractTextFromFile(file: File): Promise<{ content: string
 
       if (!content.trim() && lastError) {
         if (lastError instanceof DocumentExtractionError) {
+          if (
+            /maximo 3 paginas|maximum page limit of 3/i.test(lastError.message) &&
+            /fake worker|pdf\.worker|worker failed|worker/i.test(pdfExtractionError)
+          ) {
+            throw new DocumentExtractionError(
+              'Nao foi possivel extrair texto do PDF no servidor porque o worker do leitor de PDF nao foi carregado. Publique a correcao mais recente e tente novamente.'
+            )
+          }
+
           throw lastError
         }
 
