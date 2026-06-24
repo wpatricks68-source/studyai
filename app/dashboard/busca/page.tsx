@@ -252,6 +252,7 @@ export default function BuscaPage() {
   const [showImportModal, setShowImportModal] = useState(false)
   const [showImportQModal, setShowImportQModal] = useState(false)
   const [importFile, setImportFile] = useState<File | null>(null)
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [importDisciplina, setImportDisciplina] = useState('')
   const [importTema, setImportTema] = useState('')
   const [importBusy, setImportBusy] = useState(false)
@@ -267,6 +268,7 @@ export default function BuscaPage() {
   const [showSources, setShowSources] = useState(true)
   const [showSearchModal, setShowSearchModal] = useState(false)
   const [showResumoWindow, setShowResumoWindow] = useState(false)
+  const uploadInputRef = useRef<HTMLInputElement | null>(null)
 
   // ─── Estado de Disciplinas Salvas (Painel de Disciplina) ───
   const [savedDisciplinas, setSavedDisciplinas] = useState<string[]>([])
@@ -420,6 +422,8 @@ export default function BuscaPage() {
     setGenTarget(null)
     setError('')
     setAiNotice('')
+    setUploadFile(null)
+    if (uploadInputRef.current) uploadInputRef.current.value = ''
     try { sessionStorage.removeItem('busca_session') } catch {}
     
     // Remove id from URL if present
@@ -1127,8 +1131,7 @@ export default function BuscaPage() {
   }
 
   // ─── UPLOAD ───────────────────────────────────────────────
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
+  async function handleUpload(file: File | null) {
     if (!file) return
     setPhase('searching')
     setError('')
@@ -1211,7 +1214,8 @@ export default function BuscaPage() {
       setPhase('idle')
     } finally {
       setGenTarget(null)
-      e.target.value = ''
+      setUploadFile(null)
+      if (uploadInputRef.current) uploadInputRef.current.value = ''
     }
   }
 
@@ -1689,9 +1693,39 @@ export default function BuscaPage() {
                   color: 'var(--muted,#6b7194)', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
                 }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-                  Arquivo
-                  <input type="file" accept=".pdf,.txt,.md" style={{ display: 'none' }} onChange={e => { handleUpload(e); setShowSearchModal(false); }} />
+                  {uploadFile ? uploadFile.name : 'Arquivo'}
+                  <input
+                    ref={uploadInputRef}
+                    type="file"
+                    accept=".pdf,.txt,.md"
+                    style={{ display: 'none' }}
+                    onChange={e => {
+                      const selectedFile = e.target.files?.[0] ?? null
+                      setUploadFile(selectedFile)
+                      if (selectedFile && !tema.trim()) {
+                        setTema(selectedFile.name.replace(/\.[^.]+$/, ''))
+                      }
+                    }}
+                  />
                 </label>
+
+                <button
+                  onClick={() => {
+                    handleUpload(uploadFile)
+                    setShowSearchModal(false)
+                  }}
+                  disabled={!uploadFile || isLoading}
+                  style={{
+                    padding: '10px 18px', borderRadius: '10px', border: '1px solid var(--border,#1f2640)',
+                    background: !uploadFile || isLoading ? 'var(--surface2,#181d2e)' : 'var(--accent,#6c63ff)',
+                    color: !uploadFile || isLoading ? 'var(--muted,#6b7194)' : '#fff',
+                    fontSize: '13px', fontWeight: 600, cursor: !uploadFile || isLoading ? 'not-allowed' : 'pointer',
+                    display: 'flex', alignItems: 'center', gap: '8px'
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                  Processar arquivo
+                </button>
                 
                 <button
                   onClick={() => { handleClear(); }}
