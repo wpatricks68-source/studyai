@@ -62,6 +62,23 @@ function decodeScheduleMateria(materia: string | null | undefined): ScheduleCycl
   }
 }
 
+function getFormattedWeekDates(): string[] {
+  const current = new Date()
+  const day = current.getDay()
+  const distanceToMonday = day === 0 ? 6 : day - 1
+
+  const monday = new Date(current)
+  monday.setDate(current.getDate() - distanceToMonday)
+
+  return Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(monday)
+    date.setDate(monday.getDate() + i)
+    const dayStr = String(date.getDate()).padStart(2, '0')
+    const monthStr = String(date.getMonth() + 1).padStart(2, '0')
+    return `${dayStr}/${monthStr}`
+  })
+}
+
 // Modals Overlay Component
 const Modal = ({ show, onClose, title, children }: { show: boolean, onClose: () => void, title: string, children: React.ReactNode }) => {
   if (!show) return null
@@ -118,6 +135,7 @@ export default function CronogramaPage() {
   const [subjects, setSubjects] = useState<PlannerSubject[]>([])
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [cycles, setCycles] = useState<StudyCycle[]>([])
+  const [weekDates, setWeekDates] = useState<string[]>([])
 
   const [viewMode, setViewMode] = useState<'calendar' | 'cycle'>('calendar')
   const [revisionRows, setRevisionRows] = useState<RevisionRow[]>([
@@ -141,6 +159,7 @@ export default function CronogramaPage() {
 
   useEffect(() => {
     loadData()
+    setWeekDates(getFormattedWeekDates())
   }, [])
 
   useEffect(() => {
@@ -644,10 +663,33 @@ export default function CronogramaPage() {
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: '86px repeat(7, minmax(82px, 1fr))', minWidth: '720px', border: '1px solid var(--border,#1f2640)', borderRadius: '12px', overflow: 'hidden' }}>
-                <div style={{ padding: '10px 8px', background: 'var(--surface2,#181d2e)', color: 'var(--muted,#6b7194)', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.7px', borderBottom: '1px solid var(--border,#1f2640)' }}>Horário</div>
-                {DAYS.map(day => (
-                  <div key={day} style={{ padding: '10px 8px', background: 'var(--surface2,#181d2e)', color: 'var(--text,#e8eaf6)', fontSize: '10px', fontWeight: 900, textAlign: 'center', textTransform: 'uppercase', borderLeft: '1px solid var(--border,#1f2640)', borderBottom: '1px solid var(--border,#1f2640)' }}>{day}</div>
-                ))}
+                <div style={{ padding: '10px 8px', background: 'var(--surface2,#181d2e)', color: 'var(--muted,#6b7194)', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.7px', borderBottom: '1px solid var(--border,#1f2640)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Horário</div>
+                {DAYS.map((day, index) => (
+                   <div
+                     key={day}
+                     style={{
+                       padding: '8px 4px',
+                       background: 'var(--surface2,#181d2e)',
+                       color: 'var(--text,#e8eaf6)',
+                       fontSize: '10px',
+                       fontWeight: 900,
+                       textAlign: 'center',
+                       textTransform: 'uppercase',
+                       borderLeft: '1px solid var(--border,#1f2640)',
+                       borderBottom: '1px solid var(--border,#1f2640)',
+                       display: 'flex',
+                       flexDirection: 'column',
+                       alignItems: 'center',
+                       justifyContent: 'center',
+                       gap: '2px'
+                     }}
+                   >
+                     <span>{day}</span>
+                     <span style={{ fontSize: '8.5px', fontWeight: 500, color: 'var(--muted,#6b7194)', textTransform: 'none', minHeight: '12px' }}>
+                       {weekDates[index] || ''}
+                     </span>
+                   </div>
+                 ))}
                 {filledSlots.map(row => (
                   <React.Fragment key={row.label}>
                     <div style={{ padding: '10px 8px', color: 'var(--accent,#6c63ff)', fontSize: '10px', fontWeight: 600, borderBottom: '1px solid var(--border,#1f2640)', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
@@ -971,9 +1013,29 @@ export default function CronogramaPage() {
                <div style={{ display: 'grid', gridTemplateColumns: '70px repeat(7, 1fr)', minWidth: '800px' }}>
                  {/* Header Dias */}
                  <div style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface2,#181d2e)' }} />
-                 {DAYS.map(d => (
-                   <div key={d} style={{ padding: '14px', textAlign: 'center', fontSize: '12px', fontWeight: 700, color: 'var(--text,#fff)', borderBottom: '1px solid var(--border)', background: 'var(--surface2,#181d2e)', borderLeft: '1px solid var(--border)' }}>
-                     {d}
+                 {DAYS.map((d, index) => (
+                   <div
+                     key={d}
+                     style={{
+                       padding: '10px 4px',
+                       textAlign: 'center',
+                       fontSize: '12px',
+                       fontWeight: 700,
+                       color: 'var(--text,#fff)',
+                       borderBottom: '1px solid var(--border)',
+                       background: 'var(--surface2,#181d2e)',
+                       borderLeft: '1px solid var(--border)',
+                       display: 'flex',
+                       flexDirection: 'column',
+                       alignItems: 'center',
+                       justifyContent: 'center',
+                       gap: '2px'
+                     }}
+                   >
+                     <span>{d}</span>
+                     <span style={{ fontSize: '10px', fontWeight: 500, color: 'var(--muted,#6b7194)', minHeight: '14px' }}>
+                       {weekDates[index] || ''}
+                     </span>
                    </div>
                  ))}
 
