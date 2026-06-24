@@ -1,5 +1,15 @@
 type ExtractionMode = 'plain' | 'pdfjs' | 'pdf-parse' | 'ocr'
 
+export class DocumentExtractionError extends Error {
+  constructor(
+    message: string,
+    public readonly status = 400
+  ) {
+    super(message)
+    this.name = 'DocumentExtractionError'
+  }
+}
+
 export const SUPPORTED_DOCUMENT_TYPES = [
   'application/pdf',
   'text/plain',
@@ -52,7 +62,13 @@ export async function extractTextWithOcrSpace(file: File) {
       data.ErrorMessage ||
       'OCR falhou ao processar o PDF'
 
-    throw new Error(message)
+    if (/maximum page limit of 3/i.test(message)) {
+      throw new DocumentExtractionError(
+        'O PDF parece ser escaneado/imagem e o OCR configurado aceita no maximo 3 paginas. Envie um PDF com texto selecionavel, um arquivo menor de ate 3 paginas ou divida o documento.'
+      )
+    }
+
+    throw new DocumentExtractionError(message)
   }
 
   const text = Array.isArray(data.ParsedResults)
@@ -95,8 +111,8 @@ async function ensurePdfPolyfills() {
 async function extractTextWithPdfjs(file: File) {
   await ensurePdfPolyfills()
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
-  const buffer = Buffer.from(await file.arrayBuffer())
-  const loadingTask = pdfjs.getDocument({ data: buffer, verbosity: pdfjs.VerbosityLevel.ERRORS })
+  const data = new Uint8Array(await file.arrayBuffer())
+  const loadingTask = pdfjs.getDocument({ data, verbosity: pdfjs.VerbosityLevel.ERRORS })
   const doc = await loadingTask.promise
 
   let text = ''
@@ -156,10 +172,10 @@ export async function extractTextFromFile(file: File): Promise<{ content: string
       console.warn('[document-text] pdfjs falhou, tentando pdf-parse:', (error as Error).message)
       try {
         await ensurePdfPolyfills()
-        const pdfParseModule = await import('pdf-parse')
-        const pdfParse = (pdfParseModule as { default?: unknown }).default ?? pdfParseModule
-        const buffer = Buffer.from(await file.arrayBuffer())
-        const parsed = await (pdfParse as (input: Buffer) => Promise<{ text?: string }>)(buffer)
+        const { PDFParse } = await import('pdf-parse')
+        const data = new Uint8Array(await file.arrayBuffer())
+        const parser = new PDFParse({ data })
+        const parsed = await parser.getText().finally(() => parser.destroy())
         content = (parsed?.text ?? '').trim()
         extractionMode = 'pdf-parse'
       } catch (innerError) {
@@ -188,7 +204,13 @@ export async function extractTextFromFile(file: File): Promise<{ content: string
       }
 
       if (!content.trim() && lastError) {
-        throw lastError as Error
+        if (lastError instanceof DocumentExtractionError) {
+          throw lastError
+        }
+
+        throw new DocumentExtractionError(
+          (lastError as Error)?.message || 'Nao foi possivel extrair texto do PDF via OCR.'
+        )
       }
     }
   }
@@ -196,7 +218,7 @@ export async function extractTextFromFile(file: File): Promise<{ content: string
   const clean = content.replace(/\u0000/g, '').trim()
 
   if (!clean) {
-    throw new Error('O arquivo esta vazio ou sem texto legivel.')
+    throw new DocumentExtractionError('O arquivo esta vazio ou sem texto legivel.')
   }
 
   return { content: clean, extractionMode }

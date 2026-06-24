@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { extractTextFromFile, isSupportedDocumentFile } from '@/lib/document-text'
+import { DocumentExtractionError, extractTextFromFile, isSupportedDocumentFile } from '@/lib/document-text'
 
 export async function POST(req: NextRequest) {
   try {
@@ -52,6 +52,14 @@ export async function POST(req: NextRequest) {
       extractionMode,
     })
   } catch (error) {
+    if (error instanceof DocumentExtractionError) {
+      console.warn('[upload] documento nao processado:', error.message)
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status }
+      )
+    }
+
     console.error('[upload]', error)
     return NextResponse.json(
       { error: 'Erro inesperado no upload.' },
